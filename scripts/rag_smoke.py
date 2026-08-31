@@ -28,7 +28,9 @@ def rank_documents(query: str, documents: dict[str, str], limit: int = 5) -> lis
     for path, text in documents.items():
         body_overlap = len(query_grams & _ngrams(text))
         title_overlap = len(query_grams & _ngrams(_title(text)))
-        score = body_overlap + title_overlap * 4
+        # A generic domain word in a title should not outrank a document whose
+        # body matches most of the query.
+        score = body_overlap + title_overlap * 2
         if score:
             scored.append((score, path))
     scored.sort(key=lambda item: (-item[0], item[1]))

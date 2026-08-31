@@ -22,6 +22,16 @@ class RagSmokeTest(unittest.TestCase):
 
         self.assertEqual(ranked[0], "/products/aip.md")
 
+    def test_generic_title_does_not_outrank_exact_body_match(self):
+        documents = {
+            "/history/generic.md": "---\ntitle: 空手の歴史\n---\n空手の近代史を説明する。",
+            "/terms/tool.md": "---\ntitle: 巻藁\n---\n空手の伝統的な鍛錬具には巻藁がある。",
+        }
+
+        ranked = rank_documents("空手の伝統的な鍛錬具にはどんなものがあるか", documents)
+
+        self.assertEqual(ranked[0], "/terms/tool.md")
+
     def test_evaluate_passes_when_expected_evidence_is_retrieved(self):
         entries = [
             {
