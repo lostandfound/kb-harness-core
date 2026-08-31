@@ -106,7 +106,7 @@ types:
   Claim:
     directory: claims
     graph: false
-    extra_fields: [subject, predicate, object, status, confidence]
+    extra_fields: [subject, status, confidence]
 ```
 
 Claim frontmatter の契約は次のとおりである。
@@ -117,7 +117,7 @@ Claim frontmatter の契約は次のとおりである。
 - `confidence`: `A` / `B` / `C` / `D`
 - `sources`: 1件以上。通常エンティティと同じ出典検証を適用する
 
-通常 relation と同じ subject / predicate / object の三つ組を重複登録すると `validate.py` はエラーにする。`export_graph.py` は Claim を通常の `nodes` / `edges` に混ぜず、独立した `claims` 配列へ出力する。値主張や期間は現時点の共通契約に含まれない。
+通常 relation と同じ subject / predicate / object の三つ組を重複登録すると `validate.py` はエラーにする。`export_graph.py` は Claim を通常の `nodes` / `edges` に混ぜず、独立した `claims` 配列へ出力する。値Claimは `property` と `value` を使い、`vocabulary.yml` の `properties` に定義した domain と value_type で検証する。関係形式との混在は禁止する。期間付き主張は現時点の共通契約に含まれない。
 
 ### ③ ルート `apm.yml` に依存を追加し、デプロイする
 

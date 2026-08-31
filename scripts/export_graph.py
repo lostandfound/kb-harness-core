@@ -23,17 +23,23 @@ def export_graph(root: Path) -> dict:
         entity_type = fm.get("type")
         rel = "/" + str(path.relative_to(root))
         if entity_type == "Claim":
-            claims.append({
+            claim = {
                 "path": rel,
                 "subject": fm.get("subject"),
-                "predicate": fm.get("predicate"),
-                "object": fm.get("object"),
                 "status": fm.get("status"),
                 "confidence": fm.get("confidence"),
                 "sources": fm.get("sources") or [],
-            })
+            }
+            if "property" in fm or "value" in fm:
+                claim["property"] = fm.get("property")
+                claim["value"] = fm.get("value")
+            else:
+                claim["predicate"] = fm.get("predicate")
+                claim["object"] = fm.get("object")
+            claims.append(claim)
             referenced.add(fm.get("subject"))
-            referenced.add(fm.get("object"))
+            if fm.get("object"):
+                referenced.add(fm.get("object"))
             continue
         if entity_type == "Index" or entity_type in non_graph_types:
             continue

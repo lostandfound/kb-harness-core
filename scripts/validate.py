@@ -26,9 +26,10 @@ CITATION_RE = re.compile(r"（出典:\s*([^（）]*)）")
 # LLM 生成時に混入しうるラッパータグ（本文は純 Markdown であり HTML タグを含まない前提）
 ARTIFACT_RE = re.compile(r"</?(content|document|file|output|text)>", re.IGNORECASE)
 
-CLAIM_REQUIRED_FIELDS = ("subject", "predicate", "object", "status", "confidence")
+CLAIM_COMMON_FIELDS = ("subject", "status", "confidence")
 CLAIM_STATUSES = {"proposed", "accepted", "disputed", "rejected"}
 CLAIM_CONFIDENCES = {"A", "B", "C", "D"}
+YEAR_EXPRESSION_RE = re.compile(r"^(?:\d{4}[?頃]?|\d{4}年代)$")
 
 def _load_vocabulary(root: Path):
     vocab_path = root / "vocabulary.yml"
@@ -46,6 +47,20 @@ def _load_vocabulary(root: Path):
             predicates[name] = {"description": val, "domain": [], "range": []}
     tags = set(data.get("tags") or [])
     return predicates, tags
+
+def _load_properties(root: Path) -> dict:
+    data = yaml.safe_load((root / "vocabulary.yml").read_text(encoding="utf-8")) or {}
+    properties = {}
+    for name, val in (data.get("properties") or {}).items():
+        if isinstance(val, dict):
+            properties[name] = {
+                "description": val.get("description", ""),
+                "domain": val.get("domain") or [],
+                "value_type": val.get("value_type", "string"),
+            }
+        else:
+            properties[name] = {"description": val, "domain": [], "value_type": "string"}
+    return properties
 
 
 def _load_types(root: Path) -> dict:
@@ -171,6 +186,7 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     if warnings is None:
         warnings = []
     predicates, vocab_tags = _load_vocabulary(root)
+    properties = _load_properties(root)
     types = _load_types(root)
     type_dir_map = {t["directory"]: name for name, t in types.items()}
     references, ref_errors = _load_references(root)
@@ -326,10 +342,20 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                 edges.append((rel, predicate, target))
 
         if entity_type == "Claim":
-            for field in CLAIM_REQUIRED_FIELDS:
-                value = fm.get(field)
-                if not isinstance(value, str) or not value.strip():
+            for field in CLAIM_COMMON_FIELDS:
+                field_value = fm.get(field)
+                if not isinstance(field_value, str) or not field_value.strip():
                     errors.append(f"ERROR {rel}: Claim missing required field '{field}'")
+
+            relation_fields = (fm.get("predicate"), fm.get("object"))
+            value_fields = (fm.get("property"), fm.get("value"))
+            relation_complete = all(isinstance(v, str) and v.strip() for v in relation_fields)
+            value_complete = all(isinstance(v, str) and v.strip() for v in value_fields)
+            if relation_complete == value_complete:
+                errors.append(
+                    f"ERROR {rel}: Claim 形式は predicate/object または property/value の"
+                    "どちらか一方を完全に指定する"
+                )
 
             status = fm.get("status")
             if status is not None and status not in CLAIM_STATUSES:
@@ -340,27 +366,48 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                 errors.append(f"ERROR {rel}: Claim confidence '{claim_confidence}' は A/B/C/D のいずれか")
 
             subject = fm.get("subject")
-            claim_predicate = fm.get("predicate")
-            object_ = fm.get("object")
-            for field, endpoint in (("subject", subject), ("object", object_)):
-                if isinstance(endpoint, str) and endpoint not in all_paths:
-                    errors.append(f"ERROR {rel}: Claim {field} '{endpoint}' does not exist")
+            if isinstance(subject, str) and subject not in all_paths:
+                errors.append(f"ERROR {rel}: Claim subject '{subject}' does not exist")
 
-            predicate_def = predicates.get(claim_predicate)
-            if isinstance(claim_predicate, str) and predicate_def is None:
-                errors.append(f"ERROR {rel}: Claim unknown predicate '{claim_predicate}'")
+            if relation_complete:
+                claim_predicate, object_ = relation_fields
+                if object_ not in all_paths:
+                    errors.append(f"ERROR {rel}: Claim object '{object_}' does not exist")
+                predicate_def = predicates.get(claim_predicate)
+                if predicate_def is None:
+                    errors.append(f"ERROR {rel}: Claim unknown predicate '{claim_predicate}'")
+                if subject in entities and object_ in entities and predicate_def is not None:
+                    subject_type = entities[subject][1].get("type")
+                    object_type = entities[object_][1].get("type")
+                    domain = predicate_def["domain"]
+                    range_ = predicate_def["range"]
+                    if (domain and subject_type not in domain) or (range_ and object_type not in range_):
+                        errors.append(
+                            f"ERROR {rel}: Claim predicate {claim_predicate} の型制約違反"
+                            f"（{subject_type}→{object_type}）"
+                        )
+                    claims.append((rel, subject, claim_predicate, object_))
 
-            if subject in entities and object_ in entities and predicate_def is not None:
-                subject_type = entities[subject][1].get("type")
-                object_type = entities[object_][1].get("type")
-                domain = predicate_def["domain"]
-                range_ = predicate_def["range"]
-                if (domain and subject_type not in domain) or (range_ and object_type not in range_):
-                    errors.append(
-                        f"ERROR {rel}: Claim predicate {claim_predicate} の型制約違反"
-                        f"（{subject_type}→{object_type}）"
-                    )
-                claims.append((rel, subject, claim_predicate, object_))
+            if value_complete:
+                property_name, claim_value = value_fields
+                property_def = properties.get(property_name)
+                if property_def is None:
+                    errors.append(f"ERROR {rel}: Claim unknown property '{property_name}'")
+                elif subject in entities:
+                    subject_type = entities[subject][1].get("type")
+                    domain = property_def["domain"]
+                    if domain and subject_type not in domain:
+                        errors.append(
+                            f"ERROR {rel}: Claim property {property_name} の型制約違反"
+                            f"（{subject_type}）"
+                        )
+                    value_type = property_def["value_type"]
+                    if value_type == "year-expression" and not YEAR_EXPRESSION_RE.match(claim_value):
+                        errors.append(
+                            f"ERROR {rel}: Claim value '{claim_value}' は year-expression の形式でない"
+                        )
+                    elif value_type not in ("string", "year-expression"):
+                        errors.append(f"ERROR {rel}: Claim property の未知の value_type '{value_type}'")
 
         for link in LINK_RE.findall(body or ""):
             if link not in all_paths:
