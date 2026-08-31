@@ -26,6 +26,9 @@ CITATION_RE = re.compile(r"（出典:\s*([^（）]*)）")
 # LLM 生成時に混入しうるラッパータグ（本文は純 Markdown であり HTML タグを含まない前提）
 ARTIFACT_RE = re.compile(r"</?(content|document|file|output|text)>", re.IGNORECASE)
 
+CLAIM_REQUIRED_FIELDS = ("subject", "predicate", "object", "status", "confidence")
+CLAIM_STATUSES = {"proposed", "accepted", "disputed", "rejected"}
+CLAIM_CONFIDENCES = {"A", "B", "C", "D"}
 
 def _load_vocabulary(root: Path):
     vocab_path = root / "vocabulary.yml"
@@ -188,6 +191,7 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     all_paths = set(entities.keys())
     expected_index_links = {f"/{d}/index.md" for d in type_dir_map}
     edges: list[tuple[str, str, str, str]] = []
+    claims: list[tuple[str, str, str, str]] = []
 
     unknown_dirs = {
         rel.split("/")[1] for rel in all_paths
@@ -321,6 +325,43 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                     )
                 edges.append((rel, predicate, target))
 
+        if entity_type == "Claim":
+            for field in CLAIM_REQUIRED_FIELDS:
+                value = fm.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    errors.append(f"ERROR {rel}: Claim missing required field '{field}'")
+
+            status = fm.get("status")
+            if status is not None and status not in CLAIM_STATUSES:
+                errors.append(f"ERROR {rel}: Claim status '{status}' は許容値でない")
+
+            claim_confidence = fm.get("confidence")
+            if claim_confidence is not None and claim_confidence not in CLAIM_CONFIDENCES:
+                errors.append(f"ERROR {rel}: Claim confidence '{claim_confidence}' は A/B/C/D のいずれか")
+
+            subject = fm.get("subject")
+            claim_predicate = fm.get("predicate")
+            object_ = fm.get("object")
+            for field, endpoint in (("subject", subject), ("object", object_)):
+                if isinstance(endpoint, str) and endpoint not in all_paths:
+                    errors.append(f"ERROR {rel}: Claim {field} '{endpoint}' does not exist")
+
+            predicate_def = predicates.get(claim_predicate)
+            if isinstance(claim_predicate, str) and predicate_def is None:
+                errors.append(f"ERROR {rel}: Claim unknown predicate '{claim_predicate}'")
+
+            if subject in entities and object_ in entities and predicate_def is not None:
+                subject_type = entities[subject][1].get("type")
+                object_type = entities[object_][1].get("type")
+                domain = predicate_def["domain"]
+                range_ = predicate_def["range"]
+                if (domain and subject_type not in domain) or (range_ and object_type not in range_):
+                    errors.append(
+                        f"ERROR {rel}: Claim predicate {claim_predicate} の型制約違反"
+                        f"（{subject_type}→{object_type}）"
+                    )
+                claims.append((rel, subject, claim_predicate, object_))
+
         for link in LINK_RE.findall(body or ""):
             if link not in all_paths:
                 errors.append(f"ERROR {rel}: broken link '{link}'")
@@ -358,6 +399,14 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
         if len(owners) > 1:
             for rel in owners:
                 errors.append(f"ERROR {rel}: aliases '{alias}' が複数エンティティ間で重複している")
+
+    edge_keys = {(source, predicate, target) for source, predicate, target in edges}
+    for claim_rel, subject, predicate, object_ in claims:
+        if (subject, predicate, object_) in edge_keys:
+            errors.append(
+                f"ERROR {claim_rel}: relation と Claim の三つ組が重複 "
+                f"({subject}, {predicate}, {object_})"
+            )
 
     seen: dict[tuple[str, str, str], str] = {}
     for source_rel, predicate, target in edges:

@@ -11,6 +11,7 @@ from validate import _load_types, _parse_frontmatter, validate
 def export_graph(root: Path) -> dict:
     nodes = []
     edges = []
+    claims = []
     referenced = set()
     types = _load_types(root)
     non_graph_types = {name for name, t in types.items() if not t["graph"]}
@@ -20,9 +21,22 @@ def export_graph(root: Path) -> dict:
         if err or fm is None:
             continue
         entity_type = fm.get("type")
+        rel = "/" + str(path.relative_to(root))
+        if entity_type == "Claim":
+            claims.append({
+                "path": rel,
+                "subject": fm.get("subject"),
+                "predicate": fm.get("predicate"),
+                "object": fm.get("object"),
+                "status": fm.get("status"),
+                "confidence": fm.get("confidence"),
+                "sources": fm.get("sources") or [],
+            })
+            referenced.add(fm.get("subject"))
+            referenced.add(fm.get("object"))
+            continue
         if entity_type == "Index" or entity_type in non_graph_types:
             continue
-        rel = "/" + str(path.relative_to(root))
         nodes.append({
             "path": rel,
             "type": fm.get("type"),
@@ -48,7 +62,7 @@ def export_graph(root: Path) -> dict:
         if node["path"] not in referenced:
             print(f"WARN isolated: {node['path']}", file=sys.stderr)
 
-    return {"nodes": nodes, "edges": edges}
+    return {"nodes": nodes, "edges": edges, "claims": claims}
 
 
 def main():

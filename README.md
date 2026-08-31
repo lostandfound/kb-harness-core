@@ -97,6 +97,28 @@ tags:
 - `tags` は frontmatter の `tags` に使える語の全量であり、一覧にない語を使うと validate エラーになる。
 - `<content_root>/references.yml` の各エントリは optional key `pending`（非空文字列の待ち理由）を持てる。付与すると未参照 WARNING が個別に出ず件数集計の INFO 1行にまとまり、参照済みなのに `pending` が残っていると WARNING で警告される。
 
+#### Claim 型（任意）
+
+`Claim` という型を `vocabulary.yml` に定義すると、確定した relation と区別して、出典と評価を伴う関係主張を記録できる。
+
+```yaml
+types:
+  Claim:
+    directory: claims
+    graph: false
+    extra_fields: [subject, predicate, object, status, confidence]
+```
+
+Claim frontmatter の契約は次のとおりである。
+
+- `subject` / `object`: 存在するエンティティへのルート相対パス
+- `predicate`: `vocabulary.yml` に定義済みの述語。domain/range 制約を適用する
+- `status`: `proposed` / `accepted` / `disputed` / `rejected`
+- `confidence`: `A` / `B` / `C` / `D`
+- `sources`: 1件以上。通常エンティティと同じ出典検証を適用する
+
+通常 relation と同じ subject / predicate / object の三つ組を重複登録すると `validate.py` はエラーにする。`export_graph.py` は Claim を通常の `nodes` / `edges` に混ぜず、独立した `claims` 配列へ出力する。値主張や期間は現時点の共通契約に含まれない。
+
 ### ③ ルート `apm.yml` に依存を追加し、デプロイする
 
 ```yaml
