@@ -1,0 +1,10 @@
+
+# APM dependencies
+apm_modules/
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Local credentials
+.env

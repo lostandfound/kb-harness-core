@@ -1,0 +1,29 @@
+#!/bin/bash
+# ステージされたファイルに .md / .yml / .py が含まれる場合のみ検証を実行する。
+set -euo pipefail
+
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+
+if ! echo "$staged_files" | grep -qE '\.(md|yml|py)$'; then
+    exit 0
+fi
+
+echo "pre-commit: .md/.yml/.py の変更を検出、検証を実行します..."
+
+if ! python3 scripts/validate.py; then
+    echo "pre-commit: validate.py が失敗しました。コミットを中止します。" >&2
+    exit 1
+fi
+
+if ! python3 -m unittest discover tests -q; then
+  echo "pre-commit: テストが失敗しました。コミットを中止します。" >&2
+  exit 1
+fi
+
+if ! python3 scripts/rag_smoke.py; then
+  echo "pre-commit: rag_smoke.py が失敗しました。コミットを中止します。" >&2
+  exit 1
+fi
+
+echo "pre-commit: 検証成功。"
+exit 0

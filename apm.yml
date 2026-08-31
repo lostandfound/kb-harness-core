@@ -1,0 +1,6 @@
+name: kb-harness-core
+version: 0.2.0
+description: ドメイン非依存の知識ベース運用ハーネス。検証、グラフ、評価、検索回帰、証拠レビューを提供する
+author: lostandfound
+license: MIT
+includes: auto
