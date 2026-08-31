@@ -13,6 +13,8 @@ import yaml
 
 DEFAULT_EVAL_FILE = "evals/rag-eval.yml"
 VERDICTS = ("OK", "曖昧", "回答不能", "誤答誘発")
+# 非 OK の原因分類。by-design（争点ゆえ断定しないのが正しい挙動）だけは拡張候補にしない。
+GAP_KINDS = ("missing-entity", "missing-relation", "missing-text", "retrieval", "by-design")
 
 
 def load_entries(path: Path) -> list[dict]:
@@ -144,6 +146,56 @@ def find_stale(entries: list[dict], stale_days: int = 30) -> list[dict]:
     return stale
 
 
+def find_open_gaps(entries: list[dict]) -> list[dict]:
+    """最新 verdict が OK でない設問のうち、拡張候補になりうるものを返す。
+
+    gap が by-design のものは KB として正しい挙動なので除外する。gap 未設定・
+    語彙外の値は未分類として返し、分類を促す（invalid_gap に元の値を残す）。
+    """
+    open_gaps = []
+    for entry in entries:
+        rec = latest_record(entry)
+        if rec is None:
+            continue
+        if rec["verdict"] == "OK":
+            continue
+        gap = _norm(entry.get("gap"))
+        if gap == "by-design":
+            continue
+        open_gaps.append(
+            {
+                "id": entry.get("id"),
+                "kind": entry.get("kind"),
+                "query": entry.get("query"),
+                "date": rec["date"],
+                "verdict": rec["verdict"],
+                "gap": gap if gap in GAP_KINDS else "",
+                "invalid_gap": "" if gap in GAP_KINDS else gap,
+                "evidence": entry.get("evidence") or [],
+            }
+        )
+    return open_gaps
+
+
+def format_open_lines(open_gaps: list[dict]) -> list[str]:
+    """未解決の欠落を docs/BACKLOG.md へ転記しやすい 1 行形式にする。"""
+    lines = []
+    for g in open_gaps:
+        evidence = " / ".join(str(e) for e in g["evidence"]) or "なし"
+        lines.append(
+            "- [ ] {id} ({kind}): {query} — {verdict}（{date}）。gap: {gap}。evidence: {evidence}".format(
+                id=g["id"],
+                kind=g["kind"],
+                query=g["query"],
+                verdict=g["verdict"],
+                date=g["date"],
+                gap=g["gap"] or "未分類",
+                evidence=evidence,
+            )
+        )
+    return lines
+
+
 def format_report(entries: list[dict], stale_days: int) -> str:
     summary = summarize_latest(entries)
     lines = []
@@ -188,6 +240,12 @@ def format_report(entries: list[dict], stale_days: int) -> str:
         lines.append("退行なし")
 
     lines.append("")
+    open_gaps = find_open_gaps(entries)
+    lines.append(f"未解決の欠落（by-design 除く）: {len(open_gaps)}件")
+    for line in format_open_lines(open_gaps):
+        lines.append(f"  {line}")
+
+    lines.append("")
     stale = find_stale(entries, stale_days=stale_days)
     lines.append(f"未評価の古い設問（{stale_days}日以上）: {len(stale)}件")
     for s in stale:
@@ -201,6 +259,12 @@ def main(argv=None) -> int:
     parser.add_argument("--eval-file", default=DEFAULT_EVAL_FILE, help="評価データセット YAML のパス")
     parser.add_argument("--since", default=None, help="YYYY-MM-DD 以降の history のみを対象に集計する")
     parser.add_argument("--stale-days", type=int, default=30, help="未評価とみなす経過日数の閾値")
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        dest="open_only",
+        help="未解決の欠落のみを BACKLOG 転記用の行形式で出力する（退行検出の exit code は据え置き）",
+    )
     args = parser.parse_args(argv)
 
     path = Path(args.eval_file)
@@ -210,6 +274,11 @@ def main(argv=None) -> int:
 
     entries = load_entries(path)
     entries = filter_history_since(entries, args.since)
+
+    if args.open_only:
+        for line in format_open_lines(find_open_gaps(entries)):
+            print(line)
+        return 1 if find_regressions(entries) else 0
 
     report, has_regression = format_report(entries, args.stale_days)
     print(report)
