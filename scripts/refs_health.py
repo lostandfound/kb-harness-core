@@ -15,6 +15,10 @@ import yaml
 
 DEFAULT_REFS = "okinawa-karate/references.yml"
 
+# lineage の予約値。系統に属さない資料であることを判定済みだと示す。
+# 未記載は「独立源」ではなく「未判定」を意味する。系統外どうしは互いに独立源として数える。
+INDEPENDENT = "系統外"
+
 
 def load_references(path: Path) -> dict:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -69,13 +73,29 @@ def stale_urls(refs: dict, today: date, stale_days: int) -> list[dict]:
     return out
 
 
+def lineage_unjudged(refs: dict) -> list[dict]:
+    """lineage が未記載の文献を返す。独立性を過大評価しうる箇所にあたる。"""
+    return [
+        {"id": ref_id, "author": entry.get("author"), "title": entry.get("title")}
+        for ref_id, entry in refs.items()
+        if not entry.get("lineage")
+    ]
+
+
 def summarize(refs: dict, today: date, stale_days: int) -> dict:
     by_type: dict[str, int] = {}
     for entry in refs.values():
         t = entry.get("type") or "不明"
         by_type[t] = by_type.get(t, 0) + 1
     pend = pending_entries(refs, today)
+    by_lineage: dict[str, int] = {}
+    for entry in refs.values():
+        lin = entry.get("lineage")
+        if lin:
+            by_lineage[lin] = by_lineage.get(lin, 0) + 1
     return {
+        "by_lineage": by_lineage,
+        "lineage_unjudged": len(lineage_unjudged(refs)),
         "total": len(refs),
         "by_type": by_type,
         "pending": len(pend),
@@ -129,6 +149,10 @@ def format_report(refs: dict, today: date, stale_days: int) -> str:
     for t in sorted(s["by_type"]):
         lines.append(f"  {t}: {s['by_type'][t]}")
     lines.append("")
+    lines.append(f"lineage 未判定: {s['lineage_unjudged']}件")
+    for lin in sorted(s["by_lineage"]):
+        lines.append(f"  {lin}: {s['by_lineage'][lin]}")
+    lines.append("")
     lines.append(f"pending: {s['pending']}件（うち since 未記載 {s['pending_without_since']}件）")
     for p in sorted(pending_entries(refs, today), key=lambda x: (x["age_days"] is None, -(x["age_days"] or 0))):
         age = f"{p['age_days']}日" if p["age_days"] is not None else "不明"
@@ -142,6 +166,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--refs", default=DEFAULT_REFS, help="文献レジストリのパス")
     parser.add_argument("--stale-days", type=int, default=180, help="到達確認が古いとみなす経過日数")
+    parser.add_argument("--lineage", action="store_true", help="lineage 未判定の文献のみを出力する")
     parser.add_argument("--pending", action="store_true", help="pending の文献のみを滞留日数順に出力する")
     parser.add_argument(
         "--record-check",
@@ -174,6 +199,11 @@ def main(argv=None) -> int:
         for e in unreachable:
             print(f"UNREACHABLE {e['id']}: {e['url']}")
         return 1 if unreachable else 0
+
+    if args.lineage:
+        for e in lineage_unjudged(refs):
+            print(f"{e['id']}: {e['author']} 『{e['title']}』")
+        return 0
 
     if args.pending:
         for p in sorted(pending_entries(refs, today), key=lambda x: (x["age_days"] is None, -(x["age_days"] or 0))):
