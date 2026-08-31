@@ -11,10 +11,10 @@ description: ハーネス文書群（CLAUDE.md・CONTRIBUTING・スキル・エ�
 - CLAUDE.md（**25 行以内の制約あり**）
 - CONTRIBUTING.md、README.md
 - docs/expansion-loop.md、docs/BACKLOG.md、docs/CONCERNS.md
-- packages/kb-harness/.apm/ 配下の全 SKILL.md・エージェント定義（**KB ハーネス資産の正本**。`.claude/` 配下の同名資産は `apm install` による生成物 — 正本と `.claude/` 側の同一性も確認し、ドリフトがあれば正本を直して `apm install --target claude` で再デプロイする）
+- packages/kb-harness-core/.apm/ 配下の全 SKILL.md・エージェント定義（**KB ハーネス資産の正本**。`.claude/` 配下の同名資産は `apm install` による生成物 — 正本と `.claude/` 側の同一性も確認し、ドリフトがあれば正本を直して `apm install` で再デプロイする）
 - .claude/skills/ .claude/agents/ 配下のうちパッケージ外の資産（プロジェクト固有スキル等）
-- apm.yml・packages/kb-harness/apm.yml（依存宣言・パッケージ内容の一致）
-- scripts/*.py の CLI 実引数（--help 相当）と docstring（正本は `packages/kb-harness/scripts`、リポジトリルート `scripts/` は symlink）
+- apm.yml・packages/kb-harness-core/apm.yml（依存宣言・パッケージ内容の一致）
+- scripts/*.py の CLI 実引数（--help 相当）と docstring（正本は `packages/kb-harness-core/scripts`、リポジトリルート `scripts/` は symlink）
 - `<content_root>/vocabulary.yml`、`references.yml`（content_root は `kb-domain.yml` の `domain.content_root`）のスキーマ実態
 - evals/ 配下、.env.example、.github/workflows/
 
