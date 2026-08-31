@@ -11,6 +11,7 @@ from pathlib import Path
 import yaml
 
 from kb_config import default_content_root
+from ontology_adapter import Ontology, validate_claim
 
 REQUIRED_FIELDS = ["type", "title", "description", "tags", "timestamp"]
 FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
@@ -25,11 +26,6 @@ CITATION_MARKER_RE = re.compile(r"（出典")
 CITATION_RE = re.compile(r"（出典:\s*([^（）]*)）")
 # LLM 生成時に混入しうるラッパータグ（本文は純 Markdown であり HTML タグを含まない前提）
 ARTIFACT_RE = re.compile(r"</?(content|document|file|output|text)>", re.IGNORECASE)
-
-CLAIM_COMMON_FIELDS = ("subject", "status", "confidence")
-CLAIM_STATUSES = {"proposed", "accepted", "disputed", "rejected"}
-CLAIM_CONFIDENCES = {"A", "B", "C", "D"}
-YEAR_EXPRESSION_RE = re.compile(r"^(?:\d{4}[?頃]?|\d{4}年代)$")
 
 def _load_vocabulary(root: Path):
     vocab_path = root / "vocabulary.yml"
@@ -187,6 +183,7 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
         warnings = []
     predicates, vocab_tags = _load_vocabulary(root)
     properties = _load_properties(root)
+    ontology = Ontology.from_mapping({"predicates": predicates, "properties": properties})
     types = _load_types(root)
     type_dir_map = {t["directory"]: name for name, t in types.items()}
     references, ref_errors = _load_references(root)
@@ -207,7 +204,7 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     all_paths = set(entities.keys())
     expected_index_links = {f"/{d}/index.md" for d in type_dir_map}
     edges: list[tuple[str, str, str, str]] = []
-    claims: list[tuple[str, str, str, str]] = []
+    claims: list[tuple[str, dict]] = []
 
     unknown_dirs = {
         rel.split("/")[1] for rel in all_paths
@@ -342,72 +339,7 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                 edges.append((rel, predicate, target))
 
         if entity_type == "Claim":
-            for field in CLAIM_COMMON_FIELDS:
-                field_value = fm.get(field)
-                if not isinstance(field_value, str) or not field_value.strip():
-                    errors.append(f"ERROR {rel}: Claim missing required field '{field}'")
-
-            relation_fields = (fm.get("predicate"), fm.get("object"))
-            value_fields = (fm.get("property"), fm.get("value"))
-            relation_complete = all(isinstance(v, str) and v.strip() for v in relation_fields)
-            value_complete = all(isinstance(v, str) and v.strip() for v in value_fields)
-            if relation_complete == value_complete:
-                errors.append(
-                    f"ERROR {rel}: Claim 形式は predicate/object または property/value の"
-                    "どちらか一方を完全に指定する"
-                )
-
-            status = fm.get("status")
-            if status is not None and status not in CLAIM_STATUSES:
-                errors.append(f"ERROR {rel}: Claim status '{status}' は許容値でない")
-
-            claim_confidence = fm.get("confidence")
-            if claim_confidence is not None and claim_confidence not in CLAIM_CONFIDENCES:
-                errors.append(f"ERROR {rel}: Claim confidence '{claim_confidence}' は A/B/C/D のいずれか")
-
-            subject = fm.get("subject")
-            if isinstance(subject, str) and subject not in all_paths:
-                errors.append(f"ERROR {rel}: Claim subject '{subject}' does not exist")
-
-            if relation_complete:
-                claim_predicate, object_ = relation_fields
-                if object_ not in all_paths:
-                    errors.append(f"ERROR {rel}: Claim object '{object_}' does not exist")
-                predicate_def = predicates.get(claim_predicate)
-                if predicate_def is None:
-                    errors.append(f"ERROR {rel}: Claim unknown predicate '{claim_predicate}'")
-                if subject in entities and object_ in entities and predicate_def is not None:
-                    subject_type = entities[subject][1].get("type")
-                    object_type = entities[object_][1].get("type")
-                    domain = predicate_def["domain"]
-                    range_ = predicate_def["range"]
-                    if (domain and subject_type not in domain) or (range_ and object_type not in range_):
-                        errors.append(
-                            f"ERROR {rel}: Claim predicate {claim_predicate} の型制約違反"
-                            f"（{subject_type}→{object_type}）"
-                        )
-                    claims.append((rel, subject, claim_predicate, object_))
-
-            if value_complete:
-                property_name, claim_value = value_fields
-                property_def = properties.get(property_name)
-                if property_def is None:
-                    errors.append(f"ERROR {rel}: Claim unknown property '{property_name}'")
-                elif subject in entities:
-                    subject_type = entities[subject][1].get("type")
-                    domain = property_def["domain"]
-                    if domain and subject_type not in domain:
-                        errors.append(
-                            f"ERROR {rel}: Claim property {property_name} の型制約違反"
-                            f"（{subject_type}）"
-                        )
-                    value_type = property_def["value_type"]
-                    if value_type == "year-expression" and not YEAR_EXPRESSION_RE.match(claim_value):
-                        errors.append(
-                            f"ERROR {rel}: Claim value '{claim_value}' は year-expression の形式でない"
-                        )
-                    elif value_type not in ("string", "year-expression"):
-                        errors.append(f"ERROR {rel}: Claim property の未知の value_type '{value_type}'")
+            claims.append((rel, fm))
 
         for link in LINK_RE.findall(body or ""):
             if link not in all_paths:
@@ -448,12 +380,9 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                 errors.append(f"ERROR {rel}: aliases '{alias}' が複数エンティティ間で重複している")
 
     edge_keys = {(source, predicate, target) for source, predicate, target in edges}
-    for claim_rel, subject, predicate, object_ in claims:
-        if (subject, predicate, object_) in edge_keys:
-            errors.append(
-                f"ERROR {claim_rel}: relation と Claim の三つ組が重複 "
-                f"({subject}, {predicate}, {object_})"
-            )
+    entity_types = {path: data[1].get("type") for path, data in entities.items()}
+    for claim_rel, claim in claims:
+        errors.extend(validate_claim(claim_rel, claim, entity_types, ontology, edge_keys))
 
     seen: dict[tuple[str, str, str], str] = {}
     for source_rel, predicate, target in edges:

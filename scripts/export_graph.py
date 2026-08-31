@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from kb_config import default_content_root
+from ontology_adapter import export_claim
 from validate import _load_types, _parse_frontmatter, validate
 
 
@@ -23,19 +24,7 @@ def export_graph(root: Path) -> dict:
         entity_type = fm.get("type")
         rel = "/" + str(path.relative_to(root))
         if entity_type == "Claim":
-            claim = {
-                "path": rel,
-                "subject": fm.get("subject"),
-                "status": fm.get("status"),
-                "confidence": fm.get("confidence"),
-                "sources": fm.get("sources") or [],
-            }
-            if "property" in fm or "value" in fm:
-                claim["property"] = fm.get("property")
-                claim["value"] = fm.get("value")
-            else:
-                claim["predicate"] = fm.get("predicate")
-                claim["object"] = fm.get("object")
+            claim = export_claim(rel, fm)
             claims.append(claim)
             referenced.add(fm.get("subject"))
             if fm.get("object"):

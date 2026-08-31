@@ -1,0 +1,2 @@
+PyYAML==6.0.2
+kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@f3d79d5

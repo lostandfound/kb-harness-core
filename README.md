@@ -99,6 +99,11 @@ tags:
 
 #### Claim 型（任意）
 
+Claim のドメイン検証とグラフ用シリアライズは
+[`kb-ontology-core`](https://github.com/lostandfound/kb-ontology-core) が正本である。
+通常は `pip install -r requirements.txt` で依存を導入する。ソースから併用する場合は、
+`kb-harness-core` と `kb-ontology-core` を同じ親ディレクトリへ配置してもよい。
+
 `Claim` という型を `vocabulary.yml` に定義すると、確定した relation と区別して、出典と評価を伴う関係主張を記録できる。
 
 ```yaml

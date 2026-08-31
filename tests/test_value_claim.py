@@ -65,5 +65,21 @@ class ValueClaimTest(unittest.TestCase):
             self.assertEqual(claim["value"], "1950年代")
             self.assertNotIn("object", claim)
 
+    def test_value_claim_rejects_partial_relation_form(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / "kata").mkdir()
+            (root / "claims").mkdir()
+            (root / "vocabulary.yml").write_text(VOCAB, encoding="utf-8")
+            (root / "kata" / "test.md").write_text(KATA, encoding="utf-8")
+            mixed = CLAIM.replace(
+                "property: established-year",
+                "predicate: taught\nproperty: established-year",
+            )
+            (root / "claims" / "test-year.md").write_text(mixed, encoding="utf-8")
+
+            self.assertTrue(any("Claim 形式" in error for error in validate(root)))
+
+
 if __name__ == "__main__":
     unittest.main()
