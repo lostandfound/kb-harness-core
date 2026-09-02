@@ -37,4 +37,4 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 
 ## 検証
 
-修正後: `python3 -m unittest discover tests` と `python3 -m unittest discover packages/kb-harness-core/tests` 全パス + `python3 scripts/validate.py` エラーゼロ + `kb sync --check` 差分なし + `wc -l AGENTS.md` で 25 行以内。`.apm/` 正本を直した場合は `apm install --force` で全 `targets` に再デプロイし、正本と配布先の diff がないことを確認 → コミット（docs: / fix:、pre-commit hook 成功確認）。
+修正後: `python3 -m pytest tests packages/kb-harness-core/tests` 全パス（unittest discover はパッケージ側の pytest 形式テストを取りこぼす） + `python3 scripts/validate.py` エラーゼロ + `kb sync --check` 差分なし + `wc -l AGENTS.md` で 25 行以内。`.apm/` 正本を直した場合は `apm install --force` で全 `targets` に再デプロイし、正本と配布先の diff がないことを確認 → コミット（docs: / fix:、pre-commit hook 成功確認）。
