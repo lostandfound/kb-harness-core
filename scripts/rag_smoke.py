@@ -74,7 +74,8 @@ def main(argv: list[str] | None = None) -> int:
 
     entries = yaml.safe_load(Path(args.eval_file).read_text(encoding="utf-8")) or []
     documents = load_documents(Path(args.root))
-    failures = evaluate(entries, documents, args.limit)
+    # Empty history marks a planned, unevaluated case; it is not a smoke failure.
+    failures = evaluate([entry for entry in entries if entry.get("history")], documents, args.limit)
     if failures:
         for failure in failures:
             print(

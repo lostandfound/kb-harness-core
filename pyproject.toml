@@ -9,7 +9,7 @@ description = "Domain-independent operational harness for Markdown knowledge bas
 requires-python = ">=3.10"
 dependencies = [
   "PyYAML>=6.0,<7",
-  "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.1.0",
+    "kb-ontology-core @ git+ssh://git@github.com/lostandfound/kb-ontology-core.git@v0.2.0",
 ]
 
 [project.scripts]

@@ -11,15 +11,66 @@ from pathlib import Path
 
 import yaml
 
+from kb_config import default_content_root
+
 DEFAULT_EVAL_FILE = "evals/rag-eval.yml"
 VERDICTS = ("OK", "曖昧", "回答不能", "誤答誘発")
 # 非 OK の原因分類。by-design（争点ゆえ断定しないのが正しい挙動）だけは拡張候補にしない。
 GAP_KINDS = ("missing-entity", "missing-relation", "missing-text", "retrieval", "by-design")
+REQUIRED_FIELDS = ("id", "kind", "query", "expected", "evidence", "history")
 
 
 def load_entries(path: Path) -> list[dict]:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or []
-    return [e for e in data if isinstance(e, dict)]
+    return data if isinstance(data, list) else [data]
+
+
+def validate_entries(entries: list[dict], evidence_root: Path | None = None) -> list[str]:
+    """Return deterministic schema diagnostics for an evaluation dataset."""
+    diagnostics: list[str] = []
+    seen: set[str] = set()
+    for index, entry in enumerate(entries):
+        prefix = f"entry[{index}]"
+        if not isinstance(entry, dict):
+            diagnostics.append(f"{prefix}: entry must be a mapping")
+            continue
+        missing = [field for field in REQUIRED_FIELDS if field not in entry]
+        diagnostics.extend(f"{prefix}: missing required field '{field}'" for field in missing)
+        entry_id = _norm(entry.get("id"))
+        if entry_id:
+            if entry_id in seen:
+                diagnostics.append(f"{prefix}: duplicate id '{entry_id}'")
+            seen.add(entry_id)
+        if not _norm(entry.get("query")):
+            diagnostics.append(f"{prefix}: query must be non-empty")
+        if not _norm(entry.get("expected")):
+            diagnostics.append(f"{prefix}: expected must be non-empty")
+        evidence = entry.get("evidence")
+        if not isinstance(evidence, list) or not evidence or any(not _norm(path) for path in evidence):
+            diagnostics.append(f"{prefix}: evidence must be a non-empty list of paths")
+        elif evidence_root is not None:
+            for raw_path in evidence:
+                rel = _norm(raw_path)
+                if not rel.startswith("/") or ".." in Path(rel).parts:
+                    diagnostics.append(f"{prefix}: invalid evidence path '{rel}'")
+                elif not (evidence_root / rel.lstrip("/")).is_file():
+                    diagnostics.append(f"{prefix}: evidence path does not exist '{rel}'")
+        history = entry.get("history")
+        if not isinstance(history, list):
+            diagnostics.append(f"{prefix}: history must be a list")
+        else:
+            for hidx, record in enumerate(history):
+                if not isinstance(record, dict):
+                    diagnostics.append(f"{prefix}.history[{hidx}]: record must be a mapping")
+                    continue
+                if _parse_date(record.get("date")) is None:
+                    diagnostics.append(f"{prefix}.history[{hidx}]: date must be YYYY-MM-DD")
+                if _norm(record.get("verdict")) not in VERDICTS:
+                    diagnostics.append(f"{prefix}.history[{hidx}]: invalid verdict")
+        gap = entry.get("gap")
+        if gap is not None and _norm(gap) not in GAP_KINDS:
+            diagnostics.append(f"{prefix}: invalid gap")
+    return diagnostics
 
 
 def _norm(value) -> str:
@@ -273,6 +324,11 @@ def main(argv=None) -> int:
         return 2
 
     entries = load_entries(path)
+    diagnostics = validate_entries(entries, evidence_root=Path(default_content_root()))
+    if diagnostics:
+        for diagnostic in diagnostics:
+            print(f"INVALID {diagnostic}", file=sys.stderr)
+        return 1
     entries = filter_history_since(entries, args.since)
 
     if args.open_only:

@@ -100,9 +100,9 @@ def apply_changes(changes: Mapping[Path, str]) -> list[Path]:
     rollback guarantees as ``sync``.
     """
     # Import lazily because sync imports ``plan_index`` from this module.
-    from .sync import apply_changes_atomically
+    from .sync import execute_write_plan, plan_write
 
-    return apply_changes_atomically(changes)
+    return execute_write_plan(plan_write(changes))
 
 
 def generate_index(root: Path) -> list[Path]:

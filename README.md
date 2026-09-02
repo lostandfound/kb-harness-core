@@ -1,7 +1,7 @@
 # kb-harness-core
 
 ドメイン非依存の知識ベース（KB）運用ハーネスである。
-特定分野の知識を Markdown エンティティ集合として管理する KB リポジトリに、検証スクリプトと Claude Code 用のスキル・エージェントを提供する。
+特定分野の知識を Markdown エンティティ集合として管理する KB リポジトリに、検証スクリプトと各種エージェント向けのスキル・エージェントを提供する。
 
 このパッケージ自体はどのドメインの知識も持たない。
 ドメイン固有の情報（型・述語・タグの語彙、ディレクトリ構成）は導入先の KB リポジトリ側が `kb-domain.yml` と `vocabulary.yml` に書き、ハーネスはそれを読んで動作する。
@@ -18,14 +18,19 @@ kb validate
 kb sync --check
 ```
 
-CLI の Phase 2 コマンドは次のとおりである。
+CLI のコマンドは次のとおりである。
 
 - `kb validate` — KB 全体を検証する。
-- `kb index build` / `kb index check` — 各型の `index.md` を生成・同期確認する。
-- `kb graph build` / `kb graph check` — ルートの `graph.json` を生成・同期確認する。
-- `kb sync` / `kb sync --check` — index と graph をまとめて生成・同期確認する。
+- `kb index build` / `kb index check` — 各型の `index.md` を生成・同期確認する。build は `--dry-run` に対応する。
+- `kb graph build` / `kb graph check` — ルートの `graph.json` を生成・同期確認する。build は `--dry-run` に対応する。
+- `kb sync` / `kb sync --check` — index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。
 - `kb doctor` — 設定、依存バージョン、生成物の状態を診断する。
 - `kb entity create --from entity.yml` — 検証済み spec から entity と index/graph を原子的に作成する。`--dry-run` は統一 diff のみを返す。
+- `kb claim create|inspect|list|validate|transition` — Claim の spec 作成、照会、検証、明示的な状態遷移を行う。create/transition は一時 KB を全体検証してから反映し、`--dry-run` は変更diffだけを表示する。
+- `kb reference health` — `references.yml` の構造を検査する。
+- `kb reference spec --from search-result.json --output reference.yml` — NDL/CiNii の JSON/YAML 検索結果を登録用 spec に変換する。`--dry-run`、`--force` に対応する。
+- `kb reference create --from reference.yml` — spec を `references.yml` に原子的に追加する。非空 registry は既存のコメント・引用符・順序・空行・改行コードを再シリアライズせず保持し、EOF に新規エントリだけを canonical YAML として追記する。既存ファイルが空でない場合、末尾に改行が無ければ既存の改行規約（純粋な CRLF なら CRLF、それ以外は LF）で 1 つ補う。追記ブロックも同じ規約を使う（既存の末尾空行は保持）。空 mapping（`{}`）は新規エントリ全体に置換する。`--dry-run` に対応する。
+- `kb eval summary` / `kb eval smoke` — 評価資産の集計と検索可能性を確認する。
 
 すべてのコマンドは `--format json` を指定できる。JSON は `ok`、`changed`、`diagnostics` を基本フィールドとし、CI やエージェントから機械的に扱える。終了コードは `0`（成功・同期済み）、`1`（検証不合格・差分あり）、`2`（引数または設定不備）、`3`（予期しない内部エラー）である。`build` は生成予定をメモリ上で作成し、共通の原子的適用処理で書き込む。
 
@@ -35,6 +40,10 @@ CLI の Phase 2 コマンドは次のとおりである。
 - `kb_harness.diagnostics`: 安定したコードを持つ構造化診断
 - `kb_harness.markdown`: YAML frontmatter と本文の解析
 - `kb_harness.entity`: エンティティ雛形生成と clock 注入
+
+`kb_harness.ontology` は `kb-ontology-core` の構造化 `Diagnostic` を安定した
+`code`・`field`・`context` で翻訳する。既存の `validate_claim` は従来どおり
+人向け文字列のリストを返すため、互換入口として利用できる。
 
 エンティティ作成 spec は `type`、`slug`、`title`、`description`、`tags`、`sources`、`sections`（見出しから非空本文への mapping）を必須とし、`aliases`、`relations`、`fields`、`timestamp` を任意とする。型ごとの章構成と extra fields は導入先の `vocabulary.yml` を正本とする。timestamp は CLI、spec、`SOURCE_DATE_EPOCH`、注入 clock の順で解決される。
 
@@ -50,10 +59,10 @@ CLI の Phase 2 コマンドは次のとおりである。
 | スキル | 説明 |
 |---|---|
 | `add-entity` | KB に新規エンティティを追加する確定的手順。「エンティティ追加」「新しいエンティティ（人物・概念等）を追加」で使用。 |
-| `audit-harness` | ハーネス文書群（CLAUDE.md・CONTRIBUTING・スキル・エージェント・スクリプト）の整合性を監査し正本参照型で修正する手順。「整合性チェック」「ハーネス監査」「文書の陳腐化確認」で使用。 |
+| `audit-harness` | ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エージェント・スクリプト）の整合性を監査し正本参照型で修正する手順。「整合性チェック」「ハーネス監査」「文書の陳腐化確認」で使用。 |
 | `find-book` | NDL サーチ（国立国会図書館）API で書籍・資料を検索し、文献レジストリ references.yml に登録する手順。「書籍を探して」「NDLで検索」「書誌を確認して」で使用。 |
 | `find-paper` | CiNii API で論文を検索し references.yml へ登録する確定的手順。「論文を探して」「文献を追加」「CiNii で検索」で使用。 |
-| `ndl-digicolle` | NDL デジタルコレクション（個人送信サービス）で資料本文を確認する半自動手順。ログイン等のブラウザ操作はユーザーが行い、Claude は準備と結果の反映を担当する。 |
+| `ndl-digicolle` | NDL デジタルコレクション（個人送信サービス）で資料本文を確認する半自動手順。ログイン等のブラウザ操作はユーザーが行い、エージェントは準備と結果の反映を担当する。 |
 
 ### エージェント（2件）
 
@@ -76,8 +85,12 @@ CLI の Phase 2 コマンドは次のとおりである。
 | `export_graph.py` | ナレッジグラフ（nodes/edges）を JSON でエクスポートする。 |
 | `eval_summary.py` | `evals/rag-eval.yml` の最新判定を集計し、退行（過去 OK→最新非 OK）を検出する。`--eval-file` / `--since` / `--stale-days` オプションあり。退行検出時は exit 1。 |
 | `rag_smoke.py` | 固定クエリごとに期待根拠が字面検索の上位へ入るかを検査する。回答品質ではなく検索可能性の回帰を検出する。 |
+| `concerns_summary.py` | 懸念台帳の状態を集計し、着手可能な項目を抽出する。 |
 | `cinii_search.py` | CiNii Research API で論文を検索し references.yml 登録用の YAML を出力する。 |
 | `ndl_search.py` | NDL サーチ API で書籍・資料を検索し references.yml 登録用の YAML を出力する。 |
+| `refs_health.py` | 文献の pending、lineage 未判定、URL 到達確認日を点検する。 |
+| `kb_config.py` | `kb-domain.yml` から content root を解決する共有ヘルパー（単体 CLI なし）。 |
+| `ontology_adapter.py` | 語彙を ontology-core 形式へ変換する互換入口（単体 CLI なし）。 |
 | `wiki_fetch.py` | MediaWiki API で Wikipedia 記事の全文を取得する（考証の裏取り用、転載禁止）。 |
 | `browse.py` | 軽量ブラウザ操作 CLI。CDP 経由で可視 Chromium を操作し、抽出テキストのみを出力する。 |
 | `explore_diff.py` | Wikipedia カテゴリと KB 収録の機械的差分を出す（探索ループ経路A用）。未収録候補を出力する。一覧記事・名前空間付きタイトルは既定で除外（`--include-lists` で無効化）、429/503 は自動リトライする。 |
@@ -174,10 +187,10 @@ dependencies:
 ```
 
 ```bash
-apm install --target claude
+apm install --target claude   # または codex
 ```
 
-`apm install` はパッケージの `.apm/skills/` `.apm/agents/` を `.claude/skills/` `.claude/agents/` へ展開する。scripts はこのデプロイ対象に含まれないため、別途コピーまたは symlink を張る。
+`apm install` はパッケージの `.apm/skills/` `.apm/agents/` を選択したランタイムへ展開する。scripts はこのデプロイ対象に含まれないため、別途コピーまたは symlink を張る。
 
 ```bash
 ln -s ../kb-harness-core/scripts scripts
@@ -194,7 +207,7 @@ ln -s ../kb-harness-core/scripts scripts
 
 ## 制約・既知の非対応
 
-- **hooks は APM の管理対象外である。** `apm install` はスキル・エージェントのみをデプロイし、Claude Code の hooks（`.claude/settings.json` の `hooks` フィールド）は生成しない。導入先リポジトリで手書きする必要がある。このリポジトリでは `.md` 編集後に `validate.py` を自動実行する PostToolUse hook を次のように設定している。
+- **hooks は APM の管理対象外である。** `apm install` はスキル・エージェントのみをデプロイし、各ランタイムの hooks（例: `.claude/settings.json` の `hooks` フィールド）は生成しない。導入先リポジトリで手書きする必要がある。このリポジトリでは `.md` 編集後に `validate.py` を自動実行する PostToolUse hook を次のように設定している。
 
 ```json
 {
@@ -216,11 +229,11 @@ ln -s ../kb-harness-core/scripts scripts
 }
 ```
 
-- **エージェント定義の拡張子は正規化される。** `.apm/agents/` 配下では `*.agent.md` という名前で定義するが、`apm install --target claude` でデプロイすると `.claude/agents/` 配下では `.md`（例: `evidence-reviewer.agent.md` → `evidence-reviewer.md`）になる。
+- **エージェント定義の拡張子は正規化される。** `.apm/agents/` 配下では `*.agent.md` という名前で定義するが、`apm install` でデプロイすると対象ランタイムのエージェント形式（Claude は `.md`、Codex は `.toml`）になる。
 - scripts はエンティティ検証・生成のみを対象とし、hooks からの呼び出しも含めて APM のデプロイ機構の外側で手動配線する前提である。
 
 ## 運用
 
-- 資産（スキル・エージェント）を修正するときは `.apm/` 側の正本を編集し、`apm install --target claude` で再デプロイする。`.claude/skills/` `.claude/agents/` の同名ファイルは生成物であり直接編集しない。
-- `apm audit` で、正本（`.apm/`）とデプロイ先（`.claude/`）のドリフト（未反映の差分）を検査できる。
+- 資産（スキル・エージェント）を修正するときは `.apm/` 側の正本を編集し、`apm install --target <runtime>` で再デプロイする。各ランタイム配下の同名ファイルは生成物であり直接編集しない。
+- `apm audit` で、正本（`.apm/`）とデプロイ先のドリフト（未反映の差分）を検査できる。
 - scripts はこのパッケージの `scripts/` が正本である。導入先リポジトリのルート `scripts/` はそこへのコピーまたは symlink として運用する。

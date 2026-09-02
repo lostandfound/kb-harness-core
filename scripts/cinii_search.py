@@ -67,10 +67,28 @@ def search(query: str, count: int, app_id: str) -> list[dict]:
     return results
 
 
+def render_results(results: list[dict], output_format: str = "yaml") -> str:
+    """Render search results; JSON is directly consumable by ``reference spec``."""
+    if output_format == "json":
+        items = [{**r, "type": "journal-article"} for r in results]
+        return json.dumps({"results": items}, ensure_ascii=False, indent=2) + "\n"
+    lines = []
+    for r in results:
+        author = "、".join(r["authors"]) if r["authors"] else "不明"
+        ref_id = slugify(r["authors"][0] if r["authors"] else "ref", r["year"], r["url"])
+        lines.extend([f"# --- references.yml 登録案（ID は要編集: {ref_id}） ---", f"{ref_id}:", "  type: journal-article", f"  author: {author}", f"  title: {r['title']}"])
+        if r["venue"]: lines.append(f"  venue: {r['venue']}")
+        if r["year"]: lines.append(f"  year: {r['year']}")
+        if r["url"]: lines.append(f"  url: {r['url']}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("query")
     ap.add_argument("--count", type=int, default=5)
+    ap.add_argument("--format", choices=("yaml", "json"), default="yaml")
     args = ap.parse_args()
 
     load_dotenv()
@@ -89,21 +107,7 @@ def main() -> int:
         print("該当なし", file=sys.stderr)
         return 1
 
-    for r in results:
-        author = "、".join(r["authors"]) if r["authors"] else "不明"
-        ref_id = slugify(r["authors"][0] if r["authors"] else "ref", r["year"], r["url"])
-        print(f"# --- references.yml 登録案（ID は要編集: {ref_id}） ---")
-        print(f"{ref_id}:")
-        print("  type: journal-article")
-        print(f"  author: {author}")
-        print(f"  title: {r['title']}")
-        if r["venue"]:
-            print(f"  venue: {r['venue']}")
-        if r["year"]:
-            print(f"  year: {r['year']}")
-        if r["url"]:
-            print(f"  url: {r['url']}")
-        print()
+    print(render_results(results, args.format), end="")
     return 0
 
 

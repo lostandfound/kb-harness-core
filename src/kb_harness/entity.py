@@ -244,7 +244,7 @@ def plan_entity_create(project: Any, spec_path: Path, *, timestamp: str | None =
     from .graph import plan_graph
     from .index import plan_index
     from .project import Project
-    from .sync import apply_changes_atomically, plan_sync
+    from .sync import execute_write_plan, plan_sync, plan_write
     from .validation import validate
 
     with tempfile.TemporaryDirectory(prefix="kb-entity-") as tempdir:
@@ -269,7 +269,7 @@ def plan_entity_create(project: Any, spec_path: Path, *, timestamp: str | None =
         stage_entity.write_text(entity_text, encoding="utf-8")
         stage_project = Project(repo_root=stage_root, content_root=stage_content)
         derived = {**plan_index(stage_content), **plan_graph(stage_content, stage_root / "graph.json")}
-        apply_changes_atomically(derived)
+        execute_write_plan(plan_write(derived))
         errors = validate(stage_content)
         if errors:
             raise EntitySpecError("new entity failed full validation: " + "; ".join(errors), code="entity.validation.failed")

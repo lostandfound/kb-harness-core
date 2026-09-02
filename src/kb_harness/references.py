@@ -1,4 +1,7 @@
 """Local reference registry health checks and deterministic creation."""
+from __future__ import annotations
+
+import difflib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -45,12 +48,31 @@ def reference_spec_from_search(source_path: Path) -> dict[str, Any]:
 @dataclass(frozen=True)
 class ReferencePlan:
     changes: dict[Path, str]
+    diff: str = ""
+
+
+def _unified_diff(changes: dict[Path, str]) -> str:
+    chunks: list[str] = []
+    for path, new_text in sorted(changes.items(), key=lambda item: str(item[0])):
+        # ``read_text`` performs universal-newline conversion.  Read/decode the
+        # bytes directly so a preserved CRLF registry does not appear rewritten
+        # in the preview diff.
+        old_text = path.read_bytes().decode("utf-8") if path.is_file() else ""
+        chunks.extend(
+            difflib.unified_diff(
+                old_text.splitlines(keepends=True),
+                new_text.splitlines(keepends=True),
+                fromfile=f"a/{path}",
+                tofile=f"b/{path}",
+            )
+        )
+    return "".join(chunks)
 
 
 def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
     try:
         spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as exc:
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
         raise ReferenceSpecError("reference.spec.read", str(exc)) from exc
     if not isinstance(spec, dict):
         raise ReferenceSpecError("reference.spec.mapping", "reference spec must be a mapping")
@@ -64,15 +86,59 @@ def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
     if spec.get("url") and not str(spec["url"]).startswith(("http://", "https://")):
         raise ReferenceSpecError("reference.url.invalid", f"{ref_id}: URL must start with http:// or https://")
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else {}
-    except (OSError, yaml.YAMLError) as exc:
+        # Preserve the registry's original bytes (including comments, quoting,
+        # ordering, line endings, and blank lines) instead of round-tripping it.
+        existing_text = path.read_bytes().decode("utf-8") if path.exists() else ""
+        data = yaml.safe_load(existing_text) if path.exists() else {}
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
         raise ReferenceSpecError("reference.read", str(exc)) from exc
     if not isinstance(data, dict):
         raise ReferenceSpecError("reference.root.mapping", "references.yml must be a mapping")
     if ref_id in data:
         raise ReferenceSpecError("reference.duplicate.id", f"{ref_id}: duplicate reference id")
-    data[ref_id] = spec
-    return ReferencePlan({path: yaml.safe_dump(dict(sorted(data.items())), allow_unicode=True, sort_keys=False)})
+
+    # Only the new top-level entry is canonicalized.  The sole normalization
+    # permitted on existing content is adding one separator when a non-empty
+    # file has no line terminator; existing trailing blank lines remain
+    # untouched.  A pure CRLF file keeps CRLF for the appended block too.
+    newline = (
+        "\r\n"
+        if "\r\n" in existing_text
+        and "\n" not in existing_text.replace("\r\n", "")
+        else "\n"
+    )
+    entry_text = yaml.safe_dump(
+        {ref_id: spec}, allow_unicode=True, sort_keys=False
+    ).replace("\n", newline)
+    if data == {}:
+        # ``{}`` is a valid empty registry, but appending after its document
+        # would create two adjacent top-level documents.  Replace that empty
+        # representation with the first entry (comments-only/empty documents
+        # still fail the root-mapping check above).
+        new_text = entry_text
+    else:
+        separator = newline if existing_text and not existing_text.endswith(newline) else ""
+        new_text = existing_text + separator + entry_text
+
+    # Validate the actual bytes that will be written, including the new entry.
+    # This guards against producing a plan whose appended block is not a valid
+    # top-level mapping without reparsing/reformatting the existing registry.
+    try:
+        validated = yaml.safe_load(new_text)
+    except yaml.YAMLError as exc:
+        raise ReferenceSpecError("reference.write.invalid", str(exc)) from exc
+    if (
+        not isinstance(validated, dict)
+        or ref_id not in validated
+        or validated[ref_id] != spec
+    ):
+        raise ReferenceSpecError(
+            "reference.write.invalid",
+            f"{ref_id}: appended reference could not be validated",
+        )
+
+    changes = {path: new_text}
+    return ReferencePlan(changes, diff=_unified_diff(changes))
 
 class _Loader(yaml.SafeLoader):
     pass

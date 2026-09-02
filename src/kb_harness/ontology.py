@@ -27,8 +27,55 @@ def _import_core():
 
 
 _core = _import_core()
+Diagnostic = _core.Diagnostic
 Ontology = _core.Ontology
 export_claim = _core.export_claim
+
+
+def _translate_diagnostic(path: str, diagnostic: Diagnostic) -> str:
+    """Translate a core diagnostic without inspecting its human text.
+
+    The harness keeps its historical text return value for compatibility.  All
+    branching is keyed by the core's stable code; ``field`` and ``context``
+    provide the values needed to render the old Japanese/English messages.
+    """
+    context = diagnostic.context or {}
+    field = diagnostic.field
+    value = context.get("value")
+    if diagnostic.code == "claim.field.missing":
+        message = f"Claim missing required field '{field}'"
+    elif diagnostic.code == "claim.sources.empty":
+        message = "Claim sources must contain at least one entry"
+    elif diagnostic.code == "claim.status.unknown":
+        if value is None:
+            message = f"Claim {diagnostic}"
+        else:
+            message = f"Claim status '{value}' は許容値でない"
+    elif diagnostic.code == "claim.confidence.unknown":
+        message = f"Claim confidence '{value}' は A/B/C/D のいずれか"
+    elif diagnostic.code in {"claim.subject.not_found", "claim.object.not_found"}:
+        message = f"Claim {field} '{value}' does not exist"
+    elif diagnostic.code in {"claim.predicate.unknown", "claim.property.unknown"}:
+        message = f"Claim unknown {field} '{value}'"
+    elif diagnostic.code == "claim.form.invalid":
+        message = "Claim 形式は predicate/object または property/value のどちらか一方を完全に指定する"
+    elif diagnostic.code in {
+        "claim.predicate.domain_violation",
+        "claim.predicate.range_violation",
+        "claim.property.domain_violation",
+    }:
+        message = f"Claim {diagnostic}（型制約違反）"
+    elif diagnostic.code == "claim.duplicate_relation":
+        message = "relation と Claim の三つ組が重複"
+    elif diagnostic.code == "claim.value.invalid_format":
+        message = f"Claim {diagnostic}（year-expression の形式でない）"
+    elif diagnostic.code == "claim.value_type.unknown":
+        message = f"Claim {diagnostic}"
+    else:
+        # Future core diagnostics remain visible without making the adapter
+        # depend on their wording.
+        message = f"Claim {diagnostic}"
+    return f"ERROR {path}: {message}"
 
 
 def validate_claim(
@@ -39,27 +86,4 @@ def validate_claim(
     relation_edges: Iterable[tuple[str, str, str]],
 ) -> list[str]:
     """Validate through kb-ontology-core while preserving harness diagnostics."""
-    translated = []
-    for error in _core.validate_claim(claim, entities, ontology, relation_edges):
-        if error.startswith("missing field"):
-            message = f"Claim missing required {error[8:]}"
-        elif error.startswith("unknown status"):
-            message = f"Claim status {error[14:]} は許容値でない"
-        elif error.startswith("unknown confidence"):
-            message = f"Claim confidence {error[18:]} は A/B/C/D のいずれか"
-        elif "must use exactly one complete form" in error:
-            message = "Claim 形式は predicate/object または property/value のどちらか一方を完全に指定する"
-        elif error.startswith("subject ") or error.startswith("object "):
-            message = f"Claim {error}"
-        elif error.startswith("unknown predicate") or error.startswith("unknown property"):
-            message = f"Claim {error}"
-        elif "domain violation" in error or "range violation" in error:
-            message = f"Claim {error}（型制約違反）"
-        elif error == "claim duplicates relation edge":
-            message = "relation と Claim の三つ組が重複"
-        elif "year-expression" in error:
-            message = f"Claim {error}（year-expression の形式でない）"
-        else:
-            message = f"Claim {error}"
-        translated.append(f"ERROR {path}: {message}")
-    return translated
+    return [_translate_diagnostic(path, diagnostic) for diagnostic in _core.validate_claim(claim, entities, ontology, relation_edges)]
