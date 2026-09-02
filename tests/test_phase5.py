@@ -1,7 +1,9 @@
 import json
+import pytest
 from pathlib import Path
 
 from kb_harness.references import reference_health
+from kb_harness.references import reference_spec_from_search, ReferenceSpecError
 from kb_harness.cli import main
 
 
@@ -48,6 +50,22 @@ def test_reference_health_is_deterministic_and_accepts_bibliography(tmp_path):
     path = tmp_path / "references.yml"
     path.write_text("""b:\n  type: book\n  title: B\n  author: Author\n  year: 2020\n""", encoding="utf-8")
     assert reference_health(path)["ok"] is True
+
+def test_reference_spec_from_search_is_deterministic(tmp_path):
+    source = tmp_path / "search.json"
+    source.write_text('{"results":[{"title":"Karate","authors":["Alice"],"year":"1915","url":"https://example.test/x","publisher":"Press"}]}', encoding="utf-8")
+    result = reference_spec_from_search(source)
+    assert result["id"] == "alice-1915"
+    assert result["type"] == "book"
+    assert result["author"] == "Alice"
+    assert result["publisher"] == "Press"
+
+def test_reference_spec_from_search_rejects_empty_or_ambiguous_input(tmp_path):
+    source = tmp_path / "search.yml"
+    source.write_text("results: []\n", encoding="utf-8")
+    with pytest.raises(ReferenceSpecError) as exc:
+        reference_spec_from_search(source)
+    assert exc.value.code == "search.results.empty"
 
 
 def test_eval_commands_report_missing_assets(tmp_path, capsys):

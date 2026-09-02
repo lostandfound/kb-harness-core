@@ -15,7 +15,7 @@ import yaml
 from .doctor import diagnose
 from .entity import EntitySpecError, plan_entity_create
 from .claim import ClaimSpecError, plan_claim_create, plan_claim_transition, inspect_claim, list_claims, validate_claim_file
-from .references import ReferenceSpecError, plan_reference_create, reference_health
+from .references import ReferenceSpecError, plan_reference_create, reference_health, reference_spec_from_search
 from .graph import plan_graph
 from .index import plan_index
 from .project import Project, ProjectError
@@ -85,6 +85,11 @@ def _parser() -> argparse.ArgumentParser:
     rc.add_argument("--from", dest="spec", required=True)
     rc.add_argument("--dry-run", action="store_true")
     _add_common_options(rc)
+    rs = reference_commands.add_parser("spec", help="convert search output to a reference spec")
+    rs.add_argument("--from", dest="source", required=True)
+    rs.add_argument("--output", required=True)
+    rs.add_argument("--start", default=None)
+    rs.add_argument("--format", choices=("text", "json"), default="text")
     evaluation = subcommands.add_parser("eval", help="inspect evaluation assets")
     evaluation_commands = evaluation.add_subparsers(dest="eval_command", required=True)
     for name in ("summary", "smoke"):
@@ -289,6 +294,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             _emit(result, args.format)
             return 0
         apply_changes_atomically(plan.changes)
+        _emit(result, args.format)
+        return 0
+    if args.command == "reference" and args.reference_command == "spec":
+        try:
+            spec = reference_spec_from_search(Path(args.source))
+            output = Path(args.output)
+            output.write_text(yaml.safe_dump(spec, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        except ReferenceSpecError as error:
+            _emit({"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]}, args.format, error=True)
+            return 1
+        result = {"ok": True, "changed": [str(output)], "diagnostics": [], "spec": spec}
         _emit(result, args.format)
         return 0
     if args.command == "reference":

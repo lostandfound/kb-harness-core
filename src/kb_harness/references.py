@@ -3,12 +3,43 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 import yaml
+import re
 
 
 class ReferenceSpecError(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
         self.code = code
+
+
+def reference_spec_from_search(source_path: Path) -> dict[str, Any]:
+    """Convert one JSON/YAML search result into a ``reference create`` spec."""
+    try:
+        raw = yaml.safe_load(source_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise ReferenceSpecError("search.result.read", str(exc)) from exc
+    items = raw.get("results", raw.get("items", raw)) if isinstance(raw, dict) else raw
+    if not isinstance(items, list) or not items:
+        raise ReferenceSpecError("search.results.empty", "search result contains no results")
+    item = items[0]
+    if not isinstance(item, dict):
+        raise ReferenceSpecError("search.result.mapping", "search result must contain mappings")
+    title = str(item.get("title", "")).strip()
+    if not title:
+        raise ReferenceSpecError("search.result.title", "search result requires title")
+    authors = item.get("authors", item.get("author", []))
+    if isinstance(authors, str):
+        authors = [authors]
+    authors = [str(a).strip() for a in authors if str(a).strip()] if isinstance(authors, list) else []
+    year = str(item.get("year", "")).strip()
+    url = str(item.get("url", "")).strip()
+    base = re.sub(r"[^a-z0-9]+", "-", (authors[0] if authors else "ref").lower()).strip("-") or "ref"
+    ref_id = str(item.get("id", "")).strip() or f"{base}-{year}" if year else str(item.get("id", "")).strip() or base
+    result: dict[str, Any] = {"id": ref_id, "type": item.get("type", "journal-article" if item.get("venue") else "book"), "title": title}
+    if authors: result["author"] = "、".join(authors)
+    for key in ("publisher", "venue", "year", "url"):
+        if item.get(key): result[key] = item[key]
+    return result
 
 
 @dataclass(frozen=True)
