@@ -20,6 +20,7 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 - `kb --help` と各サブコマンドの `--help` 実出力 ↔ docs/cli-development-plan.md・packages/kb-harness-core/README.md・各 SKILL.md が語るコマンド名とフラグ
 - `<content_root>/vocabulary.yml`、`references.yml`（content_root は `kb-domain.yml` の `domain.content_root`）のスキーマ実態
 - evals/ 配下、.env.example、.github/workflows/
+- `.git/hooks/pre-commit` ↔ `scripts/hooks/pre-commit`（install-hooks.sh はコピー方式のため、正本更新後に再インストールしないと古い hook が走り続ける。diff で同一性を確認し、違えば `bash scripts/install-hooks.sh`）
 
 ## 監査の 5 観点
 
