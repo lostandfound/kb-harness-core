@@ -1,87 +1,65 @@
 #!/usr/bin/env python3
+"""Compatibility entry point for :mod:`kb_harness.graph`."""
+
+from __future__ import annotations
+
 import argparse
-import json
 import sys
 from pathlib import Path
 
-from kb_config import default_content_root
-from ontology_adapter import export_claim
-from validate import _load_types, _parse_frontmatter, validate
+try:
+    from kb_harness.graph import export_graph as _export_graph, render_graph
+    from kb_harness.project import Project
+    from kb_harness.sync import apply_changes_atomically, plan_graph
+    from kb_harness.validation import validate
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    from kb_harness.graph import export_graph as _export_graph, render_graph
+    from kb_harness.project import Project
+    from kb_harness.sync import apply_changes_atomically, plan_graph
+    from kb_harness.validation import validate
+
+def export_graph(root: Path, warnings: list[str] | None = None) -> dict:
+    """Compatibility API that retains the legacy warning display behavior."""
+    collected: list[str] = []
+    graph = _export_graph(root, warnings=collected)
+    if warnings is not None:
+        warnings.extend(collected)
+    for warning in collected:
+        print(f"WARN {warning}", file=sys.stderr)
+    return graph
 
 
-def export_graph(root: Path) -> dict:
-    nodes = []
-    edges = []
-    claims = []
-    referenced = set()
-    types = _load_types(root)
-    non_graph_types = {name for name, t in types.items() if not t["graph"]}
-
-    for path in sorted(root.rglob("*.md")):
-        fm, _body, err = _parse_frontmatter(path)
-        if err or fm is None:
-            continue
-        entity_type = fm.get("type")
-        rel = "/" + str(path.relative_to(root))
-        if entity_type == "Claim":
-            claim = export_claim(rel, fm)
-            claims.append(claim)
-            referenced.add(fm.get("subject"))
-            if fm.get("object"):
-                referenced.add(fm.get("object"))
-            continue
-        if entity_type == "Index" or entity_type in non_graph_types:
-            continue
-        nodes.append({
-            "path": rel,
-            "type": fm.get("type"),
-            "title": fm.get("title"),
-            "description": fm.get("description"),
-            "tags": fm.get("tags") or [],
-        })
-        for rel_entry in fm.get("relations") or []:
-            if not isinstance(rel_entry, dict):
-                continue
-            predicate = rel_entry.get("predicate")
-            target = rel_entry.get("target")
-            if predicate is None or target is None:
-                continue
-            edge = {"source": rel, "predicate": predicate, "target": target}
-            if rel_entry.get("confidence") == "C":
-                edge["confidence"] = "C"
-            edges.append(edge)
-            referenced.add(rel)
-            referenced.add(target)
-
-    for node in nodes:
-        if node["path"] not in referenced:
-            print(f"WARN isolated: {node['path']}", file=sys.stderr)
-
-    return {"nodes": nodes, "edges": edges, "claims": claims}
+__all__ = ["export_graph"]
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", default=default_content_root())
+    parser.add_argument("--root")
     parser.add_argument("--out")
-    parser.add_argument("--force", action="store_true", help="validate() をスキップする（デバッグ用）")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="validate() をスキップする（デバッグ用）",
+    )
     args = parser.parse_args()
-
-    root = Path(args.root)
-
+    root = Path(args.root) if args.root else Project.discover().content_root
     if not args.force:
         errors = validate(root)
         if errors:
-            for e in errors:
-                print(e, file=sys.stderr)
-            sys.exit(1)
-
-    graph = export_graph(root)
-    output = json.dumps(graph, ensure_ascii=False, indent=2)
+            for error in errors:
+                print(error, file=sys.stderr)
+            raise SystemExit(1)
+    warnings: list[str] = []
+    export_graph(root, warnings=warnings)
+    output = render_graph(root)
     if args.out:
-        Path(args.out).write_text(output + "\n", encoding="utf-8")
+        output_path = Path(args.out).resolve()
+        # Keep the compatibility entry point on the same atomic writer as
+        # ``kb graph build`` and ``kb sync``.
+        apply_changes_atomically(plan_graph(root, output_path))
     else:
-        print(output)
+        print(output, end="")
 
 
 if __name__ == "__main__":

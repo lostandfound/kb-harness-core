@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kb-harness-core"
+version = "0.2.0"
+description = "Domain-independent operational harness for Markdown knowledge bases"
+requires-python = ">=3.10"
+dependencies = [
+  "PyYAML>=6.0,<7",
+  "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.1.0",
+]
+
+[project.scripts]
+kb = "kb_harness.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

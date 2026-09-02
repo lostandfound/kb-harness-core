@@ -6,6 +6,41 @@
 このパッケージ自体はどのドメインの知識も持たない。
 ドメイン固有の情報（型・述語・タグの語彙、ディレクトリ構成）は導入先の KB リポジトリ側が `kb-domain.yml` と `vocabulary.yml` に書き、ハーネスはそれを読んで動作する。
 
+## Python パッケージと CLI
+
+`kb-harness-core` は、既存 scripts と同じドメイン設定を読むインストール可能な Python パッケージである。Phase 2 では読み取り・検証・生成物同期を `kb` CLI に統合した。
+
+```bash
+python3 -m pip install ./packages/kb-harness-core
+kb project show
+kb project show --format json
+kb validate
+kb sync --check
+```
+
+CLI の Phase 2 コマンドは次のとおりである。
+
+- `kb validate` — KB 全体を検証する。
+- `kb index build` / `kb index check` — 各型の `index.md` を生成・同期確認する。
+- `kb graph build` / `kb graph check` — ルートの `graph.json` を生成・同期確認する。
+- `kb sync` / `kb sync --check` — index と graph をまとめて生成・同期確認する。
+- `kb doctor` — 設定、依存バージョン、生成物の状態を診断する。
+- `kb entity create --from entity.yml` — 検証済み spec から entity と index/graph を原子的に作成する。`--dry-run` は統一 diff のみを返す。
+
+すべてのコマンドは `--format json` を指定できる。JSON は `ok`、`changed`、`diagnostics` を基本フィールドとし、CI やエージェントから機械的に扱える。終了コードは `0`（成功・同期済み）、`1`（検証不合格・差分あり）、`2`（引数または設定不備）、`3`（予期しない内部エラー）である。`build` は生成予定をメモリ上で作成し、共通の原子的適用処理で書き込む。
+
+共通 API の責務:
+
+- `kb_harness.project`: `kb-domain.yml` の探索とパス解決
+- `kb_harness.diagnostics`: 安定したコードを持つ構造化診断
+- `kb_harness.markdown`: YAML frontmatter と本文の解析
+- `kb_harness.entity`: エンティティ雛形生成と clock 注入
+
+エンティティ作成 spec は `type`、`slug`、`title`、`description`、`tags`、`sources`、`sections`（見出しから非空本文への mapping）を必須とし、`aliases`、`relations`、`fields`、`timestamp` を任意とする。型ごとの章構成と extra fields は導入先の `vocabulary.yml` を正本とする。timestamp は CLI、spec、`SOURCE_DATE_EPOCH`、注入 clock の順で解決される。
+
+`scripts/new_entity.py` と `scripts/kb_config.py` は共通 API を呼ぶ互換入口であり、`scripts/validate.py` も共通 Markdown 解析を利用する。
+`scripts/generate_index.py` と `scripts/export_graph.py` も同じ計画・適用 API を使う互換入口である。
+
 ## 提供物
 
 ### スキル（5件）

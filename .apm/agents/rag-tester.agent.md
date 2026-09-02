@@ -16,6 +16,18 @@ model: sonnet
 固定クエリセットは `evals/rag-eval.yml`（リポジトリルート直下）に記録されている。各エントリは
 `id` / `kind` / `query` / `expected` / `evidence` / `history`（評価実行ごとの `{date, verdict}` 追記列）を持つ。
 
+非 OK と判定した設問には `gap` を付ける（既存値が実態と合わなくなっていれば更新する）。これは拡張ループが
+候補を拾う際の振り分けに使う。
+
+- `missing-entity` … エンティティ自体が未収録
+- `missing-relation` … エンティティはあるがエッジ・相互参照が欠けている
+- `missing-text` … 本文の記述が不足している
+- `retrieval` … 記述はあるが description / tags / リンクが弱く検索で届かない
+- `by-design` … 争点ゆえ断定しないのが正しい挙動。拡張候補にしない
+
+`by-design` は「KB を直す必要がない」と宣言することであり、誤って付けると欠落が永久に沈む。
+expected が明示的にヘッジを求めている場合に限って使う。
+
 ## 作業手順
 
 1. 評価範囲はサンプリング回帰を基本とする（運用の正本は `docs/expansion-loop.md` 5節）:
