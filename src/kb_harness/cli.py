@@ -11,7 +11,7 @@ from typing import Any
 
 from .doctor import diagnose
 from .entity import EntitySpecError, plan_entity_create
-from .claim import ClaimSpecError, plan_claim_create, plan_claim_transition, inspect_claim
+from .claim import ClaimSpecError, plan_claim_create, plan_claim_transition, inspect_claim, list_claims, validate_claim_file
 from .graph import plan_graph
 from .index import plan_index
 from .project import Project, ProjectError
@@ -68,7 +68,9 @@ def _parser() -> argparse.ArgumentParser:
     cc.add_argument("--from", dest="spec", required=True); cc.add_argument("--dry-run", action="store_true")
     cc.add_argument("--start", default=None); cc.add_argument("--format", choices=("text", "json"), default="text")
     ci = claim_commands.add_parser("inspect"); ci.add_argument("path"); ci.add_argument("--start", default=None); ci.add_argument("--format", choices=("text", "json"), default="text")
-    ct = claim_commands.add_parser("transition"); ct.add_argument("path"); ct.add_argument("--status", required=True); ct.add_argument("--start", default=None); ct.add_argument("--format", choices=("text", "json"), default="text")
+    cl = claim_commands.add_parser("list"); cl.add_argument("--status", default=None); cl.add_argument("--start", default=None); cl.add_argument("--format", choices=("text", "json"), default="text")
+    cv = claim_commands.add_parser("validate"); cv.add_argument("path"); cv.add_argument("--start", default=None); cv.add_argument("--format", choices=("text", "json"), default="text")
+    ct = claim_commands.add_parser("transition"); ct.add_argument("path"); ct.add_argument("--to", dest="status"); ct.add_argument("--status", dest="legacy_status"); ct.add_argument("--start", default=None); ct.add_argument("--format", choices=("text", "json"), default="text")
 
     doctor_parser = subcommands.add_parser("doctor", help="check project health")
     _add_common_options(doctor_parser)
@@ -211,11 +213,21 @@ def _claim_create(project: Project, args: Any) -> int:
     apply_changes_atomically(dict(plan.changes)); _emit(result, args.format); return 0
 
 def _claim_action(project: Project, args: Any) -> int:
+    if args.claim_command == "list":
+        claims = list_claims(project.content_root, args.status)
+        _emit({"ok": True, "claims": claims, "diagnostics": []}, args.format)
+        return 0
     path = Path(args.path)
     if not path.is_absolute(): path = project.content_root / path
     try:
         if args.claim_command == "inspect": _emit(inspect_claim(path), args.format); return 0
-        plan = plan_claim_transition(path, args.status)
+        if args.claim_command == "validate":
+            errors = validate_claim_file(path)
+            _emit({"ok": not errors, "changed": [], "diagnostics": [{"code": "validation.error", "message": e} for e in errors]}, args.format, error=bool(errors))
+            return 1 if errors else 0
+        status = args.status or args.legacy_status
+        if not status: raise ClaimSpecError("transition requires --to", "claim.transition.argument")
+        plan = plan_claim_transition(path, status)
         apply_changes_atomically(dict(plan.changes)); _emit({"ok": True, "changed": _relative_paths(project, dict(plan.changes)), "diagnostics": []}, args.format); return 0
     except ClaimSpecError as error:
         _emit({"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]}, args.format, error=True); return 2

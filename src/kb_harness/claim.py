@@ -56,6 +56,35 @@ def inspect_claim(path: Path) -> dict:
         display_path = "/" + path.name
     return export_claim(display_path, doc.frontmatter)
 
+def list_claims(content_root: Path, status: str | None = None) -> list[dict]:
+    claims = []
+    for path in sorted((content_root / "claims").glob("*.md"), key=lambda p: p.name):
+        doc = parse_document(str(path), path.read_text(encoding="utf-8"))
+        if status is None or doc.frontmatter.get("status") == status:
+            item = {"path": "/claims/" + path.name, **doc.frontmatter}
+            # YAML loaders may produce Path/date-like values; CLI JSON is stable.
+            item = {key: _json_value(value) for key, value in item.items()}
+            claims.append(item)
+    return claims
+
+def _json_value(value):
+    if isinstance(value, Path): return value.as_posix()
+    if isinstance(value, dict): return {str(k): _json_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)): return [_json_value(v) for v in value]
+    if hasattr(value, "isoformat"): return value.isoformat()
+    return value
+
+def validate_claim_file(path: Path) -> list[str]:
+    doc = parse_document(str(path), path.read_text(encoding="utf-8"))
+    fm = doc.frontmatter
+    errors = []
+    if fm.get("type") != "Claim": errors.append("type must be Claim")
+    for field in ("subject", "status", "confidence", "sources"):
+        if not fm.get(field): errors.append("missing field " + field)
+    if fm.get("status") not in {"proposed", "accepted", "disputed", "rejected"}: errors.append("unknown status")
+    if fm.get("confidence") not in {"A", "B", "C", "D"}: errors.append("unknown confidence")
+    return errors
+
 def plan_claim_transition(path: Path, status: str) -> ClaimPlan:
     from kb_ontology_core import plan_transition
     doc = parse_document(str(path), path.read_text(encoding="utf-8"))
