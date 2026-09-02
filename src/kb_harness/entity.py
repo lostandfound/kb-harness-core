@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import difflib
 import os
 import re
 import shutil
-import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -227,59 +225,21 @@ def _frontmatter_and_body(root: Path, spec: Mapping[str, Any], *, timestamp: str
     return path, f"---\n{rendered}\n---\n\n{body}\n"
 
 
-def _unified_diff(changes: Mapping[Path, str], repo_root: Path) -> str:
-    chunks: list[str] = []
-    for path, new_text in sorted(changes.items(), key=lambda item: str(item[0])):
-        old_text = path.read_text(encoding="utf-8") if path.is_file() else ""
-        relative = str(path.resolve().relative_to(repo_root.resolve()))
-        chunks.extend(difflib.unified_diff(old_text.splitlines(keepends=True), new_text.splitlines(keepends=True), fromfile=f"a/{relative}", tofile=f"b/{relative}"))
-    return "".join(chunks)
-
-
 def plan_entity_create(project: Any, spec_path: Path, *, timestamp: str | None = None, clock: Callable[[], datetime] | None = None) -> EntityPlan:
     """Build and fully validate a create plan without touching the real KB."""
     spec = load_entity_spec(spec_path)
     resolved_timestamp = _resolve_timestamp(spec.get("timestamp"), timestamp, clock)
     entity_path, entity_text = _frontmatter_and_body(project.content_root, spec, timestamp=resolved_timestamp)
-    from .graph import plan_graph
-    from .index import plan_index
-    from .project import Project
-    from .sync import execute_write_plan, plan_sync, plan_write
-    from .validation import validate
+    from .staging import stage_and_validate
+    from .sync import unified_diff
 
-    with tempfile.TemporaryDirectory(prefix="kb-entity-") as tempdir:
-        stage_root = (Path(tempdir) / "repo").resolve()
-        stage_content = stage_root / project.content_root.relative_to(project.repo_root)
-        stage_root.mkdir(parents=True, exist_ok=True)
-        # The validator only needs the content tree and a small amount of
-        # repository context.  In particular, do not clone .git, packages,
-        # corpus, or unrelated user files into every create staging area.
-        shutil.copytree(project.content_root, stage_content, symlinks=True)
-        domain_config = project.repo_root / "kb-domain.yml"
-        if domain_config.is_file():
-            shutil.copy2(domain_config, stage_root / "kb-domain.yml")
-        existing_graph = project.repo_root / "graph.json"
-        if existing_graph.is_file():
-            shutil.copy2(existing_graph, stage_root / "graph.json")
-        evals = project.repo_root / "evals"
-        if evals.is_dir():
-            shutil.copytree(evals, stage_root / "evals", symlinks=True)
-        stage_entity = stage_root / entity_path.relative_to(project.repo_root)
-        stage_entity.parent.mkdir(parents=True, exist_ok=True)
-        stage_entity.write_text(entity_text, encoding="utf-8")
-        stage_project = Project(repo_root=stage_root, content_root=stage_content)
-        derived = {**plan_index(stage_content), **plan_graph(stage_content, stage_root / "graph.json")}
-        execute_write_plan(plan_write(derived))
-        errors = validate(stage_content)
-        if errors:
-            raise EntitySpecError("new entity failed full validation: " + "; ".join(errors), code="entity.validation.failed")
-        if plan_sync(stage_project):
-            raise EntitySpecError("new entity leaves index/graph synchronization changes", code="entity.sync.failed")
-        changes: dict[Path, str] = {entity_path: entity_text}
-        for staged_path in derived:
-            real_path = project.repo_root / staged_path.relative_to(stage_root)
-            changes[real_path] = staged_path.read_text(encoding="utf-8")
-    return EntityPlan(changes=changes, diff=_unified_diff(changes, project.repo_root))
+    changes = stage_and_validate(
+        project, entity_path, entity_text, prefix="kb-entity-",
+        validation_error=lambda details: EntitySpecError("new entity failed full validation: " + details, code="entity.validation.failed"),
+        sync_error=lambda: EntitySpecError("new entity leaves index/graph synchronization changes", code="entity.sync.failed"),
+        copytree=shutil.copytree,
+    )
+    return EntityPlan(changes=changes, diff=unified_diff(changes, display_root=project.repo_root))
 
 
 def create_entity(root: Path, type_key: str, slug: str, *, clock: Callable[[], datetime] | None = None) -> Path:

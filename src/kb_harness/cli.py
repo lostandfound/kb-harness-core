@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import difflib
 import json
 import sys
 from collections import Counter
@@ -14,6 +13,7 @@ from typing import Any
 import yaml
 
 from .doctor import diagnose
+from .sync import unified_diff
 from .entity import EntitySpecError, plan_entity_create
 from .claim import ClaimSpecError, plan_claim_create, plan_claim_transition, inspect_claim, list_claims, validate_claim_file
 from .references import (
@@ -82,14 +82,7 @@ def _parser() -> argparse.ArgumentParser:
     create_parser.add_argument("--start", default=None)
     create_parser.add_argument("--format", choices=("text", "json"), default="text")
     claim_parser = subcommands.add_parser("claim", help="manage claims")
-    claim_commands = claim_parser.add_subparsers(dest="claim_command", required=True)
-    cc = claim_commands.add_parser("create", help="create a claim from YAML spec")
-    cc.add_argument("--from", dest="spec", required=True); cc.add_argument("--dry-run", action="store_true")
-    cc.add_argument("--start", default=None); cc.add_argument("--format", choices=("text", "json"), default="text")
-    ci = claim_commands.add_parser("inspect"); ci.add_argument("path"); ci.add_argument("--start", default=None); ci.add_argument("--format", choices=("text", "json"), default="text")
-    cl = claim_commands.add_parser("list"); cl.add_argument("--status", default=None); cl.add_argument("--start", default=None); cl.add_argument("--format", choices=("text", "json"), default="text")
-    cv = claim_commands.add_parser("validate"); cv.add_argument("path"); cv.add_argument("--start", default=None); cv.add_argument("--format", choices=("text", "json"), default="text")
-    ct = claim_commands.add_parser("transition"); ct.add_argument("path"); ct.add_argument("--to", dest="status"); ct.add_argument("--status", dest="legacy_status"); ct.add_argument("--dry-run", action="store_true"); ct.add_argument("--start", default=None); ct.add_argument("--format", choices=("text", "json"), default="text")
+    _configure_claim_commands(claim_parser)
 
     doctor_parser = subcommands.add_parser("doctor", help="check project health")
     _add_common_options(doctor_parser)
@@ -112,6 +105,33 @@ def _parser() -> argparse.ArgumentParser:
     for name in ("summary", "smoke"):
         _add_common_options(evaluation_commands.add_parser(name))
     return parser
+
+
+def _configure_claim_commands(parent: argparse.ArgumentParser) -> None:
+    commands = parent.add_subparsers(dest="claim_command", required=True)
+    create = commands.add_parser("create", help="create a claim from YAML spec")
+    create.add_argument("--from", dest="spec", required=True)
+    create.add_argument("--dry-run", action="store_true")
+    _add_common_options(create)
+
+    inspect = commands.add_parser("inspect")
+    inspect.add_argument("path")
+    _add_common_options(inspect)
+
+    listing = commands.add_parser("list")
+    listing.add_argument("--status", default=None)
+    _add_common_options(listing)
+
+    validate_parser = commands.add_parser("validate")
+    validate_parser.add_argument("path")
+    _add_common_options(validate_parser)
+
+    transition = commands.add_parser("transition")
+    transition.add_argument("path")
+    transition.add_argument("--to", dest="status")
+    transition.add_argument("--status", dest="legacy_status")
+    transition.add_argument("--dry-run", action="store_true")
+    _add_common_options(transition)
 
 
 def _emit(result: Result, output_format: str, *, error: bool = False) -> None:
@@ -314,11 +334,22 @@ def _resolve_reference_output(project: Project, raw_output: str, *, force: bool)
     return output
 
 def _claim_create(project: Project, args: Any) -> int:
-    try: plan = plan_claim_create(project, Path(args.spec))
+    try:
+        plan = plan_claim_create(project, Path(args.spec))
     except ClaimSpecError as error:
-        _emit({"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]}, args.format, error=True); return 2
+        _emit(
+            {"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]},
+            args.format,
+            error=True,
+        )
+        return 2
     except OSError as error:
-        _emit({"ok": False, "changed": [], "diagnostics": [{"code": "claim.path.not_found", "message": str(error)}]}, args.format, error=True); return 2
+        _emit(
+            {"ok": False, "changed": [], "diagnostics": [{"code": "claim.path.not_found", "message": str(error)}]},
+            args.format,
+            error=True,
+        )
+        return 2
     return _run_write_plan(
         project,
         changes=dict(plan.changes),
@@ -333,15 +364,23 @@ def _claim_action(project: Project, args: Any) -> int:
         _emit({"ok": True, "claims": claims, "diagnostics": []}, args.format)
         return 0
     path = Path(args.path)
-    if not path.is_absolute(): path = project.content_root / path
+    if not path.is_absolute():
+        path = project.content_root / path
     try:
-        if args.claim_command == "inspect": _emit(inspect_claim(path), args.format); return 0
+        if args.claim_command == "inspect":
+            _emit(inspect_claim(path), args.format)
+            return 0
         if args.claim_command == "validate":
             errors = validate_claim_file(path, project.content_root)
-            _emit({"ok": not errors, "changed": [], "diagnostics": [{"code": "claim.validation", "message": e} for e in errors]}, args.format, error=bool(errors))
+            _emit(
+                {"ok": not errors, "changed": [], "diagnostics": [{"code": "claim.validation", "message": e} for e in errors]},
+                args.format,
+                error=bool(errors),
+            )
             return 1 if errors else 0
         status = args.status or args.legacy_status
-        if not status: raise ClaimSpecError("transition requires --to", "claim.transition.argument")
+        if not status:
+            raise ClaimSpecError("transition requires --to", "claim.transition.argument")
         plan = plan_claim_transition(path, status, project)
         return _run_write_plan(
             project,
@@ -351,9 +390,19 @@ def _claim_action(project: Project, args: Any) -> int:
             dry_run=args.dry_run,
         )
     except ClaimSpecError as error:
-        _emit({"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]}, args.format, error=True); return 1 if error.code in {"claim.validation", "claim.sync"} else 2
+        _emit(
+            {"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]},
+            args.format,
+            error=True,
+        )
+        return 1 if error.code in {"claim.validation", "claim.sync"} else 2
     except OSError as error:
-        _emit({"ok": False, "changed": [], "diagnostics": [{"code": "claim.path.not_found", "message": str(error)}]}, args.format, error=True); return 2
+        _emit(
+            {"ok": False, "changed": [], "diagnostics": [{"code": "claim.path.not_found", "message": str(error)}]},
+            args.format,
+            error=True,
+        )
+        return 2
 
 
 def _main(argv: Sequence[str] | None = None) -> int:
@@ -404,15 +453,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             spec = reference_spec_from_search(Path(args.source))
             output = _resolve_reference_output(project, args.output, force=args.force)
             output_text = yaml.safe_dump(spec, allow_unicode=True, sort_keys=False)
-            old_text = output.read_text(encoding="utf-8") if output.is_file() else ""
-            diff = "".join(
-                difflib.unified_diff(
-                    old_text.splitlines(keepends=True),
-                    output_text.splitlines(keepends=True),
-                    fromfile=f"a/{output}",
-                    tofile=f"b/{output}",
-                )
-            )
+            diff = unified_diff({output: output_text})
             plan = ReferencePlan({output: output_text}, diff=diff)
         except ReferenceSpecError as error:
             _emit({"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]}, args.format, error=True)

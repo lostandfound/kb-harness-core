@@ -1,18 +1,31 @@
 """Local reference registry health checks and deterministic creation."""
 from __future__ import annotations
 
-import difflib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 import yaml
 import re
 
+from .sync import unified_diff
+
 
 class ReferenceSpecError(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
         self.code = code
+
+
+def _reference_id(item: dict[str, Any], authors: list[str], year: str) -> str:
+    """Choose a stable identifier, honoring an explicit search-result id."""
+    explicit_id = str(item.get("id", "")).strip()
+    if explicit_id:
+        return explicit_id
+    first_author = authors[0] if authors else "ref"
+    base = re.sub(r"[^a-z0-9]+", "-", first_author.lower()).strip("-") or "ref"
+    if year:
+        return f"{base}-{year}"
+    return base
 
 
 def reference_spec_from_search(source_path: Path) -> dict[str, Any]:
@@ -36,8 +49,7 @@ def reference_spec_from_search(source_path: Path) -> dict[str, Any]:
     authors = [str(a).strip() for a in authors if str(a).strip()] if isinstance(authors, list) else []
     year = str(item.get("year", "")).strip()
     url = str(item.get("url", "")).strip()
-    base = re.sub(r"[^a-z0-9]+", "-", (authors[0] if authors else "ref").lower()).strip("-") or "ref"
-    ref_id = str(item.get("id", "")).strip() or f"{base}-{year}" if year else str(item.get("id", "")).strip() or base
+    ref_id = _reference_id(item, authors, year)
     result: dict[str, Any] = {"id": ref_id, "type": item.get("type", "journal-article" if item.get("venue") else "book"), "title": title}
     if authors: result["author"] = "、".join(authors)
     for key in ("publisher", "venue", "year", "url"):
@@ -49,24 +61,6 @@ def reference_spec_from_search(source_path: Path) -> dict[str, Any]:
 class ReferencePlan:
     changes: dict[Path, str]
     diff: str = ""
-
-
-def _unified_diff(changes: dict[Path, str]) -> str:
-    chunks: list[str] = []
-    for path, new_text in sorted(changes.items(), key=lambda item: str(item[0])):
-        # ``read_text`` performs universal-newline conversion.  Read/decode the
-        # bytes directly so a preserved CRLF registry does not appear rewritten
-        # in the preview diff.
-        old_text = path.read_bytes().decode("utf-8") if path.is_file() else ""
-        chunks.extend(
-            difflib.unified_diff(
-                old_text.splitlines(keepends=True),
-                new_text.splitlines(keepends=True),
-                fromfile=f"a/{path}",
-                tofile=f"b/{path}",
-            )
-        )
-    return "".join(chunks)
 
 
 def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
@@ -138,7 +132,7 @@ def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
         )
 
     changes = {path: new_text}
-    return ReferencePlan(changes, diff=_unified_diff(changes))
+    return ReferencePlan(changes, diff=unified_diff(changes))
 
 class _Loader(yaml.SafeLoader):
     pass

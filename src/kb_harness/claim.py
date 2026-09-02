@@ -2,19 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
-import shutil
-import tempfile
 from pathlib import Path
 import re
 import yaml
 
 from .markdown import parse_document
 from .ontology import Ontology, export_claim, validate_claim
-from .graph import plan_graph
-from .index import plan_index
-from .sync import execute_write_plan, plan_sync, plan_write
-from .validation import validate
 
 class ClaimSpecError(ValueError):
     def __init__(self, message: str, code: str = "claim.invalid"):
@@ -58,55 +51,21 @@ def plan_claim_create(project, spec_path: Path) -> ClaimPlan:
 
 def _stage_claim_plan(project, claim_path: Path, claim_text: str) -> ClaimPlan:
     """Validate the complete prospective KB and collect derived artifacts."""
-    with tempfile.TemporaryDirectory(prefix="kb-claim-") as tempdir:
-        # ``tempfile`` may return macOS's ``/var`` spelling while Path.resolve()
-        # (used by the planners below) returns the canonical ``/private/var``
-        # spelling.  Keep the staging root canonical from the outset so that
-        # relative-path conversion cannot escape the temporary repository.
-        stage_root = (Path(tempdir) / "repo").resolve()
-        stage_content = stage_root / project.content_root.relative_to(project.repo_root)
-        shutil.copytree(project.content_root, stage_content, symlinks=True)
-        config = project.repo_root / "kb-domain.yml"
-        if config.is_file():
-            stage_root.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(config, stage_root / "kb-domain.yml")
-        graph = project.repo_root / "graph.json"
-        if graph.is_file(): shutil.copy2(graph, stage_root / "graph.json")
-        evals = project.repo_root / "evals"
-        if evals.is_dir(): shutil.copytree(evals, stage_root / "evals", symlinks=True)
-        # Callers may provide a path through a macOS ``/var`` symlink while the
-        # project itself was resolved to ``/private/var``.  Compare canonical
-        # paths for containment/relativization, while retaining the caller's
-        # lexical path as the eventual write target in the returned plan.
-        try:
-            claim_relative = claim_path.resolve().relative_to(project.content_root.resolve())
-        except ValueError as error:
-            raise ClaimSpecError(
-                f"claim path must be inside content root: {claim_path}",
-                "claim.path.outside_content",
-            ) from error
-        staged_claim = stage_content / claim_relative
-        staged_claim.parent.mkdir(parents=True, exist_ok=True)
-        staged_claim.write_text(claim_text, encoding="utf-8")
-        staged_project = type(project)(repo_root=stage_root, content_root=stage_content)
-        derived = {**plan_index(stage_content), **plan_graph(stage_content, stage_root / "graph.json")}
-        execute_write_plan(plan_write(derived))
-        errors = validate(stage_content)
-        if errors:
-            raise ClaimSpecError("new claim failed full validation: " + "; ".join(errors), "claim.validation")
-        if plan_sync(staged_project):
-            raise ClaimSpecError("new claim leaves derived artifacts out of sync", "claim.sync")
-        changes = {claim_path: claim_text}
-        for staged_path in derived:
-            real = project.repo_root / os.path.relpath(staged_path, stage_root)
-            changes[real] = staged_path.read_text(encoding="utf-8")
-        ordered = tuple(sorted(changes.items(), key=lambda item: str(item[0])))
-        from .sync import unified_diff
-        return ClaimPlan(
-            ordered,
-            claim_path,
-            unified_diff(dict(ordered), display_root=project.repo_root),
-        )
+    from .staging import stage_and_validate
+    from .sync import unified_diff
+
+    changes = stage_and_validate(
+        project, claim_path, claim_text, prefix="kb-claim-",
+        validation_error=lambda details: ClaimSpecError("new claim failed full validation: " + details, "claim.validation"),
+        sync_error=lambda: ClaimSpecError("new claim leaves derived artifacts out of sync", "claim.sync"),
+        containment_error=lambda path: ClaimSpecError(f"claim path must be inside content root: {path}", "claim.path.outside_content"),
+    )
+    ordered = tuple(sorted(changes.items(), key=lambda item: str(item[0])))
+    return ClaimPlan(
+        ordered,
+        claim_path,
+        unified_diff(dict(ordered), display_root=project.repo_root),
+    )
 
 def inspect_claim(path: Path) -> dict:
     doc = parse_document(str(path), path.read_text(encoding="utf-8"))

@@ -3,7 +3,29 @@ from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 from pathlib import Path
 
-from kb_harness.cli import main
+from kb_harness.cli import _parser, main
+
+
+def test_claim_parser_preserves_command_surface_and_options():
+    # Given the public claim subcommands and their documented options
+    parser = _parser()
+
+    # When each command is parsed with its supported arguments
+    parsed = [
+        parser.parse_args(["claim", "create", "--from", "spec.yml", "--dry-run"]),
+        parser.parse_args(["claim", "inspect", "claim.md", "--format", "json"]),
+        parser.parse_args(["claim", "list", "--status", "accepted"]),
+        parser.parse_args(["claim", "validate", "claim.md"]),
+        parser.parse_args(["claim", "transition", "claim.md", "--status", "accepted"]),
+    ]
+
+    # Then argparse exposes the same command names and destination attributes
+    assert [args.claim_command for args in parsed] == [
+        "create", "inspect", "list", "validate", "transition"
+    ]
+    assert parsed[0].spec == "spec.yml" and parsed[0].dry_run is True
+    assert parsed[1].format == "json" and parsed[2].status == "accepted"
+    assert parsed[4].legacy_status == "accepted"
 
 
 def test_claim_inspect_accepts_start_and_emits_json(tmp_path: Path):

@@ -2,7 +2,42 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
-from kb_harness.references import reference_spec_from_search
+from kb_harness.references import _reference_id, reference_spec_from_search
+
+
+def test_reference_id_explicit_id_wins_with_year():
+    # Given a search result with an explicit id and year
+    # When its reference id is calculated
+    # Then the explicit id is preserved
+    assert _reference_id({"id": "catalog-7"}, ["Author"], "1950") == "catalog-7"
+
+
+def test_reference_id_uses_author_and_year_when_id_missing():
+    # Given a result without an id and a named author/year
+    # When its reference id is calculated
+    # Then a deterministic slug-year id is returned
+    assert _reference_id({}, ["John Doe"], "1950") == "john-doe-1950"
+
+
+def test_reference_id_uses_author_slug_without_year():
+    # Given a result without an id or year
+    # When its reference id is calculated
+    # Then the author slug is returned
+    assert _reference_id({}, ["John Doe"], "") == "john-doe"
+
+
+def test_reference_id_fallback_is_stable_without_author():
+    # Given a result without an id or author
+    # When its reference id is calculated
+    # Then the documented fallback id is used
+    assert _reference_id({}, [], "") == "ref"
+
+
+def test_reference_id_ignores_whitespace_id():
+    # Given a result whose id contains only whitespace
+    # When its reference id is calculated
+    # Then the invalid explicit value is rejected in favor of a fallback
+    assert _reference_id({"id": "  "}, [], "2020") == "ref-2020"
 
 ROOT = Path(__file__).resolve().parents[3]
 
