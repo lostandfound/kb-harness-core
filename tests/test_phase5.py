@@ -37,3 +37,32 @@ def test_eval_summary_discovers_repo_evals(tmp_path, capsys):
     assert main(["eval", "summary", "--start", str(tmp_path), "--format", "json"]) == 0
     output = json.loads(capsys.readouterr().out)
     assert output["assets"] == ["evals/rag-eval.yml"]
+
+def test_eval_summary_reports_verdicts_and_gaps(tmp_path, capsys):
+    (tmp_path / "content").mkdir()
+    (tmp_path / "kb-domain.yml").write_text("domain:\n content_root: content\n", encoding="utf-8")
+    (tmp_path / "evals").mkdir()
+    (tmp_path / "evals" / "rag-eval.yml").write_text(
+        "entries:\n"
+        "  - id: ok\n    kind: fact\n    history:\n      - {date: '2026-08-01', verdict: OK}\n"
+        "  - id: open\n    kind: fact\n    gap: missing-text\n    history:\n      - {date: '2026-08-01', verdict: 回答不能}\n",
+        encoding="utf-8",
+    )
+    assert main(["eval", "summary", "--start", str(tmp_path), "--format", "json"]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["summary"]["evaluated"] == 2
+    assert output["summary"]["by_verdict"]["OK"] == 1
+    assert output["open_gaps"][0]["id"] == "open"
+
+def test_eval_summary_accepts_top_level_entry_list(tmp_path, capsys):
+    (tmp_path / "content").mkdir()
+    (tmp_path / "kb-domain.yml").write_text("domain:\n content_root: content\n", encoding="utf-8")
+    (tmp_path / "evals").mkdir()
+    (tmp_path / "evals" / "rag-eval.yml").write_text(
+        "- id: q1\n  kind: fact\n  history:\n    - {date: '2026-09-01', verdict: OK}\n",
+        encoding="utf-8",
+    )
+    assert main(["eval", "summary", "--start", str(tmp_path), "--format", "json"]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["summary"]["evaluated"] == 1
+    assert output["summary"]["by_verdict"] == {"OK": 1}

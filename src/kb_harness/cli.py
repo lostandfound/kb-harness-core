@@ -5,9 +5,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from .doctor import diagnose
 from .entity import EntitySpecError, plan_entity_create
@@ -278,6 +281,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         roots = [project.repo_root / "evals", project.repo_root / "eval", project.repo_root / "evaluations", project.content_root / "eval"]
         assets = sorted(str(p.relative_to(project.repo_root)) for root in roots if root.is_dir() for p in root.rglob("*") if p.is_file())
         result = {"ok": bool(assets), "assets": assets, "diagnostics": [] if assets else [{"code": "eval.assets.missing", "message": "no local evaluation assets found"}]}
+        if assets:
+            path = project.repo_root / assets[0]
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            entries = data if isinstance(data, list) else data.get("entries", [])
+            verdicts = Counter()
+            open_gaps = []
+            for entry in entries:
+                history = entry.get("history", []) if isinstance(entry, dict) else []
+                if not history:
+                    continue
+                latest = history[-1]
+                verdict = str(latest.get("verdict", "")).strip()
+                verdicts[verdict] += 1
+                if verdict != "OK" and entry.get("gap") != "by-design":
+                    open_gaps.append({"id": entry.get("id"), "kind": entry.get("kind"), "gap": entry.get("gap")})
+            result["summary"] = {"evaluated": sum(verdicts.values()), "by_verdict": dict(sorted(verdicts.items()))}
+            result["open_gaps"] = sorted(open_gaps, key=lambda item: str(item.get("id", "")))
         _emit(result, args.format, error=not result["ok"])
         return 0 if result["ok"] else 1
     if args.command == "validate":
