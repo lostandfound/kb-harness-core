@@ -5,6 +5,36 @@ from kb_harness.references import reference_health
 from kb_harness.cli import main
 
 
+def _reference_project(tmp_path):
+    (tmp_path / "content").mkdir()
+    (tmp_path / "kb-domain.yml").write_text("domain:\n  content_root: content\n", encoding="utf-8")
+    (tmp_path / "content" / "references.yml").write_text(
+        "existing:\n  type: web\n  title: Existing\n", encoding="utf-8"
+    )
+    return tmp_path
+
+
+def test_reference_create_from_spec_is_deterministic(tmp_path, capsys):
+    root = _reference_project(tmp_path)
+    spec = root / "ref.yml"
+    spec.write_text("id: new-ref\ntype: book\ntitle: New\nurl: https://example.com\n", encoding="utf-8")
+    assert main(["reference", "create", "--from", str(spec), "--start", str(root), "--format", "json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["changed"] == ["references.yml"]
+    assert "new-ref:" in (root / "content" / "references.yml").read_text(encoding="utf-8")
+
+
+def test_reference_create_rejects_duplicate_and_invalid_spec(tmp_path, capsys):
+    root = _reference_project(tmp_path)
+    spec = root / "ref.yml"
+    spec.write_text("id: existing\ntype: book\ntitle: New\n", encoding="utf-8")
+    assert main(["reference", "create", "--from", str(spec), "--start", str(root), "--format", "json"]) == 2
+    assert json.loads(capsys.readouterr().err)["diagnostics"][0]["code"] == "reference.duplicate.id"
+    spec.write_text("id: bad\ntype: book\ntitle: New\nurl: ftp://example.com\n", encoding="utf-8")
+    assert main(["reference", "create", "--from", str(spec), "--start", str(root), "--format", "json"]) == 2
+    assert json.loads(capsys.readouterr().err)["diagnostics"][0]["code"] == "reference.url.invalid"
+
+
 def test_reference_health_reports_missing_and_duplicate_ids(tmp_path):
     path = tmp_path / "references.yml"
     path.write_text("""a:\n  type: book\n  title: A\na:\n  type: web\n  url: https://example.com\nc:\n  type: book\n""", encoding="utf-8")

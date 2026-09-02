@@ -15,7 +15,7 @@ import yaml
 from .doctor import diagnose
 from .entity import EntitySpecError, plan_entity_create
 from .claim import ClaimSpecError, plan_claim_create, plan_claim_transition, inspect_claim, list_claims, validate_claim_file
-from .references import reference_health
+from .references import ReferenceSpecError, plan_reference_create, reference_health
 from .graph import plan_graph
 from .index import plan_index
 from .project import Project, ProjectError
@@ -81,6 +81,10 @@ def _parser() -> argparse.ArgumentParser:
     reference = subcommands.add_parser("reference", help="manage references")
     reference_commands = reference.add_subparsers(dest="reference_command", required=True)
     _add_common_options(reference_commands.add_parser("health"))
+    rc = reference_commands.add_parser("create", help="create a reference from YAML spec")
+    rc.add_argument("--from", dest="spec", required=True)
+    rc.add_argument("--dry-run", action="store_true")
+    _add_common_options(rc)
     evaluation = subcommands.add_parser("eval", help="inspect evaluation assets")
     evaluation_commands = evaluation.add_subparsers(dest="eval_command", required=True)
     for name in ("summary", "smoke"):
@@ -273,6 +277,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Exception as error:
         return _internal_error(error, args.format)
 
+    if args.command == "reference" and args.reference_command == "create":
+        try:
+            plan = plan_reference_create(project.content_root / "references.yml", Path(args.spec))
+        except ReferenceSpecError as error:
+            _emit({"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]}, args.format, error=True)
+            return 2
+        result = {"ok": True, "changed": ["references.yml"], "diagnostics": [], "diff": ""}
+        if args.dry_run:
+            result["dry_run"] = True
+            _emit(result, args.format)
+            return 0
+        apply_changes_atomically(plan.changes)
+        _emit(result, args.format)
+        return 0
     if args.command == "reference":
         result = reference_health(project.content_root / "references.yml")
         _emit(result, args.format, error=not result["ok"])
