@@ -275,7 +275,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         _emit(result, args.format, error=not result["ok"])
         return 0 if result["ok"] else 1
     if args.command == "eval":
-        roots = [project.repo_root / "eval", project.repo_root / "evaluations", project.content_root / "eval"]
+        roots = [project.repo_root / "evals", project.repo_root / "eval", project.repo_root / "evaluations", project.content_root / "eval"]
         assets = sorted(str(p.relative_to(project.repo_root)) for root in roots if root.is_dir() for p in root.rglob("*") if p.is_file())
         result = {"ok": bool(assets), "assets": assets, "diagnostics": [] if assets else [{"code": "eval.assets.missing", "message": "no local evaluation assets found"}]}
         _emit(result, args.format, error=not result["ok"])

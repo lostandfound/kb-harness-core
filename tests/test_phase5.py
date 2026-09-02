@@ -27,3 +27,13 @@ def test_eval_commands_report_missing_assets(tmp_path, capsys):
     assert main(["eval", "summary", "--start", str(tmp_path), "--format", "json"]) == 1
     output = json.loads(capsys.readouterr().err)
     assert output["diagnostics"][0]["code"] == "eval.assets.missing"
+
+
+def test_eval_summary_discovers_repo_evals(tmp_path, capsys):
+    (tmp_path / "content").mkdir()
+    (tmp_path / "kb-domain.yml").write_text("domain:\n  content_root: content\n", encoding="utf-8")
+    (tmp_path / "evals").mkdir()
+    (tmp_path / "evals" / "rag-eval.yml").write_text("entries: []\n", encoding="utf-8")
+    assert main(["eval", "summary", "--start", str(tmp_path), "--format", "json"]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["assets"] == ["evals/rag-eval.yml"]
