@@ -12,6 +12,7 @@ from typing import Any
 from .doctor import diagnose
 from .entity import EntitySpecError, plan_entity_create
 from .claim import ClaimSpecError, plan_claim_create, plan_claim_transition, inspect_claim, list_claims, validate_claim_file
+from .references import reference_health
 from .graph import plan_graph
 from .index import plan_index
 from .project import Project, ProjectError
@@ -74,6 +75,13 @@ def _parser() -> argparse.ArgumentParser:
 
     doctor_parser = subcommands.add_parser("doctor", help="check project health")
     _add_common_options(doctor_parser)
+    reference = subcommands.add_parser("reference", help="manage references")
+    reference_commands = reference.add_subparsers(dest="reference_command", required=True)
+    _add_common_options(reference_commands.add_parser("health"))
+    evaluation = subcommands.add_parser("eval", help="inspect evaluation assets")
+    evaluation_commands = evaluation.add_subparsers(dest="eval_command", required=True)
+    for name in ("summary", "smoke"):
+        _add_common_options(evaluation_commands.add_parser(name))
     return parser
 
 
@@ -262,6 +270,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Exception as error:
         return _internal_error(error, args.format)
 
+    if args.command == "reference":
+        result = reference_health(project.content_root / "references.yml")
+        _emit(result, args.format, error=not result["ok"])
+        return 0 if result["ok"] else 1
+    if args.command == "eval":
+        roots = [project.repo_root / "eval", project.repo_root / "evaluations", project.content_root / "eval"]
+        assets = sorted(str(p.relative_to(project.repo_root)) for root in roots if root.is_dir() for p in root.rglob("*") if p.is_file())
+        result = {"ok": bool(assets), "assets": assets, "diagnostics": [] if assets else [{"code": "eval.assets.missing", "message": "no local evaluation assets found"}]}
+        _emit(result, args.format, error=not result["ok"])
+        return 0 if result["ok"] else 1
     if args.command == "validate":
         return _validate(project, args.format)
 
