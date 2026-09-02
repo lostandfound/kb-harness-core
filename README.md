@@ -52,7 +52,7 @@ CLI のコマンドは次のとおりである。
 
 ## 提供物
 
-### スキル（5件）
+### スキル
 
 `.apm/skills/` 配下。frontmatter の `description` から採録。
 
