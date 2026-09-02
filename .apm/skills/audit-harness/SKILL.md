@@ -12,9 +12,12 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 - CONTRIBUTING.md、README.md
 - docs/expansion-loop.md、docs/BACKLOG.md、docs/CONCERNS.md
 - packages/kb-harness-core/.apm/ 配下の全 SKILL.md・エージェント定義（**KB ハーネス資産の正本**。`.codex/`・`.claude/` 配下の同名資産は `apm install` による生成物 — 正本と配布先の同一性も確認し、ドリフトがあれば正本を直して対象ランタイムへ再デプロイする）
+- ルート `.apm/`（ドメイン固有エージェントの正本。パッケージ側と同様に配布先との同一性を確認する）
 - `.codex/`・`.claude/`・`.agents/skills/` 配下のうちパッケージ外の資産（プロジェクト固有スキル等）
+- apm.yml の `targets` と実在する配布先ディレクトリの対応（README/CONTRIBUTING が配布先として挙げるランタイムがすべて `targets` に含まれているか。抜けていると `apm install` がそのランタイムを更新せずドリフトが沈む。前例: codex 欠落、2026-09-03）
 - apm.yml・packages/kb-harness-core/apm.yml（依存宣言・パッケージ内容の一致）
 - scripts/*.py の CLI 実引数（--help 相当）と docstring（正本は `packages/kb-harness-core/scripts`、リポジトリルート `scripts/` は symlink）
+- `kb --help` と各サブコマンドの `--help` 実出力 ↔ docs/cli-development-plan.md・packages/kb-harness-core/README.md・各 SKILL.md が語るコマンド名とフラグ
 - `<content_root>/vocabulary.yml`、`references.yml`（content_root は `kb-domain.yml` の `domain.content_root`）のスキーマ実態
 - evals/ 配下、.env.example、.github/workflows/
 
@@ -34,4 +37,4 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 
 ## 検証
 
-修正後: `python3 -m unittest discover tests` 全パス + `python3 scripts/validate.py` エラーゼロ + `wc -l AGENTS.md` で 25 行以内 → コミット（docs: / fix:、pre-commit hook 成功確認）。
+修正後: `python3 -m unittest discover tests` と `python3 -m unittest discover packages/kb-harness-core/tests` 全パス + `python3 scripts/validate.py` エラーゼロ + `kb sync --check` 差分なし + `wc -l AGENTS.md` で 25 行以内。`.apm/` 正本を直した場合は `apm install --force` で全 `targets` に再デプロイし、正本と配布先の diff がないことを確認 → コミット（docs: / fix:、pre-commit hook 成功確認）。
