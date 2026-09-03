@@ -276,6 +276,163 @@ def validate_okf_bundle(root: Path) -> list[str]:
     return _validate_okf_documents(documents)
 
 
+def _audit_diag(code: str, path: str, message: str) -> dict[str, str]:
+    return {"code": code, "path": path, "message": message}
+
+
+def _mapping(value: Any) -> bool:
+    return isinstance(value, Mapping)
+
+
+def _valid_actor(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    if value.startswith(("human:", "process:")):
+        return bool(value.split(":", 1)[1].strip())
+    if "/" in value:
+        producer, version = value.split("/", 1)
+        return bool(producer.strip() and version.strip())
+    return False
+
+
+def _valid_offset(value: Any) -> bool:
+    return (isinstance(value, str) and _ISO_OFFSET.fullmatch(value) is not None) or (isinstance(value, datetime) and value.tzinfo is not None and value.utcoffset() is not None)
+
+
+def _audit_advisories(documents: Mapping[str, str]) -> list[dict[str, str]]:
+    warnings: list[dict[str, str]] = []
+    parsed: dict[str, tuple[dict[str, Any], str]] = {}
+    for path, text in sorted(documents.items()):
+        if Path(path).name != "log.md":
+            continue
+        headings = [(index, match.group(1)) for index, line in enumerate(text.splitlines()) if (match := _DATE_HEADING.match(line))]
+        dates = [item[1] for item in headings]
+        if dates != sorted(dates, reverse=True):
+            warnings.append(_audit_diag("okf.log.date_order", path, "log date sections must be descending"))
+        lines = text.splitlines()
+        for index, (start, _date) in enumerate(headings):
+            end = headings[index + 1][0] if index + 1 < len(headings) else len(lines)
+            entries = [line.strip() for line in lines[start + 1:end] if line.strip()]
+            if entries and not all(line.startswith(("- ", "* ", "+ ")) for line in entries):
+                warnings.append(_audit_diag("okf.log.entries_list", path, "each log date section must contain a list"))
+    for path in sorted(documents):
+        if Path(path).name in {"index.md", "log.md"}:
+            continue
+        try:
+            values, body = _raw_frontmatter(documents[path], path)
+        except OkfExportError:
+            continue
+        if values is None:
+            continue
+        parsed[path] = (values, body)
+    for path, (values, body) in parsed.items():
+        generated = values.get("generated")
+        if generated is not None:
+            if not _mapping(generated) or not _valid_actor(generated.get("by")):
+                warnings.append(_audit_diag("okf.generated.by_required", path, "generated requires a valid by actor"))
+            if "at" in generated and not _valid_offset(generated.get("at")):
+                warnings.append(_audit_diag("okf.generated.at_invalid", path, "generated.at requires ISO 8601 offset"))
+        verified = values.get("verified")
+        verified_items = verified if isinstance(verified, list) else [verified] if verified is not None else []
+        if verified is not None and not isinstance(verified, (Mapping, list)):
+            warnings.append(_audit_diag("okf.verified.mapping_required", path, "verified must be a mapping or list"))
+        for item in verified_items:
+            if not isinstance(item, Mapping) or not _valid_actor(item.get("by")) or not _valid_offset(item.get("at")):
+                warnings.append(_audit_diag("okf.verified.by_at_required", path, "each verified entry requires valid by and at"))
+        sources = values.get("sources")
+        if isinstance(sources, list):
+            shared_window = values.get("usage_window")
+            for index, source in enumerate(sources):
+                if not isinstance(source, Mapping):
+                    continue
+                if "author" in source and not _valid_actor(source.get("author")):
+                    warnings.append(_audit_diag("okf.source.author_invalid", path, f"sources[{index}].author has invalid actor"))
+                if "last_modified" in source and not _valid_offset(source.get("last_modified")):
+                    warnings.append(_audit_diag("okf.source.last_modified_invalid", path, f"sources[{index}].last_modified requires ISO 8601 offset"))
+                count = source.get("usage_count")
+                if count is not None and (not isinstance(count, int) or isinstance(count, bool) or count < 0):
+                    warnings.append(_audit_diag("okf.usage_count.invalid", path, f"sources[{index}].usage_count must be non-negative integer"))
+                window = source.get("usage_window", shared_window)
+                if not isinstance(window, Mapping):
+                    if count is not None:
+                        warnings.append(_audit_diag("okf.usage_window.required", path, f"sources[{index}].usage_count requires usage_window"))
+                    continue
+                start, end = window.get("from"), window.get("to")
+                valid_start = _valid_offset(start)
+                valid_end = _valid_offset(end)
+                if not valid_start or not valid_end:
+                    warnings.append(_audit_diag("okf.usage_window.invalid", path, "usage_window from/to require ISO 8601 offsets"))
+                elif (datetime.fromisoformat(start.replace("Z", "+00:00")) if isinstance(start, str) else start) > (datetime.fromisoformat(end.replace("Z", "+00:00")) if isinstance(end, str) else end):
+                    warnings.append(_audit_diag("okf.usage_window.order", path, "usage_window from must not be after to"))
+        refs = set(re.findall(r"^(?!\[\^[a-zA-Z0-9_-]+\]:).*?\[\^([a-zA-Z0-9_-]+)\]", body, re.MULTILINE))
+        defs = set(re.findall(r"^\[\^([a-zA-Z0-9_-]+)\]:", body, re.MULTILINE))
+        local_source_ids = {str(s.get("id")) for s in values.get("sources", []) if isinstance(s, Mapping) and s.get("id")} if isinstance(values.get("sources"), list) else set()
+        for ref in sorted(refs | defs):
+            if ref in refs and ref in local_source_ids and ref not in defs:
+                warnings.append(_audit_diag("okf.footnote.definition_missing", path, f"source citation {ref} has no footnote definition"))
+        if values.get("type") == "Attested Computation":
+            computation = values.get("computation")
+            section = re.search(r"^# Computation\s*$([\s\S]*?)(?=^# |\Z)", body, re.MULTILINE)
+            inline_count = len(re.findall(r"^```[^\n]*$", section.group(1), re.MULTILINE)) // 2 if section else 0
+            has_inline = inline_count == 1
+            if not values.get("runtime"):
+                warnings.append(_audit_diag("okf.computation.runtime_required", path, "Attested Computation requires runtime"))
+            has_path = isinstance(computation, str) and bool(computation.strip())
+            if inline_count != 1 and not has_path or inline_count == 1 and has_path:
+                warnings.append(_audit_diag("okf.computation.source_xor", path, "inline computation and computation path are mutually exclusive"))
+            if inline_count not in (0, 1):
+                warnings.append(_audit_diag("okf.computation.inline_block_count", path, "# Computation must contain exactly one fenced code block"))
+            if "parameters" in values and not isinstance(values.get("parameters"), list):
+                warnings.append(_audit_diag("okf.computation.parameters_list", path, "parameters must be a list"))
+            for key in ("executor", "attester"):
+                if isinstance(values.get(key), Mapping) and not values[key].get("resource"):
+                    warnings.append(_audit_diag("okf.computation.resource_required", path, f"{key} requires resource"))
+    return warnings
+
+
+def audit_okf_bundle(root: Path) -> dict[str, Any]:
+    """Return deterministic hard diagnostics and advisory warnings for an OKF bundle."""
+    root = Path(root)
+    if not root.is_dir():
+        return {"diagnostics": [_audit_diag("okf.bundle.not_directory", str(root), "bundle directory does not exist")], "warnings": []}
+    documents: dict[str, str] = {}
+    for path in sorted(root.rglob("*.md")):
+        if path.is_file():
+            rel = path.relative_to(root).as_posix()
+            try:
+                documents[rel] = path.read_text(encoding="utf-8")
+            except OSError as error:
+                return {"diagnostics": [_audit_diag("okf.document.read_error", rel, str(error))], "warnings": []}
+    hard: list[dict[str, str]] = []
+    for error in _validate_okf_documents(documents):
+        path, _, message = error.partition(": ")
+        code = "okf.conformance.error"
+        if "concept document requires frontmatter" in message:
+            code, message = "okf.concept.frontmatter_required", "concept document requires frontmatter"
+        elif "type is required" in message:
+            code = "okf.type.required"
+        elif "sources must be a list" in message:
+            code = "okf.sources.not_list"
+        elif "non-empty resource" in message:
+            code = "okf.source.resource_required"
+        elif "status must be" in message:
+            code = "okf.status.invalid"
+        elif "legacy_timestamp" in message:
+            code = "okf.legacy_timestamp"
+        elif "ISO 8601" in message:
+            code = "okf.timestamp.invalid"
+        elif "root index frontmatter" in message:
+            code = "okf.root_index.invalid"
+        elif "reserved index/log" in message:
+            code = "okf.reserved_frontmatter"
+        elif "invalid log date" in message:
+            code = "okf.log.date_invalid"
+        hard.append(_audit_diag(code, path, message))
+    hard.sort(key=lambda item: (item["path"], item["code"], item["message"]))
+    warnings = sorted(_audit_advisories(documents), key=lambda item: (item["path"], item["code"], item["message"]))
+    return {"diagnostics": hard, "warnings": warnings}
+
+
 def plan_okf_export(project: Any, output_root: Path) -> Mapping[Path, str]:
     """Plan a deterministic, write-free OKF v0.2 export bundle."""
     content_root = Path(project.content_root)

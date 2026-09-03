@@ -63,6 +63,7 @@ CLI のコマンドは次のとおりである。
 |---|---|
 | `add-entity` | KB に新規エンティティを追加する確定的手順。「エンティティ追加」「新しいエンティティ（人物・概念等）を追加」で使用。 |
 | `audit-harness` | ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エージェント・スクリプト）の整合性を監査し正本参照型で修正する手順。「整合性チェック」「ハーネス監査」「文書の陳腐化確認」で使用。 |
+| `check-okf` | OKF v0.2 bundle適合性・strict export・決定性確認。「OKFチェック」「OKF準拠確認」「bundle validate」などで使用。 |
 | `find-book` | NDL サーチ（国立国会図書館）API で書籍・資料を検索し、文献レジストリ references.yml に登録する手順。「書籍を探して」「NDLで検索」「書誌を確認して」で使用。 |
 | `find-paper` | CiNii API で論文を検索し references.yml へ登録する確定的手順。「論文を探して」「文献を追加」「CiNii で検索」で使用。 |
 | `review-doc` | README・CONTRIBUTING・方針書など説明文書 1 件を、役割適合・混在・外出し・内部語彙の観点でレビューする手順。 |

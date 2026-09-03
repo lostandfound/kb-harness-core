@@ -341,6 +341,16 @@ def test_installed_wheels_run_every_cli_family_from_isolated_directory(tmp_path)
     assert json.loads(result.stdout)
     assert "okf_version: '0.2'" in (okf_output / "index.md").read_text(encoding="utf-8")
     assert (okf_output / "notes" / "sample.md").is_file()
+    # The installed console script must expose the OKF validator command.
+    cli_validation = subprocess.run(
+        [*cli, "okf", "validate", str(okf_output), "--format", "json"],
+        cwd=isolated,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert cli_validation.returncode == 0, (cli_validation.stdout, cli_validation.stderr)
+    assert json.loads(cli_validation.stdout)["ok"] is True
     validation = subprocess.run(
         [sys.executable, "-c",
          "from pathlib import Path; from kb_harness.okf import validate_okf_bundle; "

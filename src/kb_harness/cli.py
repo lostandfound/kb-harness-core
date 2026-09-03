@@ -25,7 +25,7 @@ from .references import (
 )
 from .graph import plan_graph
 from .index import plan_index
-from .okf import OkfExportError, plan_okf_export
+from .okf import OkfExportError, audit_okf_bundle, plan_okf_export
 from .project import Project, ProjectError
 from .sync import (
     apply_changes_atomically,
@@ -54,6 +54,13 @@ def _parser() -> argparse.ArgumentParser:
 
     validate_parser = subcommands.add_parser("validate", help="validate the KB")
     _add_common_options(validate_parser)
+
+    okf = subcommands.add_parser("okf", help="inspect OKF bundles")
+    okf_commands = okf.add_subparsers(dest="okf_command", required=True)
+    okf_validate = okf_commands.add_parser("validate", help="validate an OKF v0.2 bundle")
+    okf_validate.add_argument("path")
+    okf_validate.add_argument("--strict", action="store_true")
+    okf_validate.add_argument("--format", choices=("text", "json"), default="text")
 
     export_parser = subcommands.add_parser("export", help="export KB artifacts")
     export_commands = export_parser.add_subparsers(dest="export_command", required=True)
@@ -466,8 +473,35 @@ def _okf_export(project: Project, args: Any) -> int:
     return 0
 
 
+def _okf_validate(args: Any) -> int:
+    try:
+        root = Path(args.path).expanduser()
+        if not root.is_absolute():
+            root = Path.cwd() / root
+        result = audit_okf_bundle(root)
+    except Exception as error:
+        return _internal_error(error, args.format)
+    diagnostics = result["diagnostics"]
+    warnings = result["warnings"]
+    payload = {"ok": not diagnostics and (not args.strict or not warnings), "diagnostics": diagnostics, "warnings": warnings, "strict": args.strict}
+    if args.format == "json":
+        _emit(payload, args.format, error=not payload["ok"])
+    else:
+        if not diagnostics and not warnings:
+            print("OK")
+        for item in diagnostics:
+            print(f"{item['path']}: {item['code']}: {item['message']}", file=sys.stderr)
+        for item in warnings:
+            print(f"{item['path']}: {item['code']}: {item['message']}", file=sys.stderr)
+    if any(item["code"] == "okf.bundle.not_directory" for item in diagnostics):
+        return 2
+    return 1 if diagnostics or (args.strict and warnings) else 0
+
+
 def _main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.command == "okf" and args.okf_command == "validate":
+        return _okf_validate(args)
     if args.command == "project" and args.project_command == "show":
         try:
             project = Project.discover(args.start)

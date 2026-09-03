@@ -11,6 +11,7 @@ from kb_harness.okf import (
     render_okf_concept,
     render_okf_index,
     validate_okf_bundle,
+    audit_okf_bundle,
 )
 from kb_harness.project import Project
 
@@ -27,6 +28,73 @@ def _project(tmp_path: Path, files: dict[str, str], registry: object = None) -> 
             yaml.safe_dump(registry, allow_unicode=True, sort_keys=True), encoding="utf-8"
         )
     return Project(repo_root=tmp_path, content_root=content)
+
+
+def test_audit_okf_bundle_returns_stable_hard_diagnostic(tmp_path):
+    # Given a bundle containing a concept without frontmatter.
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "thing.md").write_text("body\n", encoding="utf-8")
+    # When the deterministic audit runs.
+    result = audit_okf_bundle(bundle)
+    # Then hard diagnostics use stable code/path/message mappings.
+    assert result["diagnostics"] == [{"code": "okf.concept.frontmatter_required", "path": "thing.md", "message": "concept document requires frontmatter"}]
+    assert result["warnings"] == []
+
+
+def test_audit_attested_computation_uses_top_level_runtime_and_path(tmp_path):
+    # Given an Attested Computation with the v0.2 top-level fields.
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "computation.md").write_text("---\ntype: Attested Computation\nruntime: python3\ncomputation: scripts/run.py\n---\n", encoding="utf-8")
+    # When the deterministic audit runs.
+    result = audit_okf_bundle(bundle)
+    # Then optional parameters do not produce a warning.
+    assert result["warnings"] == []
+
+
+def test_audit_usage_checks_source_entries_and_shared_window(tmp_path):
+    # Given usage metadata on a source and a shared valid window.
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "note.md").write_text("---\ntype: Note\nusage_count: -1\nsources:\n - id: s1\n   resource: https://example.test\n   usage_count: 2\nusage_window:\n  from: '2024-01-01T00:00:00+00:00'\n  to: '2024-01-02T00:00:00+00:00'\n---\n", encoding="utf-8")
+    # When the audit runs, top-level usage_count is ignored.
+    result = audit_okf_bundle(bundle)
+    # Then only source-level metadata is diagnosed.
+    assert result["warnings"] == []
+
+
+def test_audit_generated_allows_missing_optional_at(tmp_path):
+    # Given generated provenance with the required by only.
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "note.md").write_text("---\ntype: Note\ngenerated:\n  by: process:builder\n---\n", encoding="utf-8")
+    # When auditing the bundle.
+    result = audit_okf_bundle(bundle)
+    # Then missing optional at is accepted.
+    assert result["warnings"] == []
+
+
+def test_audit_ignores_unrelated_footnote_when_sources_exist(tmp_path):
+    # Given a normal note footnote unrelated to source attribution.
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "note.md").write_text("---\ntype: Note\nsources:\n - id: source-1\n   resource: https://example.test\n---\n本文[^shoko]\n\n[^shoko]: 注釈\n", encoding="utf-8")
+    # When auditing the bundle.
+    result = audit_okf_bundle(bundle)
+    # Then the ordinary footnote is not guessed to be source attribution.
+    assert result["warnings"] == []
+
+
+def test_audit_source_citation_requires_definition(tmp_path):
+    # Given a citation whose label matches a local source ID but has no definition.
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "note.md").write_text("---\ntype: Note\nsources:\n - id: source-1\n   resource: https://example.test\n---\n本文[^source-1]\n", encoding="utf-8")
+    # When auditing the bundle.
+    result = audit_okf_bundle(bundle)
+    # Then only the matching source citation is diagnosed.
+    assert result["warnings"][0]["code"] == "okf.footnote.definition_missing"
 
 
 def test_plan_okf_export_walks_and_renders_bundle(tmp_path):

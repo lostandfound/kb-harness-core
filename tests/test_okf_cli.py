@@ -21,6 +21,34 @@ class OkfCliTest(unittest.TestCase):
         (content / "note.md").write_text("---\ntype: Note\n---\n\nBody\n", encoding="utf-8")
         return tempdir, root
 
+    def test_validate_okf_json_reports_warning_without_failing(self):
+        # Given a valid bundle with an advisory-only usage issue.
+        with tempfile.TemporaryDirectory() as tempdir:
+            bundle = Path(tempdir) / "bundle"
+            bundle.mkdir()
+            (bundle / "note.md").write_text("---\ntype: Note\nsources:\n - resource: https://example.test\n   usage_count: -1\n---\n", encoding="utf-8")
+            stdout = io.StringIO()
+            # When validating without strict mode.
+            with redirect_stdout(stdout):
+                code = main(["okf", "validate", str(bundle), "--format", "json"])
+            # Then warnings are reported while the command succeeds.
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(code, 0)
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["diagnostics"], [])
+            self.assertEqual(result["warnings"][0]["code"], "okf.usage_count.invalid")
+
+    def test_validate_okf_strict_and_missing_bundle_exit_codes(self):
+        # Given an advisory-only bundle and a missing path.
+        with tempfile.TemporaryDirectory() as tempdir:
+            bundle = Path(tempdir) / "bundle"
+            bundle.mkdir()
+            (bundle / "note.md").write_text("---\ntype: Note\nsources:\n - resource: https://example.test\n   usage_count: -1\n---\n", encoding="utf-8")
+            # When strict validation is requested.
+            self.assertEqual(main(["okf", "validate", str(bundle), "--strict"]), 1)
+            # Then a non-directory is an argument/path error.
+            self.assertEqual(main(["okf", "validate", str(bundle / "missing"), "--format", "json"]), 2)
+
     def test_export_okf_dry_run_is_write_free(self):
         # Given a minimal KB and an output path
         with tempfile.TemporaryDirectory() as tempdir:
