@@ -9,6 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Provide ontology sibling fixture
+        run: |
+          set -euo pipefail
+          ontology_root="${RUNNER_WORKSPACE}/kb-ontology-core"
+          if [ ! -f "$ontology_root/pyproject.toml" ]; then
+            rm -rf "$ontology_root"
+            git clone --depth 1 --branch v0.2.0 https://github.com/lostandfound/kb-ontology-core.git "$ontology_root"
+          fi
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

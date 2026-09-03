@@ -39,7 +39,8 @@ def test_reference_id_ignores_whitespace_id():
     # Then the invalid explicit value is rejected in favor of a fallback
     assert _reference_id({"id": "  "}, [], "2020") == "ref-2020"
 
-ROOT = Path(__file__).resolve().parents[3]
+# Resolve scripts from the harness package itself in source and installed layouts.
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_script(name):
