@@ -25,6 +25,7 @@ from .references import (
 )
 from .graph import plan_graph
 from .index import plan_index
+from .okf import OkfExportError, plan_okf_export
 from .project import Project, ProjectError
 from .sync import (
     apply_changes_atomically,
@@ -53,6 +54,13 @@ def _parser() -> argparse.ArgumentParser:
 
     validate_parser = subcommands.add_parser("validate", help="validate the KB")
     _add_common_options(validate_parser)
+
+    export_parser = subcommands.add_parser("export", help="export KB artifacts")
+    export_commands = export_parser.add_subparsers(dest="export_command", required=True)
+    okf_parser = export_commands.add_parser("okf", help="export an OKF v0.2 bundle")
+    okf_parser.add_argument("--output", required=True)
+    okf_parser.add_argument("--dry-run", action="store_true")
+    _add_common_options(okf_parser)
 
     index_parser = subcommands.add_parser("index", help="build or check indexes")
     index_commands = index_parser.add_subparsers(dest="index_command", required=True)
@@ -405,6 +413,59 @@ def _claim_action(project: Project, args: Any) -> int:
         return 2
 
 
+def _okf_output_root(project: Project, raw_output: str) -> Path:
+    """Validate an OKF destination without following a destination symlink."""
+    raw = Path(raw_output).expanduser()
+    output = raw if raw.is_absolute() else project.repo_root / raw
+    output = output.absolute()
+    root = project.repo_root.resolve()
+    content = project.content_root.resolve()
+    resolved = output.resolve(strict=False)
+    if resolved == root or resolved == content:
+        raise OkfExportError("okf.output.invalid", "output must not be the repository or content root")
+    try:
+        resolved.relative_to(content)
+    except ValueError:
+        pass
+    else:
+        raise OkfExportError("okf.output.invalid", "output must not be inside the content root")
+    if output.is_symlink():
+        raise OkfExportError("okf.output.symlink", "output must not be a symlink")
+    if output.exists():
+        if output.is_file():
+            raise OkfExportError("okf.output.exists", "output file already exists")
+        if not output.is_dir():
+            raise OkfExportError("okf.output.exists", "output already exists")
+        if any(output.iterdir()):
+            raise OkfExportError("okf.output.nonempty", "output directory must be empty")
+    return output
+
+
+def _okf_export(project: Project, args: Any) -> int:
+    try:
+        output_root = _okf_output_root(project, args.output)
+        changes = plan_okf_export(project, output_root)
+        plan = plan_write(changes, display_root=output_root)
+    except OkfExportError as error:
+        _emit({"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]}, args.format, error=True)
+        return 2 if error.code.startswith("okf.output.") else 1
+    except Exception as error:
+        return _internal_error(error, args.format)
+
+    relative = [str(path.relative_to(output_root)) for path in plan.changes]
+    result: Result = {"ok": True, "changed": relative, "diagnostics": [], "diff": plan.diff}
+    if args.dry_run:
+        result["dry_run"] = True
+        _emit(result, args.format)
+        return 0
+    try:
+        execute_write_plan(plan, apply=apply_changes_atomically)
+    except Exception as error:
+        return _internal_error(error, args.format)
+    _emit(result, args.format)
+    return 0
+
+
 def _main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "project" and args.project_command == "show":
@@ -431,6 +492,9 @@ def _main(argv: Sequence[str] | None = None) -> int:
         return _project_error(error, args.format)
     except Exception as error:
         return _internal_error(error, args.format)
+
+    if args.command == "export" and args.export_command == "okf":
+        return _okf_export(project, args)
 
     if args.command == "reference" and args.reference_command == "create":
         try:

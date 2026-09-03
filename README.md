@@ -31,6 +31,8 @@ CLI のコマンドは次のとおりである。
 - `kb reference spec --from search-result.json --output reference.yml` — NDL/CiNii の JSON/YAML 検索結果を登録用 spec に変換する。`--dry-run`、`--force` に対応する。
 - `kb reference create --from reference.yml` — spec を `references.yml` に原子的に追加する。非空 registry は既存のコメント・引用符・順序・空行・改行コードを再シリアライズせず保持し、EOF に新規エントリだけを canonical YAML として追記する。既存ファイルが空でない場合、末尾に改行が無ければ既存の改行規約（純粋な CRLF なら CRLF、それ以外は LF）で 1 つ補う。追記ブロックも同じ規約を使う（既存の末尾空行は保持）。空 mapping（`{}`）は新規エントリ全体に置換する。`--dry-run` に対応する。
 - `kb eval summary` / `kb eval smoke` — 評価資産の集計と検索可能性を確認する。
+- `kb export okf --output PATH` — 内部プロファイルを strict OKF v0.2 bundle に決定論的に変換する。変換方針は導入先 KB が文書化する。
+  出力パスは output root 配下に限定され、ref ID は小文字 kebab-case、入力 Markdown symlink は拒否（symlink directory は走査対象外）、任意階層の `log.md` は予約ファイルとして扱われる。詳細は [OKF v0.2 export contract](../../docs/okf-v0.2-export.md) を参照。
 
 すべてのコマンドは `--format json` を指定できる。JSON は `ok`、`changed`、`diagnostics` を基本フィールドとし、CI やエージェントから機械的に扱える。終了コードは `0`（成功・同期済み）、`1`（検証不合格・差分あり）、`2`（引数または設定不備）、`3`（予期しない内部エラー）である。`build` は生成予定をメモリ上で作成し、共通の原子的適用処理で書き込む。
 
@@ -40,6 +42,7 @@ CLI のコマンドは次のとおりである。
 - `kb_harness.diagnostics`: 安定したコードを持つ構造化診断
 - `kb_harness.markdown`: YAML frontmatter と本文の解析
 - `kb_harness.entity`: エンティティ雛形生成と clock 注入
+- `kb_harness.okf`: 外部 OKF 形式への出力計画・変換。内部 Markdown/YAML の編集規約やドメイン語彙は所有しない。
 
 `kb_harness.ontology` は `kb-ontology-core` の構造化 `Diagnostic` を安定した
 `code`・`field`・`context` で翻訳する。既存の `validate_claim` は従来どおり

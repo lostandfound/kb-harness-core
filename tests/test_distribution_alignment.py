@@ -285,6 +285,13 @@ def test_installed_wheels_run_every_cli_family_from_isolated_directory(tmp_path)
         encoding="utf-8",
     )
     (content / "references.yml").write_text("{}\n", encoding="utf-8")
+    (content / "index.md").write_text(
+        "---\ntitle: Fixture KB\n---\n# Fixture KB\n", encoding="utf-8"
+    )
+    (content / "notes" / "sample.md").write_text(
+        "---\ntype: Note\ntitle: Sample\nsources: []\n---\nBody\n",
+        encoding="utf-8",
+    )
     (project / "evals").mkdir()
     (project / "evals" / "rag-eval.yml").write_text("entries: []\n", encoding="utf-8")
     spec = project / "entity.yml"
@@ -320,5 +327,26 @@ def test_installed_wheels_run_every_cli_family_from_isolated_directory(tmp_path)
         payload = result.stdout or result.stderr
         assert payload, command
         assert "ModuleNotFoundError" not in payload, (command, payload)
-        parsed = json.loads(payload)
-        assert "diagnostics" in parsed or command[0] == "project", (command, parsed)
+    parsed = json.loads(payload)
+    assert "diagnostics" in parsed or command[0] == "project", (command, parsed)
+
+    okf_output = tmp_path / "okf-v0.2"
+    result = subprocess.run(
+        [
+            *cli, "export", "okf", "--output", str(okf_output),
+            "--start", str(project), "--format", "json",
+        ], cwd=isolated, env=env, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert json.loads(result.stdout)
+    assert "okf_version: '0.2'" in (okf_output / "index.md").read_text(encoding="utf-8")
+    assert (okf_output / "notes" / "sample.md").is_file()
+    validation = subprocess.run(
+        [sys.executable, "-c",
+         "from pathlib import Path; from kb_harness.okf import validate_okf_bundle; "
+         "import sys; result = validate_okf_bundle(Path(sys.argv[1])); "
+         "print(result); sys.exit(bool(result))", str(okf_output)],
+        cwd=isolated, env=env, capture_output=True, text=True,
+    )
+    assert validation.returncode == 0, validation.stdout + validation.stderr
+    assert validation.stdout.strip() == "[]"
