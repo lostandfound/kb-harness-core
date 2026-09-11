@@ -2,12 +2,18 @@
 # APM dependencies
 apm_modules/
 
-# Python caches
+# Python caches / build artifacts
 __pycache__/
 *.pyc
+*.egg-info/
+build/
+dist/
 
 # Local credentials
 .env
 
 # Local, machine-specific notes
 CLAUDE.local.md
+
+# Tool state
+.serena/

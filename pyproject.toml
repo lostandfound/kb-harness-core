@@ -6,11 +6,22 @@ build-backend = "setuptools.build_meta"
 name = "kb-harness-core"
 version = "0.2.0"
 description = "Domain-independent operational harness for Markdown knowledge bases"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.10"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
 dependencies = [
   "PyYAML>=6.0,<7",
     "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/lostandfound/kb-harness-core"
+Repository = "https://github.com/lostandfound/kb-harness-core"
 
 [project.scripts]
 kb = "kb_harness.cli:main"
