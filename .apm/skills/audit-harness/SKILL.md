@@ -13,7 +13,7 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 - AGENTS.md（**25 行以内の制約あり**）
 - CONTRIBUTING.md、README.md
 - CLAUDE.md（プロジェクト用。AGENTS.md と同じく導線の過不足を見る）
-- docs/ 配下の現行文書すべて（expansion-loop、exploration-loop、BACKLOG、CONCERNS、ontology-policy、claim-pilot-evaluation、cli-development-plan）。アーカイブ扱いのディレクトリ（docs/superpowers 等）は README でアーカイブと明示されているかだけ見る
+- `docs/` 配下の現行文書すべて。任意の予約運用ファイル `docs/CONCERNS.md`（未整理の懸念・違和感の受信箱）と `docs/BACKLOG.md`（実施すると判断した将来作業）は、存在する場合のみ監査する。アーカイブ扱いのディレクトリは、導入先の README でアーカイブと明示されているかだけ見る
 - packages/kb-harness-core/.apm/ 配下の全 SKILL.md・エージェント定義（**KB ハーネス資産の正本**。`.codex/`・`.claude/` 配下の同名資産は `apm install` による生成物 — 正本と配布先の同一性も確認し、ドリフトがあれば正本を直して対象ランタイムへ再デプロイする）
 - ルート `.apm/`（ドメイン固有エージェントの正本。パッケージ側と同様に配布先との同一性を確認する）
 - `.codex/`・`.claude/`・`.agents/skills/` 配下のうちパッケージ外の資産（プロジェクト固有スキル等）
@@ -39,7 +39,7 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 
 - **正本参照型**で直す: 値の重複記載を減らし、正となるファイル（vocabulary.yml / CONTRIBUTING / スクリプト自身）を指す記述にする。列挙をやむを得ず残す場合は「正は◯◯」と明記
 - どちらが正か判断できない矛盾は修正せずユーザーへ報告
-- 発見した不整合はすべて報告する（修正済み / 報告のみ を区別）。信頼性に関わるものは docs/CONCERNS.md に記録
+- 発見した不整合はすべて報告する（修正済み / 報告のみ を区別）。信頼性に関わる未整理の問題は、`docs/CONCERNS.md` が存在する場合はそこへ記録する。存在しない場合は監査結果で報告し、ユーザーから作成を求められていない限り新設しない
 
 ## 検証
 

@@ -37,6 +37,36 @@ kb sync --check
 
 `kb-domain.yml` / `vocabulary.yml` の書き方を含む手順は [導入ガイド](docs/integration.md) を参照。
 
+## 導入先 KB の標準構成
+
+```text
+<repo_root>/
+├── kb-domain.yml                 # 必須設定
+├── graph.json                    # 生成物
+├── evals/
+│   └── rag-eval.yml              # 任意設定
+├── docs/
+│   ├── CONCERNS.md               # 任意の予約運用ファイル：未整理の懸念・違和感の受信箱
+│   └── BACKLOG.md                # 任意の予約運用ファイル：実施すると判断した将来作業
+└── <content_root>/
+    ├── vocabulary.yml            # 必須設定
+    ├── references.yml            # 任意レジストリ
+    ├── index.md                  # 予約 Markdown
+    ├── log.md                    # OKF 上の予約 Markdown（任意）
+    └── <type-directory>/
+        ├── index.md              # 予約 Markdown
+        ├── log.md                # OKF 上の予約 Markdown（任意）
+        └── <entity>.md
+```
+
+`<content_root>` と `<type-directory>` の実際の名前は、それぞれ `kb-domain.yml` と
+`vocabulary.yml` で定義する。`graph.json` は `kb graph build` / `kb sync` が生成し、
+`index.md` は既存ファイル内の管理対象部分を同期する。`log.md` は内部 KB の必須ファイルではなく、
+OKF v0.2 で任意階層の更新履歴として予約されているファイル名である。
+`docs/CONCERNS.md` と `docs/BACKLOG.md` は、ファイル名と上記の役割だけを予約した任意の運用文書であり、
+存在しなくてもエラーにはならない。KB の Concept ではないため OKF bundle には含めない。
+その他の `docs/` 配下のファイル名と用途は導入先が自由に定める。
+
 ## 提供物
 
 ### `kb` CLI
@@ -64,6 +94,8 @@ kb sync --check
 | `find-paper` | CiNii API で論文を検索し `references.yml` に登録する |
 | `ndl-digicolle` | NDL デジタルコレクション（個人送信サービス）で資料本文を確認する半自動手順 |
 | `check-okf` | OKF v0.2 bundle の適合性・strict export・決定性を確認する |
+| `expand-kb` | 欠落分析から候補選定・調査・執筆・レビュー・検証までの拡張ループを進める |
+| `explore-kb` | 外部一覧・カテゴリ・文献から未収録候補を発見し、未考証のまま BACKLOG へ渡す |
 | `audit-harness` | ハーネス文書群の整合性を監査し正本参照型で修正する |
 | `review-doc` | README・方針書など説明文書 1 件を役割適合の観点でレビューする |
 
