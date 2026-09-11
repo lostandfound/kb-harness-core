@@ -20,7 +20,7 @@ def test_distributed_ontology_dependency_provides_transition_api():
         Path(__file__).parents[2] / "kb-ontology-core" / "pyproject.toml"
     ).read_text(encoding="utf-8")
 
-    assert "kb-ontology-core @ git+ssh://git@github.com/lostandfound/kb-ontology-core.git@v0.2.0" in harness_pyproject
+    assert "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.2.0" in harness_pyproject
     assert re.search(r'version = "0\.2\.0"', ontology_pyproject)
     ontology_api = (
         Path(__file__).parents[2]
@@ -99,7 +99,7 @@ def test_doctor_checks_installed_core_api_and_declared_tag(tmp_path, monkeypatch
         doctor.importlib.metadata,
         "requires",
         lambda name: [
-            "kb-ontology-core @ git+ssh://git@github.com/lostandfound/kb-ontology-core.git@v0.2.0"
+            "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.2.0"
         ],
     )
 
@@ -121,7 +121,7 @@ def test_doctor_reports_missing_core_api_as_structured_incompatibility(tmp_path,
         doctor.importlib.metadata,
         "requires",
         lambda name: [
-            "kb-ontology-core @ git+ssh://git@github.com/lostandfound/kb-ontology-core.git@v0.2.0"
+            "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.2.0"
         ],
     )
 
@@ -150,7 +150,7 @@ def test_doctor_reports_installed_core_version_mismatch(tmp_path, monkeypatch):
         doctor.importlib.metadata,
         "requires",
         lambda name: [
-            "kb-ontology-core @ git+ssh://git@github.com/lostandfound/kb-ontology-core.git@v0.2.0"
+            "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.2.0"
         ],
     )
 
@@ -175,7 +175,7 @@ def test_doctor_reports_core_import_failure(tmp_path, monkeypatch):
         doctor.importlib.metadata,
         "requires",
         lambda name: [
-            "kb-ontology-core @ git+ssh://git@github.com/lostandfound/kb-ontology-core.git@v0.2.0"
+            "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.2.0"
         ],
     )
 
@@ -184,8 +184,8 @@ def test_doctor_reports_core_import_failure(tmp_path, monkeypatch):
     assert diagnostics[0]["code"] == "doctor.ontology.import_failed"
 
 
-def test_doctor_parses_ssh_dependency_tag(tmp_path, monkeypatch):
-    """Given an SSH direct reference, doctor compares its tag to metadata."""
+def test_doctor_parses_direct_reference_tag(tmp_path, monkeypatch):
+    """Given a direct URL reference, doctor compares its tag to metadata."""
     import kb_harness.doctor as doctor
 
     project = _doctor_project(tmp_path)
@@ -202,7 +202,7 @@ def test_doctor_parses_ssh_dependency_tag(tmp_path, monkeypatch):
         doctor.importlib.metadata,
         "requires",
         lambda name: [
-            "kb-ontology-core @ git+ssh://git@github.com/lostandfound/kb-ontology-core.git@v0.2.0"
+            "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.2.0"
         ],
     )
 
