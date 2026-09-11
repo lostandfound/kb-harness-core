@@ -1,244 +1,106 @@
 # kb-harness-core
 
-ドメイン非依存の知識ベース（KB）運用ハーネスである。
-特定分野の知識を Markdown エンティティ集合として管理する KB リポジトリに、検証スクリプトと各種エージェント向けのスキル・エージェントを提供する。
+ドメイン非依存の知識ベース（KB）運用ハーネス。
 
-このパッケージ自体はどのドメインの知識も持たない。
-ドメイン固有の情報（型・述語・タグの語彙、ディレクトリ構成）は導入先の KB リポジトリ側が `kb-domain.yml` と `vocabulary.yml` に書き、ハーネスはそれを読んで動作する。
+特定分野の知識を「エンティティ」（1 件 1 ファイルの Markdown。frontmatter に型・タグ・出典・他エンティティへの関係を持つ）の集合として管理する KB リポジトリに、`kb` CLI・検証スクリプト・各種エージェント向けのスキルとエージェント定義を提供する。
 
-## Python パッケージと CLI
+このパッケージ自体はどのドメインの知識も持たない。型・述語・タグの語彙やディレクトリ構成は導入先が `kb-domain.yml` と `vocabulary.yml` に書き、ハーネスはそれを読んで動作する。
 
-`kb-harness-core` は、既存 scripts と同じドメイン設定を読むインストール可能な Python パッケージである。Phase 2 では読み取り・検証・生成物同期を `kb` CLI に統合した。
+## 特徴
+
+- **検証** — frontmatter・リンク・relations の型制約・タグ語彙・出典参照を `vocabulary.yml` の契約で検査する
+- **生成物同期** — 各型の `index.md` とルートの `graph.json` を決定論的に生成し、CI で差分を検出する
+- **原子的な書き込み** — エンティティ・Claim・文献の追加を spec ファイルから行い、全体検証を通してから反映する。`--dry-run` で diff のみ確認できる
+- **Claim** — 出典と確度を伴う関係主張を、確定した relation と区別して記録・検証・状態遷移する（[`kb-ontology-core`](https://github.com/lostandfound/kb-ontology-core) 連携）
+- **OKF export** — 内部プロファイルを strict OKF v0.2 bundle に決定論的に変換する
+- **RAG 評価** — 想定クエリに対する検索可能性の回帰検出と、評価履歴の退行検出
+- **文献ワークフロー** — NDL サーチ・CiNii・NDL デジタルコレクションからの書誌登録をスキル化
+- **エージェント連携** — 全コマンドが `--format json` と定義済み終了コードを持ち、スキル・エージェントから機械的に扱える
+
+## クイックスタート
+
+導入先 KB リポジトリの `apm.yml` に依存を追加する。
+
+```yaml
+dependencies:
+  apm:
+    - lostandfound/kb-harness-core
+```
 
 ```bash
-python3 -m pip install ./packages/kb-harness-core
-kb project show
-kb project show --format json
+apm install --target claude                                   # スキル・エージェントを .claude/ へ展開
+python3 -m pip install apm_modules/lostandfound/kb-harness-core   # kb CLI と Python API
+kb doctor                                                     # 設定・依存・生成物の状態を診断
 kb validate
 kb sync --check
 ```
 
-CLI のコマンドは次のとおりである。
-
-- `kb validate` — KB 全体を検証する。
-- `kb index build` / `kb index check` — 各型の `index.md` を生成・同期確認する。build は `--dry-run` に対応する。
-- `kb graph build` / `kb graph check` — ルートの `graph.json` を生成・同期確認する。build は `--dry-run` に対応する。
-- `kb sync` / `kb sync --check` — index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。
-- `kb doctor` — 設定、依存バージョン、生成物の状態を診断する。
-- `kb entity create --from entity.yml` — 検証済み spec から entity と index/graph を原子的に作成する。`--dry-run` は統一 diff のみを返す。
-- `kb claim create|inspect|list|validate|transition` — Claim の spec 作成、照会、検証、明示的な状態遷移を行う。create/transition は一時 KB を全体検証してから反映し、`--dry-run` は変更diffだけを表示する。
-- `kb reference health` — `references.yml` の構造を検査する。
-- `kb reference spec --from search-result.json --output reference.yml` — NDL/CiNii の JSON/YAML 検索結果を登録用 spec に変換する。`--dry-run`、`--force` に対応する。
-- `kb reference create --from reference.yml` — spec を `references.yml` に原子的に追加する。非空 registry は既存のコメント・引用符・順序・空行・改行コードを再シリアライズせず保持し、EOF に新規エントリだけを canonical YAML として追記する。既存ファイルが空でない場合、末尾に改行が無ければ既存の改行規約（純粋な CRLF なら CRLF、それ以外は LF）で 1 つ補う。追記ブロックも同じ規約を使う（既存の末尾空行は保持）。空 mapping（`{}`）は新規エントリ全体に置換する。`--dry-run` に対応する。
-- `kb eval summary` / `kb eval smoke` — 評価資産の集計と検索可能性を確認する。
-- `kb export okf --output PATH` — 内部プロファイルを strict OKF v0.2 bundle に決定論的に変換する。変換方針は導入先 KB が文書化する。
-  出力パスは output root 配下に限定され、ref ID は小文字 kebab-case、入力 Markdown symlink は拒否（symlink directory は走査対象外）、任意階層の `log.md` は予約ファイルとして扱われる。詳細は [OKF v0.2 export contract](../../docs/okf-v0.2-export.md) を参照。
-
-すべてのコマンドは `--format json` を指定できる。JSON は `ok`、`changed`、`diagnostics` を基本フィールドとし、CI やエージェントから機械的に扱える。終了コードは `0`（成功・同期済み）、`1`（検証不合格・差分あり）、`2`（引数または設定不備）、`3`（予期しない内部エラー）である。`build` は生成予定をメモリ上で作成し、共通の原子的適用処理で書き込む。
-
-共通 API の責務:
-
-- `kb_harness.project`: `kb-domain.yml` の探索とパス解決
-- `kb_harness.diagnostics`: 安定したコードを持つ構造化診断
-- `kb_harness.markdown`: YAML frontmatter と本文の解析
-- `kb_harness.entity`: エンティティ雛形生成と clock 注入
-- `kb_harness.okf`: 外部 OKF 形式への出力計画・変換。内部 Markdown/YAML の編集規約やドメイン語彙は所有しない。
-
-`kb_harness.ontology` は `kb-ontology-core` の構造化 `Diagnostic` を安定した
-`code`・`field`・`context` で翻訳する。既存の `validate_claim` は従来どおり
-人向け文字列のリストを返すため、互換入口として利用できる。
-
-エンティティ作成 spec は `type`、`slug`、`title`、`description`、`tags`、`sources`、`sections`（見出しから非空本文への mapping）を必須とし、`aliases`、`relations`、`fields`、`timestamp` を任意とする。型ごとの章構成と extra fields は導入先の `vocabulary.yml` を正本とする。timestamp は CLI、spec、`SOURCE_DATE_EPOCH`、注入 clock の順で解決される。
-
-`scripts/new_entity.py` と `scripts/kb_config.py` は共通 API を呼ぶ互換入口であり、`scripts/validate.py` も共通 Markdown 解析を利用する。
-`scripts/generate_index.py` と `scripts/export_graph.py` も同じ計画・適用 API を使う互換入口である。
+`kb-domain.yml` / `vocabulary.yml` の書き方を含む手順は [導入ガイド](docs/integration.md) を参照。
 
 ## 提供物
 
+### `kb` CLI
+
+| コマンド | 役割 |
+|---|---|
+| `kb project show` | `kb-domain.yml` の解決結果を表示 |
+| `kb validate` | KB 全体を検証 |
+| `kb index build\|check` / `kb graph build\|check` / `kb sync` | `index.md` と `graph.json` の生成・同期確認 |
+| `kb entity create --from spec.yml` | spec からエンティティを原子的に作成 |
+| `kb claim create\|inspect\|list\|validate\|transition` | Claim の作成・照会・検証・状態遷移 |
+| `kb reference health\|spec\|create` | `references.yml` の点検・登録 spec 変換・原子的追加 |
+| `kb eval summary\|smoke` | RAG 評価履歴の集計と検索可能性の確認 |
+| `kb okf validate` / `kb export okf` | OKF v0.2 bundle の検証と export |
+| `kb doctor` | 設定・依存バージョン・生成物の診断 |
+
+全コマンドが `--format json` に対応する。詳細は [CLI リファレンス](docs/cli.md) を参照。
+
 ### スキル
 
-`.apm/skills/` 配下。frontmatter の `description` から採録。
-
-| スキル | 説明 |
+| スキル | 用途 |
 |---|---|
-| `add-entity` | KB に新規エンティティを追加する確定的手順。「エンティティ追加」「新しいエンティティ（人物・概念等）を追加」で使用。 |
-| `audit-harness` | ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エージェント・スクリプト）の整合性を監査し正本参照型で修正する手順。「整合性チェック」「ハーネス監査」「文書の陳腐化確認」で使用。 |
-| `check-okf` | OKF v0.2 bundle適合性・strict export・決定性確認。「OKFチェック」「OKF準拠確認」「bundle validate」などで使用。 |
-| `find-book` | NDL サーチ（国立国会図書館）API で書籍・資料を検索し、文献レジストリ references.yml に登録する手順。「書籍を探して」「NDLで検索」「書誌を確認して」で使用。 |
-| `find-paper` | CiNii API で論文を検索し references.yml へ登録する確定的手順。「論文を探して」「文献を追加」「CiNii で検索」で使用。 |
-| `review-doc` | README・CONTRIBUTING・方針書など説明文書 1 件を、役割適合・混在・外出し・内部語彙の観点でレビューする手順。 |
-| `ndl-digicolle` | NDL デジタルコレクション（個人送信サービス）で資料本文を確認する半自動手順。ログイン等のブラウザ操作はユーザーが行い、エージェントは準備と結果の反映を担当する。 |
+| `add-entity` | KB に新規エンティティを追加する確定的手順 |
+| `find-book` | NDL サーチ API で書籍・資料を検索し `references.yml` に登録する |
+| `find-paper` | CiNii API で論文を検索し `references.yml` に登録する |
+| `ndl-digicolle` | NDL デジタルコレクション（個人送信サービス）で資料本文を確認する半自動手順 |
+| `check-okf` | OKF v0.2 bundle の適合性・strict export・決定性を確認する |
+| `audit-harness` | ハーネス文書群の整合性を監査し正本参照型で修正する |
+| `review-doc` | README・方針書など説明文書 1 件を役割適合の観点でレビューする |
 
-### エージェント（2件）
+### エージェント
 
-`.apm/agents/` 配下。frontmatter の `description` から採録。
-
-| エージェント | 説明 |
+| エージェント | 用途 |
 |---|---|
-| `evidence-reviewer` | KB の主張と出典の対応、出典の到達性と鮮度、主張が出典に支えられる範囲を審査する証拠レビュアー。ドメインを問わず使う。 |
-| `rag-tester` | RAG 消費者役。KB だけを根拠に想定クエリへ回答を試み、回答不能・誤答・曖昧になる箇所を報告する敵対的テスター。周期的な品質測定やエンティティ追加後の受け入れ確認に使用。 |
+| `evidence-reviewer` | KB の主張と出典の対応、情報の鮮度、確度を審査する証拠レビュアー |
+| `rag-tester` | KB だけを根拠に想定クエリへ回答を試み、回答不能・誤答・曖昧な箇所を報告する敵対的テスター |
 
-### scripts（一覧は下表が正、件数は記載しない）
+### scripts
 
-`scripts/` 配下。多くは `--root` でコンテンツルートを指定でき、省略時は `kb-domain.yml` から自動解決する（`kb_config.py` が共有ヘルパー、単体では実行しない）。
+`kb` CLI に統合済みの機能の互換入口（`validate.py` / `new_entity.py` / `generate_index.py` / `export_graph.py` / `rag_smoke.py` / `eval_summary.py`）と、外部 API を叩く補助ツール（`ndl_search.py` / `cinii_search.py` / `wiki_fetch.py` / `explore_diff.py` / `browse.py`）、点検ツール（`refs_health.py` / `concerns_summary.py`）。一覧とオプションは [scripts リファレンス](docs/scripts.md) を参照。
 
-| スクリプト | 役割 |
-|---|---|
-| `validate.py` | frontmatter・リンク・エッジ・語彙・書誌参照（ファイル単位 `sources` + 本文インライン `（出典: ref-id）`）を検証する。`--fix-timestamps` / `--check-urls` オプションあり。 |
-| `new_entity.py` | エンティティ雛形（frontmatter・見出し構成）を生成する。 |
-| `generate_index.py` | 各ディレクトリの index.md にエンティティ一覧を生成する。 |
-| `export_graph.py` | ナレッジグラフ（nodes/edges）を JSON でエクスポートする。 |
-| `eval_summary.py` | `evals/rag-eval.yml` の最新判定を集計し、退行（過去 OK→最新非 OK）を検出する。`--eval-file` / `--since` / `--stale-days` オプションあり。退行検出時は exit 1。 |
-| `rag_smoke.py` | 固定クエリごとに期待根拠が字面検索の上位へ入るかを検査する。回答品質ではなく検索可能性の回帰を検出する。 |
-| `concerns_summary.py` | 懸念台帳の状態を集計し、着手可能な項目を抽出する。 |
-| `cinii_search.py` | CiNii Research API で論文を検索し references.yml 登録用の YAML を出力する。 |
-| `ndl_search.py` | NDL サーチ API で書籍・資料を検索し references.yml 登録用の YAML を出力する。 |
-| `refs_health.py` | 文献の pending、lineage 未判定、URL 到達確認日を点検する。 |
-| `kb_config.py` | `kb-domain.yml` から content root を解決する共有ヘルパー（単体 CLI なし）。 |
-| `ontology_adapter.py` | 語彙を ontology-core 形式へ変換する互換入口（単体 CLI なし）。 |
-| `wiki_fetch.py` | MediaWiki API で Wikipedia 記事の全文を取得する（考証の裏取り用、転載禁止）。 |
-| `browse.py` | 軽量ブラウザ操作 CLI。CDP 経由で可視 Chromium を操作し、抽出テキストのみを出力する。 |
-| `explore_diff.py` | Wikipedia カテゴリと KB 収録の機械的差分を出す（探索ループ経路A用）。未収録候補を出力する。一覧記事・名前空間付きタイトルは既定で除外（`--include-lists` で無効化）、429/503 は自動リトライする。 |
+## ドキュメント
 
-## 導入手順（新しい KB リポジトリで使う場合）
+- [導入ガイド](docs/integration.md) — apm install、pip install、scripts の配線、hooks、運用上の注意
+- [設定リファレンス](docs/configuration.md) — `kb-domain.yml` / `vocabulary.yml` / `references.yml` / エンティティ spec / Claim / `evals/rag-eval.yml` の契約
+- [CLI リファレンス](docs/cli.md) — `kb` の各コマンド、終了コード、JSON 出力、Python API
+- [scripts リファレンス](docs/scripts.md) — 各スクリプトのオプション
 
-### ① `kb-domain.yml` をルートに書く
+## 動作要件
 
-ハーネスの各スクリプト・スキル・エージェントは、ドメイン名やパスをハードコードせず、リポジトリルートの `kb-domain.yml` を読んで動作する。
-このリポジトリの実物を例として示す。
+- Python 3.10 以上（CI は 3.12）
+- PyYAML、[`kb-ontology-core`](https://github.com/lostandfound/kb-ontology-core) v0.2.0（`pyproject.toml` / `requirements.txt`）
+- [`apm`](https://github.com/microsoft/apm) CLI
+- 一部スクリプトは追加の環境（API キー、Chromium）を要する。[scripts リファレンス](docs/scripts.md) 参照
 
-```yaml
-domain:
-  name: 沖縄空手史
-  kb_title: 沖縄空手 OKF 知識ベース
-  description: 沖縄空手の流派・型・人物・用語・史実を扱う知識ベース
-  content_root: okinawa-karate
-  lineage_example: 上地流系・劉衛流系など流派・系統単位
-```
-
-| フィールド | 必須 | 内容 |
-|---|---|---|
-| `domain.name` | 要 | ドメインの名称。エージェントが「専門家として」振る舞う対象を特定する。 |
-| `domain.kb_title` | 要 | KB 自体の呼称。エージェントの説明文中で使う。 |
-| `domain.description` | 要 | KB が扱う範囲の一文説明。 |
-| `domain.content_root` | 要 | エンティティ Markdown を置くディレクトリ名。scripts はここを起点に走査する。 |
-| `domain.lineage_example` | 任意 | 系統・分類の具体例。エージェントのプロンプトが参照する補助情報。 |
-
-### ② `<content_root>/vocabulary.yml` を書く
-
-`scripts/validate.py` はこのファイルを読み、エンティティの型・relations・タグを検証する。契約は次のとおりである。
-
-```yaml
-types:
-  <型名>:
-    directory: <対応ディレクトリ名>     # 必須。frontmatter の type とディレクトリの対応検査に使う
-    extra_fields: [born, died]           # 任意。この型で追加必須になる frontmatter フィールド
-    graph: false                         # 任意（既定 true）。false の型は relations を持てない
-predicates:
-  <述語名>:
-    description: <説明>
-    domain: [<型名>, ...]                # この述語の始点になれる型
-    range: [<型名>, ...]                  # この述語の終点になれる型
-tags:
-  - <タグ1>
-  - <タグ2>
-```
-
-- `types.<型>.extra_fields` に `born` または `died` を含めると、`validate.py` は値を「西暦4桁（`?` 付き可）」「西暦4桁+頃」「不詳」のいずれかの形式に限定して検証する（`PERSON_DATE_RE`）。それ以外のフィールド名は非空文字列であることのみ検査する。
-- `types.<型>.graph: false` を指定した型のエンティティは `relations` フィールドを持てない（付与すると validate エラーになる）。索引・付録的なエンティティ型に使う。
-- `predicates` の `domain` / `range` は、frontmatter の `relations` に書かれた `predicate` と `target` エンティティの型が一致するかを検査する型制約である。
-- `tags` は frontmatter の `tags` に使える語の全量であり、一覧にない語を使うと validate エラーになる。
-- `<content_root>/references.yml` の各エントリは optional key `pending`（非空文字列の待ち理由）を持てる。付与すると未参照 WARNING が個別に出ず件数集計の INFO 1行にまとまり、参照済みなのに `pending` が残っていると WARNING で警告される。
-
-#### Claim 型（任意）
-
-Claim のドメイン検証とグラフ用シリアライズは
-[`kb-ontology-core`](https://github.com/lostandfound/kb-ontology-core) が正本である。
-通常は `pip install -r requirements.txt` で依存を導入する。ソースから併用する場合は、
-`kb-harness-core` と `kb-ontology-core` を同じ親ディレクトリへ配置してもよい。
-
-`Claim` という型を `vocabulary.yml` に定義すると、確定した relation と区別して、出典と評価を伴う関係主張を記録できる。
-
-```yaml
-types:
-  Claim:
-    directory: claims
-    graph: false
-    extra_fields: [subject, status, confidence]
-```
-
-Claim frontmatter の契約は次のとおりである。
-
-- `subject` / `object`: 存在するエンティティへのルート相対パス
-- `predicate`: `vocabulary.yml` に定義済みの述語。domain/range 制約を適用する
-- `status`: `proposed` / `accepted` / `disputed` / `rejected`
-- `confidence`: `A` / `B` / `C` / `D`
-- `sources`: 1件以上。通常エンティティと同じ出典検証を適用する
-
-通常 relation と同じ subject / predicate / object の三つ組を重複登録すると `validate.py` はエラーにする。`export_graph.py` は Claim を通常の `nodes` / `edges` に混ぜず、独立した `claims` 配列へ出力する。値Claimは `property` と `value` を使い、`vocabulary.yml` の `properties` に定義した domain と value_type で検証する。関係形式との混在は禁止する。期間付き主張は現時点の共通契約に含まれない。
-
-### ③ ルート `apm.yml` に依存を追加し、デプロイする
-
-```yaml
-# ローカルパスで参照する場合（モノレポ内・開発中）
-dependencies:
-  apm:
-    - ../kb-harness-core
-
-# GitHub 参照で導入する場合
-dependencies:
-  apm:
-    - github: lostandfound/kb-harness-core
-```
+## 開発
 
 ```bash
-apm install --target claude   # または codex
+pip install -r requirements.txt pytest
+python3 -m pytest
 ```
 
-`apm install` はパッケージの `.apm/skills/` `.apm/agents/` を選択したランタイムへ展開する。scripts はこのデプロイ対象に含まれないため、別途コピーまたは symlink を張る。
+`tests/test_distribution_alignment.py` は兄弟ディレクトリ `../kb-ontology-core`（v0.2.0）の存在を前提とする。
 
-```bash
-ln -s ../kb-harness-core/scripts scripts
-```
+## ライセンス
 
-## 実行前提
-
-- Python 3.11 系（動作確認済み。3.9 以降の型ヒント構文 `X | None` を使うため 3.10 以上を推奨）
-- 依存パッケージ: PyYAML（`validate.py` / `kb_config.py` が `import yaml` する。標準ライブラリ外で唯一必須）
-- `cinii_search.py` を使う場合、環境変数 `CINII_APP_ID` が必要。リポジトリ直下の `.env`（`KEY=VALUE` 形式）からも自動で読み込む
-- `apm` CLI（[microsoft/apm](https://github.com/microsoft/apm)）。スキル・エージェントのデプロイに使う
-- `jq`（下記の hooks 例で使用）
-- `browse.py` を使う場合は Playwright 相当の CDP 対応 Chromium 環境が別途必要
-
-## 制約・既知の非対応
-
-- **hooks は APM の管理対象外である。** `apm install` はスキル・エージェントのみをデプロイし、各ランタイムの hooks（例: `.claude/settings.json` の `hooks` フィールド）は生成しない。導入先リポジトリで手書きする必要がある。このリポジトリでは `.md` 編集後に `validate.py` を自動実行する PostToolUse hook を次のように設定している。
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *.md) python3 scripts/validate.py >&2 || exit 2;; esac",
-            "timeout": 60,
-            "statusMessage": "validate.py 実行中..."
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-- **エージェント定義の拡張子は正規化される。** `.apm/agents/` 配下では `*.agent.md` という名前で定義するが、`apm install` でデプロイすると対象ランタイムのエージェント形式（Claude は `.md`、Codex は `.toml`）になる。
-- scripts はエンティティ検証・生成のみを対象とし、hooks からの呼び出しも含めて APM のデプロイ機構の外側で手動配線する前提である。
-
-## 運用
-
-- 資産（スキル・エージェント）を修正するときは `.apm/` 側の正本を編集し、`apm install --target <runtime>` で再デプロイする。各ランタイム配下の同名ファイルは生成物であり直接編集しない。
-- `apm audit` で、正本（`.apm/`）とデプロイ先のドリフト（未反映の差分）を検査できる。
-- scripts はこのパッケージの `scripts/` が正本である。導入先リポジトリのルート `scripts/` はそこへのコピーまたは symlink として運用する。
+MIT

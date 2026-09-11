@@ -8,3 +8,6 @@ __pycache__/
 
 # Local credentials
 .env
+
+# Local, machine-specific notes
+CLAUDE.local.md
