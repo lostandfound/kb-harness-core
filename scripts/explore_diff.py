@@ -7,7 +7,7 @@
 カテゴリを省略した場合は kb-domain.yml の exploration.wikipedia_categories を読む。
 MediaWiki API（action=query&list=categorymembers）でカテゴリ所属記事タイトルを取得し、
 KB 側の全エンティティ frontmatter の title / aliases と突き合わせて未収録候補を抽出する。
-一致判定は完全一致に加え、括弧註釈（例:「宮城長順 (空手家)」→「宮城長順」）を除去した
+一致判定は完全一致に加え、括弧註釈（例:「山田太郎 (画家)」→「山田太郎」）を除去した
 正規化一致も見る。判定・裏取りは行わない（機械的な列挙のみ）。
 
 「〜一覧」で終わる記事や「Category:」「Template:」等の名前空間付きタイトルは、単体エンティティ
@@ -39,7 +39,7 @@ INITIAL_BACKOFF_SECONDS = 2.0
 
 
 def normalize_title(title: str) -> str:
-    """括弧註釈を除去して比較用に正規化する（例:「宮城長順 (空手家)」→「宮城長順」）。"""
+    """括弧註釈を除去して比較用に正規化する（例:「山田太郎 (画家)」→「山田太郎」）。"""
     return PAREN_RE.sub("", title).strip()
 
 

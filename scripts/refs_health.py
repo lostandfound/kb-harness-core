@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-DEFAULT_REFS = "okinawa-karate/references.yml"
+from kb_config import default_content_root
 
 # lineage の予約値。系統に属さない資料であることを判定済みだと示す。
 # 未記載は「独立源」ではなく「未判定」を意味する。系統外どうしは互いに独立源として数える。
@@ -164,7 +164,7 @@ def format_report(refs: dict, today: date, stale_days: int) -> str:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--refs", default=DEFAULT_REFS, help="文献レジストリのパス")
+    parser.add_argument("--refs", default=None, help="文献レジストリのパス（省略時は kb-domain.yml から解決）")
     parser.add_argument("--stale-days", type=int, default=180, help="到達確認が古いとみなす経過日数")
     parser.add_argument("--lineage", action="store_true", help="lineage 未判定の文献のみを出力する")
     parser.add_argument("--pending", action="store_true", help="pending の文献のみを滞留日数順に出力する")
@@ -175,7 +175,7 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
-    path = Path(args.refs)
+    path = Path(args.refs) if args.refs else Path(default_content_root()) / "references.yml"
     if not path.exists():
         print(f"文献レジストリが見つからない: {path}", file=sys.stderr)
         return 2

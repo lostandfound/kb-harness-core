@@ -431,7 +431,7 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
 
 
 # urllib デフォルト UA は Wikipedia 等にボット扱いで 403 拒否されるため明示する
-_UA = {"User-Agent": "kb-harness-validator/1.0 (+https://github.com/lostandfound/okinawa-karate-book)"}
+_UA = {"User-Agent": "kb-harness-validator/1.0 (+https://github.com/lostandfound/kb-harness-core)"}
 
 
 def _url_reachable(url: str) -> bool:

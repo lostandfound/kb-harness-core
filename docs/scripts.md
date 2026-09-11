@@ -127,14 +127,16 @@ python3 scripts/browse.py press <key>
 `references.yml` の健全性を点検する。Web 資料の到達確認日の古さと、`pending` の滞留期間を表面化させる。
 
 ```bash
-python3 scripts/refs_health.py [--refs FILE] [--stale-days N] [--lineage] [--pending]
+python3 scripts/refs_health.py [--refs FILE] [--stale-days N] [--lineage] [--pending] [--record-check]
 ```
 
 | オプション | 内容 |
 |---|---|
+| `--refs` | レジストリのパス。省略時は `kb-domain.yml` の content_root 配下 |
 | `--stale-days` | 到達確認が古いとみなす経過日数（既定 180） |
 | `--lineage` | lineage 未判定の文献のみ出力 |
 | `--pending` | `pending` の文献のみを滞留日数順に出力 |
+| `--record-check` | 到達確認を実行し、成功した文献の `checked` を更新（ネットワーク使用） |
 
 ### concerns_summary.py
 
