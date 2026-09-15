@@ -93,6 +93,7 @@ def _load_types(root: Path) -> dict:
             "extra_fields": val.get("extra_fields") or [],
             "graph": val.get("graph", True),
             "sections": val.get("sections") or [],
+            "sources_required": val.get("sources_required", True),
         }
     return types
 
@@ -279,10 +280,13 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                     errors.append(f"ERROR {rel}: aliases '{alias}' が自身の title と重複している")
 
         entity_type = fm.get("type")
+        type_def = types.get(entity_type)
+        sources_required = (type_def or {}).get("sources_required", True)
         if not is_index:
             sources = fm.get("sources")
             if not sources:
-                errors.append(f"ERROR {rel}: missing required field 'sources'")
+                if sources_required:
+                    errors.append(f"ERROR {rel}: missing required field 'sources'")
             elif isinstance(sources, list):
                 for source in sources:
                     if not isinstance(source, str) or not source.startswith("ref:"):
@@ -293,7 +297,6 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                     else:
                         used_references.add(ref_id)
 
-        type_def = types.get(entity_type)
         for field in (type_def or {}).get("extra_fields", []):
             value = fm.get(field)
             if not isinstance(value, str) or not value.strip():

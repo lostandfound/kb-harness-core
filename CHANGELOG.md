@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `vocabulary.yml` の型定義に `sources_required: false` を追加。出典を求めない型（個人メモ等）を定義できる。`kb validate` と `kb entity create` の両方が従う
+
 ## 0.2.1 — 2026-09-11
 
 ### Fixed

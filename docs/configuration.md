@@ -46,6 +46,7 @@ types:
     directory: <対応ディレクトリ名>     # 必須。frontmatter の type とディレクトリの対応検査に使う
     extra_fields: [born, died]           # 任意。この型で追加必須になる frontmatter フィールド
     graph: false                         # 任意（既定 true）。false の型は relations を持てない
+    sources_required: false              # 任意（既定 true）。false の型は sources を省略できる
 predicates:
   <述語名>:
     description: <説明>
@@ -97,7 +98,7 @@ fields:                         # 任意。型の extra_fields に対応
 timestamp: 2026-01-01T00:00:00Z # 任意。省略時は SOURCE_DATE_EPOCH → clock
 ```
 
-`type` / `slug` / `title` / `description` / `tags` / `sources` / `sections` が必須。型ごとの章構成と `extra_fields` は `vocabulary.yml` を正本とする。
+`type` / `slug` / `title` / `description` / `tags` / `sections` が必須。`sources` は型の `sources_required` が `false` でない限り必須。型ごとの章構成と `extra_fields` は `vocabulary.yml` を正本とする。
 
 ## Claim 型（任意）
 

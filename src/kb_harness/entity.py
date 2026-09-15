@@ -56,6 +56,7 @@ def _load_types(root: Path) -> dict[str, dict[str, object]]:
             "extra_fields": definition.get("extra_fields") or [],
             "sections": definition.get("sections") or [],
             "graph": definition.get("graph", True),
+            "sources_required": definition.get("sources_required", True),
         }
     return types
 
@@ -124,8 +125,10 @@ def load_entity_spec(path: Path) -> dict[str, Any]:
         raise EntitySpecError(f"cannot read spec {path}: {error}", argument=True) from error
     if not isinstance(data, dict):
         raise EntitySpecError("entity spec must be a YAML mapping", argument=True)
-    required = {"type", "slug", "title", "description", "tags", "sources", "sections"}
-    optional = {"aliases", "relations", "fields", "timestamp"}
+    # sources は型定義の sources_required で省略可否が決まるため、
+    # ここでは存在時の形式だけを見て必須判定は _frontmatter_and_body に委ねる
+    required = {"type", "slug", "title", "description", "tags", "sections"}
+    optional = {"sources", "aliases", "relations", "fields", "timestamp"}
     unknown = sorted(set(data) - required - optional)
     if unknown:
         raise EntitySpecError(f"unknown spec field(s): {', '.join(unknown)}", argument=True)
@@ -141,7 +144,8 @@ def load_entity_spec(path: Path) -> dict[str, Any]:
         raise EntitySpecError("title must not contain parentheses")
     _nonempty_string(data["description"], "description")
     _string_list(data["tags"], "tags", required=True)
-    _string_list(data["sources"], "sources", required=True)
+    if "sources" in data:
+        _string_list(data["sources"], "sources")
     if "aliases" in data:
         _string_list(data["aliases"], "aliases")
     if "relations" in data:
@@ -210,8 +214,10 @@ def _frontmatter_and_body(root: Path, spec: Mapping[str, Any], *, timestamp: str
         "description": _nonempty_string(spec["description"], "description"),
         "tags": _string_list(spec["tags"], "tags", required=True),
         "timestamp": timestamp,
-        "sources": _string_list(spec["sources"], "sources", required=True),
     }
+    sources_required = definition.get("sources_required", True)
+    if sources_required or spec.get("sources"):
+        frontmatter["sources"] = _string_list(spec.get("sources") or [], "sources", required=True)
     if "aliases" in spec:
         frontmatter["aliases"] = _string_list(spec["aliases"], "aliases")
     if "relations" in spec:
