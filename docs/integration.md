@@ -81,7 +81,7 @@ apm は `.apm/hooks/*.json` を `.claude/settings.json` にマージする機能
 bash scripts/install-hooks.sh
 ```
 
-ステージに `.md` / `.yml` / `.py` が含まれるとき `validate.py` → テスト → `rag_smoke.py` を順に実行する。
+ステージに `.md` / `.yml` / `.py` が含まれるとき `validate.py` → テスト（`tests/` がある場合）→ `rag_smoke.py`（`evals/rag-eval.yml` がある場合）→ `.kb/hooks/pre-commit.d/*`（ある場合）を順に実行する。導入先固有のチェックは `kb-domain.yml` の `validate.extra_checks` か `.kb/hooks/pre-commit.d/` に置き、テンプレート自体は編集しない。
 
 ## 運用上の注意
 

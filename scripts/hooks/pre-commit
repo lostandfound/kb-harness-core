@@ -1,5 +1,7 @@
 #!/bin/bash
+# 導入先リポジトリ向けの pre-commit テンプレート。
 # ステージされたファイルに .md / .yml / .py が含まれる場合のみ検証を実行する。
+# tests/ や evals/rag-eval.yml を持たない導入先でも失敗しないよう、存在するものだけ実行する。
 set -euo pipefail
 
 staged_files=$(git diff --cached --name-only --diff-filter=ACM)
@@ -15,14 +17,29 @@ if ! python3 scripts/validate.py; then
     exit 1
 fi
 
-if ! python3 -m pytest tests -q; then
-  echo "pre-commit: テストが失敗しました。コミットを中止します。" >&2
-  exit 1
+if [ -d tests ]; then
+    if ! python3 -m pytest tests -q; then
+        echo "pre-commit: テストが失敗しました。コミットを中止します。" >&2
+        exit 1
+    fi
 fi
 
-if ! python3 scripts/rag_smoke.py; then
-  echo "pre-commit: rag_smoke.py が失敗しました。コミットを中止します。" >&2
-  exit 1
+if [ -f evals/rag-eval.yml ]; then
+    if ! python3 scripts/rag_smoke.py; then
+        echo "pre-commit: rag_smoke.py が失敗しました。コミットを中止します。" >&2
+        exit 1
+    fi
+fi
+
+# 導入先固有のチェックはテンプレートを編集せず .kb/hooks/pre-commit.d/ に置く。名前順に実行する。
+if [ -d .kb/hooks/pre-commit.d ]; then
+    for hook in .kb/hooks/pre-commit.d/*; do
+        [ -f "$hook" ] && [ -x "$hook" ] || continue
+        if ! "$hook"; then
+            echo "pre-commit: $hook が失敗しました。コミットを中止します。" >&2
+            exit 1
+        fi
+    done
 fi
 
 echo "pre-commit: 検証成功。"
