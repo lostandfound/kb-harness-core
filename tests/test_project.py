@@ -34,3 +34,25 @@ class ProjectTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProjectIndexConfigTest(unittest.TestCase):
+    def test_index_options_default_to_disabled(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = Path(tempdir) / "kb-domain.yml"
+            config.write_text("domain:\n  content_root: knowledge\n", encoding="utf-8")
+            project = Project.from_config(config)
+            self.assertFalse(project.index_by_tag)
+            self.assertEqual(project.tag_labels, {})
+
+    def test_reads_index_by_tag_and_labels(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = Path(tempdir) / "kb-domain.yml"
+            config.write_text(
+                "domain:\n  content_root: knowledge\n"
+                "index:\n  by_tag: true\n  tag_labels:\n    cooking: 料理\n",
+                encoding="utf-8",
+            )
+            project = Project.from_config(config)
+            self.assertTrue(project.index_by_tag)
+            self.assertEqual(project.tag_labels, {"cooking": "料理"})

@@ -454,3 +454,55 @@ class CliTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TagIndexCliTest(unittest.TestCase):
+    def _build(self, root: Path) -> Path:
+        content = root / "knowledge"
+        (content / "notes").mkdir(parents=True)
+        (root / "kb-domain.yml").write_text(
+            "domain:\n  content_root: knowledge\nindex:\n  by_tag: true\n  tag_labels:\n    cooking: 料理\n",
+            encoding="utf-8",
+        )
+        (content / "vocabulary.yml").write_text(
+            "types:\n  Note:\n    directory: notes\n    graph: false\ntags:\n  - cooking\n",
+            encoding="utf-8",
+        )
+        (content / "notes" / "index.md").write_text("# Notes\n\n## エンティティ一覧\n\n", encoding="utf-8")
+        (content / "notes" / "example.md").write_text(
+            "---\ntype: Note\ntitle: Example\ndescription: D.\ntags: [cooking]\n"
+            "timestamp: 2026-09-01T00:00:00Z\nsources: []\n---\n\nBody\n",
+            encoding="utf-8",
+        )
+        index = content / "index.md"
+        index.write_text("# Root\n", encoding="utf-8")
+        return index
+
+    def test_sync_check_reports_stale_tag_index_and_sync_writes_it(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            index = self._build(root)
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["sync", "--check", "--start", str(root), "--format", "json"])
+            result = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 1)
+            self.assertIn("knowledge/index.md", [d["path"] for d in result["diagnostics"]])
+            self.assertEqual(index.read_text(encoding="utf-8"), "# Root\n")
+
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["sync", "--start", str(root), "--format", "json"]), 0)
+            text = index.read_text(encoding="utf-8")
+            self.assertIn("### 料理（1件）\n\n- [Example](/notes/example.md) — Note\n", text)
+
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["sync", "--check", "--start", str(root), "--format", "json"]), 0)
+
+    def test_index_build_also_renders_tag_index(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            index = self._build(root)
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["index", "build", "--start", str(root), "--format", "json"]), 0)
+            self.assertIn("<!-- tag-index:start -->", index.read_text(encoding="utf-8"))

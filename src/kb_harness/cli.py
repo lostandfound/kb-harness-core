@@ -623,7 +623,11 @@ def _main(argv: Sequence[str] | None = None) -> int:
             check=args.index_command == "check",
             dry_run=args.dry_run,
             output_format=args.format,
-            planner=lambda: plan_index(project.content_root),
+            planner=lambda: plan_index(
+                project.content_root,
+                by_tag=project.index_by_tag,
+                tag_labels=project.tag_labels,
+            ),
             stale_code=lambda _path: "index.stale",
             stale_message=lambda path: f"index is stale: {path}",
         )

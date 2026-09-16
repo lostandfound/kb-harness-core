@@ -23,6 +23,13 @@ domain:
 exploration:
   wikipedia_categories:
     - 沖縄空手
+
+# 任意。kb sync / kb index build がルート index.md にタグ別一覧を生成する
+index:
+  by_tag: true
+  tag_labels:
+    cooking: 料理
+    science: 科学
 ```
 
 | フィールド | 必須 | 内容 |
@@ -33,6 +40,8 @@ exploration:
 | `domain.content_root` | 要 | エンティティ Markdown を置くディレクトリ名。scripts の `--root` 既定値はここから解決する。 |
 | `domain.lineage_example` | 任意 | 系統・分類の具体例。エージェントのプロンプトが参照する補助情報。 |
 | `exploration.wikipedia_categories` | 任意 | `explore_diff.py` が既定で走査する Wikipedia カテゴリ名の一覧。 |
+| `index.by_tag` | 任意 | `true` のとき `kb sync` / `kb index build` が `<content_root>/index.md` の `<!-- tag-index:start -->` 〜 `<!-- tag-index:end -->` 区間にタグ別一覧を生成する。区間がなければ末尾に追記し、区間外の本文は保持する。並び順は `vocabulary.yml` の `tags` 順、該当エンティティのないタグは省く。`kb sync --check` が陳腐化を検出する。既定は無効。 |
+| `index.tag_labels` | 任意 | タグ ID から見出し表示名への対応。未登録のタグは ID をそのまま見出しにする。 |
 
 上記以外のキーはハーネスは読まない。導入先が独自の設定を同じファイルに置いても支障はない。
 

@@ -37,7 +37,7 @@ KB 全体を検証する。frontmatter・リンク・relations の型制約・�
 
 ### `kb index build` / `kb index check`
 
-各型ディレクトリの `index.md` を生成する（`build`）、または同期済みか確認する（`check`）。`build` は `--dry-run` に対応する。
+各型ディレクトリの `index.md` を生成する（`build`）、または同期済みか確認する（`check`）。`build` は `--dry-run` に対応する。`kb-domain.yml` で `index.by_tag: true` のときは、ルート `index.md` の `<!-- tag-index:start -->` 〜 `<!-- tag-index:end -->` 区間にタグ別一覧も生成する（[設定リファレンス](configuration.md#kb-domainyml)）。
 
 ### `kb graph build` / `kb graph check`
 
@@ -45,7 +45,7 @@ KB 全体を検証する。frontmatter・リンク・relations の型制約・�
 
 ### `kb sync` / `kb sync --check`
 
-index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。
+index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。`index.by_tag` が有効ならタグ別一覧の陳腐化も `--check` で検出する。
 
 ## 書き込み（原子的）
 

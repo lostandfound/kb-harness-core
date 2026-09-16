@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -20,6 +20,9 @@ class ProjectError(ValueError):
 class Project:
     repo_root: Path
     content_root: Path
+    # kb-domain.yml の任意セクション index:。未指定なら無効（従来と同じ挙動）。
+    index_by_tag: bool = False
+    tag_labels: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def discover(cls, start: str | Path | None = None) -> "Project":
@@ -50,4 +53,12 @@ class Project:
             raise ProjectError(
                 f"{path}: domain.content_root must be a non-empty string"
             )
-        return cls(repo_root=path.parent, content_root=path.parent / content_root)
+        index = data.get("index") if isinstance(data.get("index"), dict) else {}
+        raw_labels = index.get("tag_labels") if isinstance(index.get("tag_labels"), dict) else {}
+        tag_labels = {str(key): str(value) for key, value in raw_labels.items()}
+        return cls(
+            repo_root=path.parent,
+            content_root=path.parent / content_root,
+            index_by_tag=bool(index.get("by_tag", False)),
+            tag_labels=tag_labels,
+        )

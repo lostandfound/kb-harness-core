@@ -95,7 +95,11 @@ def execute_write_plan(
 
 def plan_sync(project: Project) -> dict[Path, str]:
     changes = {
-        **plan_index(project.content_root),
+        **plan_index(
+            project.content_root,
+            by_tag=project.index_by_tag,
+            tag_labels=project.tag_labels,
+        ),
         **plan_graph(project.content_root, project.repo_root / "graph.json"),
     }
     return dict(sorted(changes.items(), key=lambda item: str(item[0])))

@@ -161,3 +161,31 @@ class EntityCreatePhase3Test(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EntityCreateTagIndexTest(unittest.TestCase):
+    """index.by_tag 有効時は entity create もルート index.md のタグ別一覧を更新する。"""
+
+    # 親テストの fixture を再利用するが、継承すると親のテストまで二重に走るので委譲にする
+    run_cli = EntityCreatePhase3Test.run_cli
+    tearDown = EntityCreatePhase3Test.tearDown
+
+    def setUp(self):
+        EntityCreatePhase3Test.setUp(self)
+        (self.root / "kb-domain.yml").write_text(
+            "domain:\n  content_root: knowledge\nindex:\n  by_tag: true\n", encoding="utf-8"
+        )
+        (self.root / "knowledge" / "index.md").write_text(
+            "---\ntype: Index\ntitle: Root\ndescription: Root index.\n"
+            "tags: [index]\ntimestamp: 2026-09-01T00:00:00Z\n---\n\n# Root\n\n"
+            "- [Concepts](/concepts/index.md)（0件）\n",
+            encoding="utf-8",
+        )
+
+    def test_create_updates_tag_index_and_sync_check_passes(self):
+        code, result = self.run_cli("entity", "create", "--from", str(self.root / "entity.yml"))
+        self.assertEqual(code, 0, result)
+        text = (self.root / "knowledge" / "index.md").read_text(encoding="utf-8")
+        self.assertIn("### science（1件）\n\n- [量子論](/concepts/quantum-theory.md) — Concept\n", text)
+        code, _ = self.run_cli("sync", "--check")
+        self.assertEqual(code, 0)

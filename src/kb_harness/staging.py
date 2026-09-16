@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import shutil
 import tempfile
 from pathlib import Path
@@ -49,8 +50,16 @@ def stage_and_validate(
         staged_path = stage_content / relative
         staged_path.parent.mkdir(parents=True, exist_ok=True)
         staged_path.write_text(proposed_text, encoding="utf-8")
-        staged_project = type(project)(repo_root=stage_root, content_root=stage_content)
-        derived = {**plan_index(stage_content), **plan_graph(stage_content, stage_root / "graph.json")}
+        # index.by_tag などの設定を引き継がないと、作成直後の sync --check が陳腐化を報告する
+        staged_project = dataclasses.replace(project, repo_root=stage_root, content_root=stage_content)
+        derived = {
+            **plan_index(
+                stage_content,
+                by_tag=getattr(project, "index_by_tag", False),
+                tag_labels=getattr(project, "tag_labels", None),
+            ),
+            **plan_graph(stage_content, stage_root / "graph.json"),
+        }
         execute_write_plan(plan_write(derived))
         errors = validate(stage_content)
         if errors:
