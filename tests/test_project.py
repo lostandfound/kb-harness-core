@@ -56,3 +56,24 @@ class ProjectIndexConfigTest(unittest.TestCase):
             project = Project.from_config(config)
             self.assertTrue(project.index_by_tag)
             self.assertEqual(project.tag_labels, {"cooking": "料理"})
+
+
+class ProjectExtraChecksConfigTest(unittest.TestCase):
+    def test_extra_checks_default_to_empty(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = Path(tempdir) / "kb-domain.yml"
+            config.write_text("domain:\n  content_root: knowledge\n", encoding="utf-8")
+            self.assertEqual(Project.from_config(config).extra_checks, ())
+
+    def test_reads_validate_extra_checks_in_order(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = Path(tempdir) / "kb-domain.yml"
+            config.write_text(
+                "domain:\n  content_root: knowledge\n"
+                "validate:\n  extra_checks:\n    - python3 tools/a.py --check\n    - \"true\"\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                Project.from_config(config).extra_checks,
+                ("python3 tools/a.py --check", "true"),
+            )

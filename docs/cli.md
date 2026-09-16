@@ -27,11 +27,11 @@
 
 ### `kb validate`
 
-KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml` を対象とする。
+KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml` を対象とする。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。
 
 ### `kb doctor`
 
-設定、`kb-ontology-core` のインストール状態と宣言タグとの一致、生成物の同期状態を診断する。導入直後や依存更新後の確認に使う。
+設定、`kb-ontology-core` のインストール状態と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。
 
 ## 生成物の同期
 

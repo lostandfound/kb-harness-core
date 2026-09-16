@@ -458,6 +458,32 @@ def _url_reachable(url: str) -> bool:
         return False
 
 
+def run_extra_checks(commands, cwd: Path) -> list[dict]:
+    """kb-domain.yml の validate.extra_checks を順に実行し、結果を構造化して返す。
+
+    シェル経由で実行するのは、導入先がリダイレクトや引数付きの一行コマンドを
+    そのまま書けるようにするため。失敗しても後続のチェックは続行し、まとめて報告する。
+    """
+    import subprocess
+
+    results: list[dict] = []
+    for command in commands:
+        completed = subprocess.run(
+            command, shell=True, cwd=cwd, capture_output=True, text=True
+        )
+        # 失敗理由が診断メッセージだけで分かるよう stderr の末尾を残す（長大な出力は切る）
+        stderr_tail = "\n".join(completed.stderr.strip().splitlines()[-5:])
+        results.append(
+            {
+                "command": command,
+                "returncode": completed.returncode,
+                "ok": completed.returncode == 0,
+                "stderr": stderr_tail,
+            }
+        )
+    return results
+
+
 def check_urls(root: Path) -> list[str]:
     errors: list[str] = []
     for path in _iter_entity_files(root):
