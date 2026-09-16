@@ -12,8 +12,9 @@ fi
 
 echo "pre-commit: .md/.yml/.py の変更を検出、検証を実行します..."
 
-if ! python3 scripts/validate.py; then
-    echo "pre-commit: validate.py が失敗しました。コミットを中止します。" >&2
+# 導入先の scripts/ には依存しない。kb-domain.yml の validate.extra_checks もここで走る。
+if ! kb validate; then
+    echo "pre-commit: kb validate が失敗しました。コミットを中止します。" >&2
     exit 1
 fi
 
@@ -25,8 +26,8 @@ if [ -d tests ]; then
 fi
 
 if [ -f evals/rag-eval.yml ]; then
-    if ! python3 scripts/rag_smoke.py; then
-        echo "pre-commit: rag_smoke.py が失敗しました。コミットを中止します。" >&2
+    if ! kb eval smoke; then
+        echo "pre-commit: kb eval smoke が失敗しました。コミットを中止します。" >&2
         exit 1
     fi
 fi

@@ -22,7 +22,7 @@ description: KB の外部から未収録候補を発見し、既存知識と重�
 - 登録済み文献の参考文献をたどる隣接探索
 - 許可されたコーパスに現れる未リンク固有名詞
 
-MediaWikiカテゴリを使う導入先では、`kb-domain.yml`の`exploration.wikipedia_categories`と`scripts/explore_diff.py`を利用できる。外部サービスへのアクセス、認証、取得物の保存は、導入先の規約とユーザーの権限に従う。
+MediaWikiカテゴリを使う導入先では、`kb-domain.yml`の`exploration.wikipedia_categories`と`apm_modules/lostandfound/kb-harness-core/scripts/explore_diff.py`を利用できる。外部サービスへのアクセス、認証、取得物の保存は、導入先の規約とユーザーの権限に従う。
 
 ## 候補を絞る
 

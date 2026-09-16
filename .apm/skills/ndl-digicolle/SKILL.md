@@ -10,7 +10,7 @@ NDL デジタルコレクションの個人送信資料で本文確認を行う�
 ## 前提
 
 - NDL の登録利用者アカウント（本登録済み、国内居住）が必要
-- 対象資料が「個人送信サービス対象」であること（`python3 scripts/ndl_search.py` で書誌を特定し、
+- 対象資料が「個人送信サービス対象」であること（`python3 apm_modules/lostandfound/kb-harness-core/scripts/ndl_search.py` で書誌を特定し、
   書誌ページ（ndlsearch.ndl.go.jp/books/...）を WebFetch して閲覧区分を確認する）。閲覧区分は
   「オンライン閲覧公開範囲」（インターネット公開／館内限定）と「デジタル化資料送信」（図書館・個人送信対象／対象外）の
   2 フィールドを併読して判定する。ページ内の facet 語彙やバッジ表示には全区分の文字列が出現するため、それだけで判定しない（誤判定の前例あり）
@@ -25,9 +25,9 @@ NDL デジタルコレクションの個人送信資料で本文確認を行う�
 
 ### 2. ブラウザ操作（エージェント + ユーザー）
 
-`scripts/browse.py`（軽量ブラウザ CLI、CDP 経由・抽出テキストのみ出力）で分担する:
+`apm_modules/lostandfound/kb-harness-core/scripts/browse.py`（軽量ブラウザ CLI、CDP 経由・抽出テキストのみ出力）で分担する:
 
-1. エージェント: `python3 scripts/browse.py open` で可視ブラウザを起動し（永続プロファイルのため
+1. エージェント: `python3 apm_modules/lostandfound/kb-harness-core/scripts/browse.py open` で可視ブラウザを起動し（永続プロファイルのため
    ログイン状態は維持される）、`goto` で https://dl.ndl.go.jp/ のログイン画面まで遷移する
 2. **ユーザー: 開いたウィンドウで利用者 ID・パスワード・メール認証コードを直接入力**
    （資格情報を CLI・チャットに経由させない）。完了したらチャットで知らせる
@@ -43,7 +43,7 @@ NDL デジタルコレクションの個人送信資料で本文確認を行う�
    references.yml のエントリに確認済みの書誌情報を補完する（頁番号は本文中の記述根拠として扱い、
    スキーマにないフィールドは追加しない）
 3. `docs/CONCERNS.md` が存在し、今回の調査に対応する項目がある場合は更新する（解決なら `[x]` + コミットハッシュ）。存在しない場合は新設しない
-4. `python3 scripts/validate.py` エラーゼロを確認しコミットする
+4. `kb validate` エラーゼロを確認しコミットする
 
 ## 注意
 

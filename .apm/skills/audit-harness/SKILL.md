@@ -19,11 +19,11 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 - `.codex/`・`.claude/`・`.agents/skills/` 配下のうちパッケージ外の資産（プロジェクト固有スキル等）
 - apm.yml の `targets` と実在する配布先ディレクトリの対応（README/CONTRIBUTING が配布先として挙げるランタイムがすべて `targets` に含まれているか。抜けていると `apm install` がそのランタイムを更新せずドリフトが沈む。前例: codex 欠落、2026-09-03）
 - apm.yml・packages/kb-harness-core/apm.yml（依存宣言・パッケージ内容の一致）
-- scripts/*.py の CLI 実引数（--help 相当）と docstring（正本は `packages/kb-harness-core/scripts`、リポジトリルート `scripts/` は symlink）
+- scripts/*.py の CLI 実引数（--help 相当）と docstring（正本はモジュール側 `apm_modules/lostandfound/kb-harness-core/scripts`。導入先ルートには symlink を張らず、このパスで直接呼ぶ）
 - `kb --help` と各サブコマンドの `--help` 実出力 ↔ docs/cli-development-plan.md・packages/kb-harness-core/README.md・各 SKILL.md が語るコマンド名とフラグ
 - `<content_root>/vocabulary.yml`、`references.yml`（content_root は `kb-domain.yml` の `domain.content_root`）のスキーマ実態
 - evals/ 配下、.env.example、.github/workflows/
-- `.git/hooks/pre-commit` ↔ `scripts/hooks/pre-commit`（install-hooks.sh はコピー方式のため、正本更新後に再インストールしないと古い hook が走り続ける。diff で同一性を確認し、違えば `bash scripts/install-hooks.sh`）
+- `.git/hooks/pre-commit` ↔ `apm_modules/lostandfound/kb-harness-core/scripts/hooks/pre-commit`（install-hooks.sh はコピー方式のため、正本更新後に再インストールしないと古い hook が走り続ける。diff で同一性を確認し、違えば `bash apm_modules/lostandfound/kb-harness-core/scripts/install-hooks.sh`）
 
 ## 監査の 7 観点
 
@@ -43,4 +43,4 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 
 ## 検証
 
-修正後: `python3 -m pytest tests packages/kb-harness-core/tests` 全パス（unittest discover はパッケージ側の pytest 形式テストを取りこぼす） + `python3 scripts/validate.py` エラーゼロ + `kb sync --check` 差分なし + `wc -l AGENTS.md` で 25 行以内。`.apm/` 正本を直した場合は `apm install --force` で全 `targets` に再デプロイし、正本と配布先の diff がないことを確認 → コミット（docs: / fix:、pre-commit hook 成功確認）。
+修正後: `python3 -m pytest tests apm_modules/lostandfound/kb-harness-core/tests` 全パス（unittest discover はパッケージ側の pytest 形式テストを取りこぼす） + `kb validate` エラーゼロ + `kb sync --check` 差分なし + `wc -l AGENTS.md` で 25 行以内。`.apm/` 正本を直した場合は `apm install --force` で全 `targets` に再デプロイし、正本と配布先の diff がないことを確認 → コミット（docs: / fix:、pre-commit hook 成功確認）。

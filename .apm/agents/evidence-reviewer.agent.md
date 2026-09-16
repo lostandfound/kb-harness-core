@@ -17,7 +17,7 @@ model: sonnet
 ## 手順
 
 1. 対象ファイルから検証可能な主張を列挙する。固有名、数値、日付・年代、帰属（誰が・どこが）、因果や効果の主張、現在も有効かどうかが問われる主張を分ける
-2. `sources` と本文中のインライン出典 `（出典: <ref-id>）` を確認し、可能なら原文を WebSearch・WebFetch で読む。Wikipedia は `python3 scripts/wiki_fetch.py "<記事名>"` で全文を取得する（WebFetch は要約化されて細部が落ちる）
+2. `sources` と本文中のインライン出典 `（出典: <ref-id>）` を確認し、可能なら原文を WebSearch・WebFetch で読む。Wikipedia は `python3 apm_modules/lostandfound/kb-harness-core/scripts/wiki_fetch.py "<記事名>"` で全文を取得する（WebFetch は要約化されて細部が落ちる）
 3. 一次情報、独立した二次情報、当事者・利害関係者の発信を区別する。利害関係者の発信だけで効果や優位性を断定してはならない
 4. 情報の更新日と適用範囲を確認する。現在も当てはまるか、特定の時期・地域・版・条件だけに当てはまるかを明示する
 5. 出典が主張の一部しか支えない場合は、支えられる範囲まで表現を狭める案を出す
