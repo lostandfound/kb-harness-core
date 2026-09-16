@@ -1,6 +1,6 @@
 # scripts リファレンス
 
-`scripts/` 配下の CLI 一覧。`--root` を持つものはコンテンツルートを指定でき、省略時は `kb-domain.yml` の `domain.content_root` から自動解決する。
+`scripts/` 配下の CLI 一覧。`--root` を持つものはコンテンツルートを指定でき、省略時は `kb-domain.yml` の `domain.content_root` から自動解決する。導入先からは `python3 apm_modules/lostandfound/kb-harness-core/scripts/<name>.py` のようにモジュール配下のパスで呼ぶ（導入先ルートに `scripts/` の symlink は張らない。[導入ガイド](integration.md) §5）。
 
 `kb_config.py` と `ontology_adapter.py` は共有モジュールであり、単体では実行しない。
 
@@ -150,4 +150,11 @@ python3 scripts/concerns_summary.py [--ledger FILE]
 
 ### hooks/pre-commit, install-hooks.sh
 
-導入先リポジトリ向けの pre-commit テンプレート。ステージに `.md` / `.yml` / `.py` が含まれるとき `validate.py` → `unittest` → `rag_smoke.py` を順に実行する。`install-hooks.sh` が `.git/hooks/pre-commit` へ冪等にコピーする。
+導入先リポジトリ向けの pre-commit テンプレート。ステージに `.md` / `.yml` / `.py` が含まれるとき次を順に実行し、いずれかが失敗すればコミットを中止する。`install-hooks.sh` が自身と同じ場所の `hooks/pre-commit` を `.git/hooks/pre-commit` へ冪等にコピーする（`bash apm_modules/lostandfound/kb-harness-core/scripts/install-hooks.sh`）。テンプレートは `kb` CLI だけを呼び、導入先の `scripts/` には依存しない。
+
+1. `kb validate`（`kb-domain.yml` の `validate.extra_checks` もここで走る）
+2. `tests/` が存在すれば `python3 -m pytest tests -q`
+3. `evals/rag-eval.yml` が存在すれば `kb eval smoke`
+4. `.kb/hooks/pre-commit.d/` が存在すれば、その中の実行可能ファイルを名前順に実行する
+
+導入先固有のチェックはテンプレートを編集せず `.kb/hooks/pre-commit.d/` に置く。`kb-domain.yml` の `validate.extra_checks` に登録すれば `kb validate` 側で実行されるので、通常はそちらを使う。

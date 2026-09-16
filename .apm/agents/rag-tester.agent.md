@@ -35,7 +35,7 @@ expected が明示的にヘッジを求めている場合に限って使う。
    または大きな構造変更後・ディスパッチで明示指定された場合のみ。評価した設問の `history` に
    本日の `{date, verdict}` を追記する（過去の履歴は削除せず残す）。前回の verdict から悪化した
    項目（OK → 曖昧/誤答誘発/回答不能）は **退行として Critical 報告する**。評価コミット後は
-   `python3 scripts/eval_summary.py` を実行し、exit 1（退行検出）が出ていないか機械確認する。
+   `python3 apm_modules/lostandfound/kb-harness-core/scripts/eval_summary.py` を実行し、exit 1（退行検出）が出ていないか機械確認する。
 2. 固定セットに加え、実際のユーザーが聞きそうな新規クエリを 5 件作り、判定後に
    `evals/rag-eval.yml` へ新規エントリとして追記する（新しい `id` を採番し、`history` に初回の
    `{date, verdict}` を記録）。種類を混ぜる:
@@ -45,7 +45,7 @@ expected が明示的にヘッジを求めている場合に限って使う。
    - 比較・列挙（「<系統A>と<系統B>の違いは」「<系統>に属する<下位エンティティ>を全部挙げよ」）
    - 用語（「<用語>とは何か」「<類似用語>との違いは」）
    - 年代（「<年>に何があったか」「<人物>の存命中の出来事は」）
-3. 各クエリに対し Grep/Read で該当エンティティを検索し（RAG の検索を模す — description・title・tags が引っかかるかも観察）、見つかった本文・relations・`python3 scripts/export_graph.py --force` の出力だけで回答を組み立てる
+3. 各クエリに対し Grep/Read で該当エンティティを検索し（RAG の検索を模す — description・title・tags が引っかかるかも観察）、見つかった本文・relations・`python3 apm_modules/lostandfound/kb-harness-core/scripts/export_graph.py --force` の出力だけで回答を組み立てる
 4. 各クエリを判定する:
    - **OK** — 正確に回答できた（根拠ファイルを列挙）
    - **曖昧** — 回答できたが複数ファイルの記述が不揃い・ヘッジ過多で確信が持てない

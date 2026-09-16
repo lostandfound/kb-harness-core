@@ -41,13 +41,15 @@ kb doctor
 
 `pyproject.toml` は `kb-ontology-core` を `git+https://` で参照するため、ssh 鍵は不要。
 
-## 5. scripts を配線する
+## 5. 補助スクリプトの呼び出し
 
-`scripts/` 配下の補助ツールは APM のデプロイ対象に含まれない。展開先へ symlink を張るか、コピーする。
+検証・生成・評価は `kb` CLI を正本として使う。`scripts/` 配下の補助ツール（`ndl_search.py` / `cinii_search.py` / `wiki_fetch.py` / `browse.py` など）は APM のデプロイ対象に含まれないので、モジュール配下のパスで直接実行する。
 
 ```bash
-ln -s apm_modules/lostandfound/kb-harness-core/scripts scripts
+python3 apm_modules/lostandfound/kb-harness-core/scripts/ndl_search.py "<検索語>" --count 5
 ```
+
+導入先ルートの `scripts/` をモジュールへの symlink にはしない。symlink だと導入先固有のスクリプトを `scripts/` に置けず（`git add` が symlink 越しのパスを拒む）、配下を編集すると git 管理外の外部モジュールを汚すためである。導入先固有のスクリプトは導入先自身の `scripts/` に置いてよい。
 
 ## 6. hooks を設定する（任意）
 
@@ -78,15 +80,15 @@ apm は `.apm/hooks/*.json` を `.claude/settings.json` にマージする機能
 ### git pre-commit
 
 ```bash
-bash scripts/install-hooks.sh
+bash apm_modules/lostandfound/kb-harness-core/scripts/install-hooks.sh
 ```
 
-ステージに `.md` / `.yml` / `.py` が含まれるとき `validate.py` → テスト → `rag_smoke.py` を順に実行する。
+ステージに `.md` / `.yml` / `.py` が含まれるとき `kb validate` → テスト（`tests/` がある場合）→ `kb eval smoke`（`evals/rag-eval.yml` がある場合）→ `.kb/hooks/pre-commit.d/*`（ある場合）を順に実行する。テンプレートは `kb` CLI だけを呼び、導入先の `scripts/` には依存しない。導入先固有のチェックは `kb-domain.yml` の `validate.extra_checks` か `.kb/hooks/pre-commit.d/` に置き、テンプレート自体は編集しない。
 
 ## 運用上の注意
 
 - **正本は `.apm/`。** スキル・エージェントを修正するときはパッケージ側の `.apm/` を編集し、`apm install` で再デプロイする。ランタイム配下（`.claude/skills/` など）の同名ファイルは生成物であり直接編集しない。
 - `apm audit` で、正本と展開先のドリフト（未反映の差分）を検査できる。
 - エージェント定義は `.apm/agents/` では `*.agent.md` だが、デプロイ後は対象ランタイムの形式（Claude は `.md`、Codex は `.toml`）になる。
-- scripts の正本はパッケージの `scripts/`。導入先ルートの `scripts/` はそこへの symlink またはコピーとして運用する。submodule + symlink で組み込んでいる場合、導入先で実行されるのは submodule 側のコードである。
+- scripts の正本はパッケージの `scripts/`。導入先からは `apm_modules/lostandfound/kb-harness-core/scripts/<name>.py` で直接呼び、導入先ルートに symlink を張らない。導入先ルートの `scripts/` は導入先固有のスクリプト置き場として使える。
 - `kb doctor` は `pyproject.toml` が宣言する `kb-ontology-core` のタグとインストール済みバージョンの不一致を報告する。依存を更新したら再インストールする。

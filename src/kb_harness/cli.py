@@ -33,7 +33,7 @@ from .sync import (
     plan_sync,
     plan_write,
 )
-from .validation import validate
+from .validation import run_extra_checks, validate
 
 Result = dict[str, Any]
 
@@ -248,11 +248,29 @@ def _run_derived(
 def _validate(project: Project, output_format: str) -> int:
     try:
         errors = validate(project.content_root)
+        checks = run_extra_checks(project.extra_checks, project.repo_root)
     except Exception as error:
         return _internal_error(error, output_format)
-    diagnostics = [{"code": "validation.error", "message": error} for error in errors]
-    _emit({"ok": not errors, "changed": [], "diagnostics": diagnostics}, output_format)
-    return 1 if errors else 0
+    diagnostics: list[dict[str, Any]] = [
+        {"code": "validation.error", "message": error} for error in errors
+    ]
+    for check in checks:
+        if check["ok"]:
+            continue
+        detail = f": {check['stderr']}" if check["stderr"] else ""
+        diagnostics.append(
+            {
+                "code": "validation.extra_check.failed",
+                "message": f"ERROR extra check failed (exit {check['returncode']}): {check['command']}{detail}",
+                "command": check["command"],
+                "returncode": check["returncode"],
+            }
+        )
+    result: dict[str, Any] = {"ok": not diagnostics, "changed": [], "diagnostics": diagnostics}
+    if project.extra_checks:
+        result["extra_checks"] = checks
+    _emit(result, output_format)
+    return 1 if diagnostics else 0
 
 
 def _entity_create(project: Project, args: Any) -> int:
@@ -606,16 +624,18 @@ def _main(argv: Sequence[str] | None = None) -> int:
             details, diagnostics = diagnose(project)
         except Exception as error:
             return _internal_error(error, args.format)
+        # severity: warning の診断（extra_checks のコマンド不在など）は失敗にしない
+        problems = [d for d in diagnostics if d.get("severity", "error") != "warning"]
         _emit(
             {
-                "ok": not diagnostics,
+                "ok": not problems,
                 "changed": [],
                 "diagnostics": diagnostics,
                 "details": details,
             },
             args.format,
         )
-        return 1 if diagnostics else 0
+        return 1 if problems else 0
 
     if args.command == "index":
         return _run_derived(
@@ -623,7 +643,11 @@ def _main(argv: Sequence[str] | None = None) -> int:
             check=args.index_command == "check",
             dry_run=args.dry_run,
             output_format=args.format,
-            planner=lambda: plan_index(project.content_root),
+            planner=lambda: plan_index(
+                project.content_root,
+                by_tag=project.index_by_tag,
+                tag_labels=project.tag_labels,
+            ),
             stale_code=lambda _path: "index.stale",
             stale_message=lambda path: f"index is stale: {path}",
         )

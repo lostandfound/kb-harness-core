@@ -6,7 +6,7 @@ description: KB に新規エンティティを追加する確定的手順。「�
 ナレッジベース（ドメイン定義はルートの `kb-domain.yml`）に新規エンティティを追加するときは、以下の手順を順番に実行する。
 規約の正本は `CONTRIBUTING.md` と `<content_root>/vocabulary.yml`（content_root は `kb-domain.yml` の `domain.content_root`）であり、本スキルには規約の値（述語の一覧・必須フィールドの詳細・値域など）を書かない。着手前に必ず `kb-domain.yml`・`CONTRIBUTING.md`・`vocabulary.yml` を読むこと。
 
-反映は `kb entity create` で行う。エンティティ本体・各型の `index.md`・ルートの `graph.json` を一度に原子的に更新し、事前検証に失敗すればファイルを書き換えずに停止する（`kb` が未導入なら CONTRIBUTING.md §10 の手順で入れる）。雛形を手で編集する旧手順（`python3 scripts/new_entity.py`）を使う場合は、手順 6 の `kb sync` を必ず実行する。`graph.json` はチェックイン済みで CI が `kb sync --check` で陳腐化を検出するため、index だけ更新して graph を忘れると CI が落ちる。
+反映は `kb entity create` で行う。エンティティ本体・各型の `index.md`・ルートの `graph.json` を一度に原子的に更新し、事前検証に失敗すればファイルを書き換えずに停止する（`kb` が未導入なら CONTRIBUTING.md §10 の手順で入れる）。雛形を手で編集する旧手順（`python3 apm_modules/lostandfound/kb-harness-core/scripts/new_entity.py`）を使う場合は、手順 6 の `kb sync` を必ず実行する。`graph.json` はチェックイン済みで CI が `kb sync --check` で陳腐化を検出するため、index だけ更新して graph を忘れると CI が落ちる。
 
 1. 追加する型と slug を決める。`type` に使える値と各型の必須フィールド・本文セクション（`sections`）は `<content_root>/vocabulary.yml` の `types` 定義が正。`slug` はローマ字ケバブケース。
 
@@ -20,6 +20,6 @@ description: KB に新規エンティティを追加する確定的手順。「�
 
 6. `kb entity create --from entity.yml --dry-run` で生成される差分（エンティティ本体・index.md・graph.json）を確認し、問題がなければ `kb entity create --from entity.yml` で反映する。既存 slug と衝突する場合は上書きせず停止するので、slug を見直す。旧手順で雛形を手編集した場合は、代わりに `kb sync` を実行して index と graph を更新する（index の一覧は手で編集しない）。
 
-7. `kb validate`（または `python3 scripts/validate.py`）を実行し、エラーがゼロであることを確認する。`sources` に URL を含めた場合は `python3 scripts/validate.py --check-urls` も実行する。エラーが出たら、その内容が現行規約の正であり、本スキルや自分の記憶と食い違う場合は検証側に従う。続けて `kb sync --check` が差分なし（終了コード 0）であることを確認する。
+7. `kb validate` を実行し、エラーがゼロであることを確認する。`sources` に URL を含めた場合は `kb validate --check-urls` も実行する。エラーが出たら、その内容が現行規約の正であり、本スキルや自分の記憶と食い違う場合は検証側に従う。続けて `kb sync --check` が差分なし（終了コード 0）であることを確認する。
 
 8. コミットする。最終検証は pre-commit hook が行う。spec ファイルはリポジトリに含めない。

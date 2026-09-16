@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -20,6 +20,11 @@ class ProjectError(ValueError):
 class Project:
     repo_root: Path
     content_root: Path
+    # kb-domain.yml の任意セクション index:。未指定なら無効（従来と同じ挙動）。
+    index_by_tag: bool = False
+    tag_labels: dict[str, str] = field(default_factory=dict)
+    # kb-domain.yml の任意セクション validate.extra_checks:。kb validate が repo_root で順に実行する。
+    extra_checks: tuple[str, ...] = ()
 
     @classmethod
     def discover(cls, start: str | Path | None = None) -> "Project":
@@ -50,4 +55,21 @@ class Project:
             raise ProjectError(
                 f"{path}: domain.content_root must be a non-empty string"
             )
-        return cls(repo_root=path.parent, content_root=path.parent / content_root)
+        index = data.get("index") if isinstance(data.get("index"), dict) else {}
+        raw_labels = index.get("tag_labels") if isinstance(index.get("tag_labels"), dict) else {}
+        tag_labels = {str(key): str(value) for key, value in raw_labels.items()}
+        validate_section = data.get("validate") if isinstance(data.get("validate"), dict) else {}
+        raw_checks = validate_section.get("extra_checks") or []
+        if not isinstance(raw_checks, list) or not all(
+            isinstance(command, str) and command.strip() for command in raw_checks
+        ):
+            raise ProjectError(
+                f"{path}: validate.extra_checks must be a list of non-empty strings"
+            )
+        return cls(
+            repo_root=path.parent,
+            content_root=path.parent / content_root,
+            index_by_tag=bool(index.get("by_tag", False)),
+            tag_labels=tag_labels,
+            extra_checks=tuple(raw_checks),
+        )

@@ -454,3 +454,123 @@ class CliTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TagIndexCliTest(unittest.TestCase):
+    def _build(self, root: Path) -> Path:
+        content = root / "knowledge"
+        (content / "notes").mkdir(parents=True)
+        (root / "kb-domain.yml").write_text(
+            "domain:\n  content_root: knowledge\nindex:\n  by_tag: true\n  tag_labels:\n    cooking: 料理\n",
+            encoding="utf-8",
+        )
+        (content / "vocabulary.yml").write_text(
+            "types:\n  Note:\n    directory: notes\n    graph: false\ntags:\n  - cooking\n",
+            encoding="utf-8",
+        )
+        (content / "notes" / "index.md").write_text("# Notes\n\n## エンティティ一覧\n\n", encoding="utf-8")
+        (content / "notes" / "example.md").write_text(
+            "---\ntype: Note\ntitle: Example\ndescription: D.\ntags: [cooking]\n"
+            "timestamp: 2026-09-01T00:00:00Z\nsources: []\n---\n\nBody\n",
+            encoding="utf-8",
+        )
+        index = content / "index.md"
+        index.write_text("# Root\n", encoding="utf-8")
+        return index
+
+    def test_sync_check_reports_stale_tag_index_and_sync_writes_it(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            index = self._build(root)
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["sync", "--check", "--start", str(root), "--format", "json"])
+            result = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 1)
+            self.assertIn("knowledge/index.md", [d["path"] for d in result["diagnostics"]])
+            self.assertEqual(index.read_text(encoding="utf-8"), "# Root\n")
+
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["sync", "--start", str(root), "--format", "json"]), 0)
+            text = index.read_text(encoding="utf-8")
+            self.assertIn("### 料理（1件）\n\n- [Example](/notes/example.md) — Note\n", text)
+
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["sync", "--check", "--start", str(root), "--format", "json"]), 0)
+
+    def test_index_build_also_renders_tag_index(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            index = self._build(root)
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["index", "build", "--start", str(root), "--format", "json"]), 0)
+            self.assertIn("<!-- tag-index:start -->", index.read_text(encoding="utf-8"))
+
+
+class ExtraChecksCliTest(unittest.TestCase):
+    """validate.extra_checks は本体検証の後に repo_root で順に実行され、失敗は ERROR に集約される。"""
+
+    def _build(self, root: Path, checks: str) -> None:
+        content = root / "knowledge"
+        content.mkdir()
+        (root / "kb-domain.yml").write_text(
+            f"domain:\n  content_root: knowledge\nvalidate:\n  extra_checks:\n{checks}",
+            encoding="utf-8",
+        )
+        (content / "vocabulary.yml").write_text(
+            "types:\n  Note:\n    directory: notes\n    graph: false\npredicates: {}\ntags: []\n",
+            encoding="utf-8",
+        )
+
+    def test_failed_check_is_reported_as_error_with_json_detail(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self._build(root, "    - test -f kb-domain.yml\n    - echo boom >&2; exit 3\n")
+            output = io.StringIO()
+            with redirect_stdout(output), redirect_stderr(io.StringIO()):
+                exit_code = main(["validate", "--start", str(root), "--format", "json"])
+            result = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 1)
+            self.assertFalse(result["ok"])
+            # cwd が repo_root なので相対パスの test -f が通る
+            self.assertEqual(
+                [(c["command"], c["returncode"], c["ok"]) for c in result["extra_checks"]],
+                [("test -f kb-domain.yml", 0, True), ("echo boom >&2; exit 3", 3, False)],
+            )
+            failed = [d for d in result["diagnostics"] if d["code"] == "validation.extra_check.failed"]
+            self.assertEqual(len(failed), 1)
+            self.assertIn("exit 3", failed[0]["message"])
+            self.assertIn("boom", failed[0]["message"])
+
+    def test_all_checks_pass(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self._build(root, "    - \"true\"\n")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["validate", "--start", str(root), "--format", "json"])
+            result = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["diagnostics"], [])
+            self.assertEqual(result["extra_checks"][0]["ok"], True)
+
+    def test_doctor_warns_when_check_command_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self._build(root, "    - \"true\"\n    - no-such-command-xyz --check\n")
+            (root / "knowledge" / "notes").mkdir()
+            with redirect_stdout(io.StringIO()):
+                main(["sync", "--start", str(root), "--format", "json"])
+            output = io.StringIO()
+            with redirect_stdout(output), redirect_stderr(io.StringIO()):
+                exit_code = main(["doctor", "--start", str(root), "--format", "json"])
+            result = json.loads(output.getvalue())
+            unavailable = [d for d in result["diagnostics"] if d["code"] == "doctor.extra_check.unavailable"]
+            self.assertEqual(len(unavailable), 1)
+            self.assertEqual(unavailable[0]["severity"], "warning")
+            self.assertIn("no-such-command-xyz", unavailable[0]["message"])
+            # 警告のみなら doctor は成功扱い
+            self.assertTrue(result["ok"])
+            self.assertEqual(exit_code, 0)

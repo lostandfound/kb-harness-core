@@ -11,7 +11,7 @@ This file provides guidance to coding agents when working with code in this repo
 
 - `kb validate` や `scripts/validate.py` は、このリポジトリのルートで単体実行しても `kb-domain.yml` が無いため失敗する。
 - したがって動作確認は **tests/ 経由**（tmpdir に最小 KB を組み立てて API または CLI を呼ぶ）で行う。
-- `scripts/hooks/pre-commit` は `validate.py` を呼ぶが、これは**導入先リポジトリで使う前提**のテンプレートである。このリポジトリ自体に入れると失敗する。
+- `scripts/hooks/pre-commit` は `kb validate` を呼ぶが、これは**導入先リポジトリで使う前提**のテンプレートである。このリポジトリ自体に入れると失敗する。
 
 ## コマンド
 

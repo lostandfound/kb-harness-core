@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.metadata
 import importlib
 import re
+import shlex
+import shutil
 from typing import Any
 from pathlib import Path
 
@@ -136,6 +138,42 @@ def _core_diagnostics() -> list[dict[str, Any]]:
     return diagnostics
 
 
+def _extra_check_diagnostics(project: Project) -> list[dict[str, Any]]:
+    """extra_checks の先頭語が実行可能か（PATH 上に存在するか）だけを確認する。実行はしない。"""
+    diagnostics: list[dict[str, Any]] = []
+    for command in project.extra_checks:
+        try:
+            words = shlex.split(command)
+        except ValueError as error:
+            diagnostics.append(
+                _diagnostic(
+                    "doctor.extra_check.unavailable",
+                    f"extra check cannot be parsed: {command} ({error})",
+                    context={"command": command, "severity": "warning"},
+                )
+                | {"severity": "warning"}
+            )
+            continue
+        if not words:
+            continue
+        executable = words[0]
+        # シェル組み込み（true, test など）やパス指定は which で判定できないので素通しする
+        if "/" in executable or shutil.which(executable) or executable in _SHELL_BUILTINS:
+            continue
+        diagnostics.append(
+            _diagnostic(
+                "doctor.extra_check.unavailable",
+                f"WARNING extra check command not found on PATH: {executable} ({command})",
+                context={"command": command, "executable": executable},
+            )
+            | {"severity": "warning"}
+        )
+    return diagnostics
+
+
+_SHELL_BUILTINS = frozenset({"true", "false", "test", "[", "cd", "echo", "exit", "set", "export", "source", "."})
+
+
 def diagnose(project: Project) -> tuple[dict[str, str], list[dict[str, Any]]]:
     details = {
         "kb_harness_version": __version__,
@@ -144,6 +182,7 @@ def diagnose(project: Project) -> tuple[dict[str, str], list[dict[str, Any]]]:
         "content_root": str(project.content_root),
     }
     diagnostics: list[dict[str, Any]] = _core_diagnostics()
+    diagnostics.extend(_extra_check_diagnostics(project))
     if not project.content_root.is_dir():
         diagnostics.append(
             {

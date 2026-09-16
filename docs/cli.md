@@ -27,17 +27,17 @@
 
 ### `kb validate`
 
-KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml` を対象とする。
+KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml` を対象とする。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。
 
 ### `kb doctor`
 
-設定、`kb-ontology-core` のインストール状態と宣言タグとの一致、生成物の同期状態を診断する。導入直後や依存更新後の確認に使う。
+設定、`kb-ontology-core` のインストール状態と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。
 
 ## 生成物の同期
 
 ### `kb index build` / `kb index check`
 
-各型ディレクトリの `index.md` を生成する（`build`）、または同期済みか確認する（`check`）。`build` は `--dry-run` に対応する。
+各型ディレクトリの `index.md` を生成する（`build`）、または同期済みか確認する（`check`）。`build` は `--dry-run` に対応する。`kb-domain.yml` で `index.by_tag: true` のときは、ルート `index.md` の `<!-- tag-index:start -->` 〜 `<!-- tag-index:end -->` 区間にタグ別一覧も生成する（[設定リファレンス](configuration.md#kb-domainyml)）。
 
 ### `kb graph build` / `kb graph check`
 
@@ -45,7 +45,7 @@ KB 全体を検証する。frontmatter・リンク・relations の型制約・�
 
 ### `kb sync` / `kb sync --check`
 
-index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。
+index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。`index.by_tag` が有効ならタグ別一覧の陳腐化も `--check` で検出する。
 
 ## 書き込み（原子的）
 
