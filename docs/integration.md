@@ -85,6 +85,81 @@ bash apm_modules/lostandfound/kb-harness-core/scripts/install-hooks.sh
 
 ステージに `.md` / `.yml` / `.py` が含まれるとき `kb validate` → テスト（`tests/` がある場合）→ `kb eval smoke`（`evals/rag-eval.yml` がある場合）→ `.kb/hooks/pre-commit.d/*`（ある場合）を順に実行する。テンプレートは `kb` CLI だけを呼び、導入先の `scripts/` には依存しない。導入先固有のチェックは `kb-domain.yml` の `validate.extra_checks` か `.kb/hooks/pre-commit.d/` に置き、テンプレート自体は編集しない。
 
+## 7. 運用ファイルを置く（任意）
+
+`docs/CONCERNS.md`（懸念台帳）と `docs/BACKLOG.md`（拡張バックログ）は、README の推奨構成に載せている任意の運用ファイルである。ハーネスはこれらを自動生成しない。`explore-kb` `expand-kb` スキルは既存ファイルにだけ追記し、依頼がなければ新設しないため、使う場合は導入時に手で置く。存在しなくても `kb validate` は失敗しない。
+
+両ファイルの役割分担は次のとおり。
+
+- **CONCERNS.md**: 未整理の懸念や違和感の受信箱。出典間の食い違い、根拠不足で本文に書けない事項を 1 行ずつ置く。`scripts/concerns_summary.py` が状態別に集計する。
+- **BACKLOG.md**: 実施すると判断した将来作業の正本。CONCERNS からの移動、RAG 評価の欠落、探索候補を受け、実装と検証が完了したら `[x]` にする。
+
+### `docs/CONCERNS.md` の雛形
+
+`concerns_summary.py` はチェックボックス行（`- [ ]` / `- [x]`）を懸念として拾い、行末の `status: <状態>` で分類する。`status` を省いた行は未分類として着手可能側に現れる。書式の例を本文中に書くときは、行頭から `- [ ]` を書かない（字下げやコードブロック外の文に変える）。
+
+````markdown
+# 懸念台帳
+
+レビュー指摘・執筆時の懸念・保留判断のうち、コンテンツの信頼性に関わるものを記録する。
+解決したら `[x]` にして対応コミットを付記する。着手を決めたものは [BACKLOG.md](BACKLOG.md) へ移す。
+
+形式: `<対象ファイル>: <懸念内容>。出所: <レビュー/執筆者/ユーザー>。対応方針: <方針>。status: <状態>`
+
+`status` は行末に置く。集計と抽出:
+
+```bash
+python3 apm_modules/lostandfound/kb-harness-core/scripts/concerns_summary.py
+python3 apm_modules/lostandfound/kb-harness-core/scripts/concerns_summary.py --actionable
+```
+
+- `open` … 着手できる。調査の手立てがある
+- `investigating` … 調査中
+- `blocked-source` … 一次資料の入手待ちで着手できない。何を入手すれば動くかを対応方針に書く
+- `settled-hedged` … 史料的に決着しないが、両論併記・ヘッジで記述側は完了している。新資料が出るまで動かさない
+- `suspended` … 打ち切り。再開条件を対応方針に明記する
+- `resolved` … 解決（`[x]` と併記する）
+
+`settled-hedged` と `suspended` は「もう手を入れない」宣言であり、誤って付けると懸念が沈む。
+資料が出れば動く見込みがあるものには使わない。
+
+## 未解決
+
+## 解決済み
+````
+
+### `docs/BACKLOG.md` の雛形
+
+行形式は導入先が定めてよいが、対象・型・一行説明・relations 案・根拠・完了時のコミットを 1 行に収めると、`expand-kb` が候補選定と完了記録を機械的に行える。探索候補セクションの書式コメントは `explore-kb` が追記時に参照する。滞留上限（探索候補が何件を超えたら新規探索を止めるか）と棚卸周期は導入先の拡張方針文書で決め、ここから参照する。
+
+````markdown
+# 拡張バックログ
+
+実施すると判断した将来作業の正本。上から優先。着手中という中間状態は書かず、実装と検証が完了した後に `[x]` へ変更する。
+未整理の疑問は [CONCERNS.md](CONCERNS.md) に置き、対応方針が決まったものだけをここへ移す。
+
+形式: `- [ ] <slug> (<type>): <一行説明>。relations 案: <述語 → パス>。根拠: <言及済み未収録 / RAG 欠落 / カテゴリバランス など>（コミット: <hash>）`
+
+## 収録タスク
+
+## RAG 評価の欠落
+
+`kb eval` の未解決欠落は次で行形式に出力して貼る。
+
+```bash
+python3 apm_modules/lostandfound/kb-harness-core/scripts/eval_summary.py --open
+```
+
+## 探索候補（explore-kb 供給、未考証）
+
+<!-- 書式: - [ ] <名称>: <一行説明>。出所: <探索経路 + URL> -->
+<!-- 滞留上限: N 件。超えたら新規探索を止め、考証・却下で減らす -->
+
+## 保留（除外基準該当）
+
+却下した候補と理由。同じ候補が再浮上したときの参照先。
+````
+
 ## 運用上の注意
 
 - **正本は `.apm/`。** スキル・エージェントを修正するときはパッケージ側の `.apm/` を編集し、`apm install` で再デプロイする。ランタイム配下（`.claude/skills/` など）の同名ファイルは生成物であり直接編集しない。
