@@ -158,3 +158,44 @@ python3 scripts/concerns_summary.py [--ledger FILE]
 4. `.kb/hooks/pre-commit.d/` が存在すれば、その中の実行可能ファイルを名前順に実行する
 
 導入先固有のチェックはテンプレートを編集せず `.kb/hooks/pre-commit.d/` に置く。`kb-domain.yml` の `validate.extra_checks` に登録すれば `kb validate` 側で実行されるので、通常はそちらを使う。
+
+### check_source_attrition.py
+
+改版で先行する出典の記述が失われていないかを検出する。複数の出典を並存させるエンティティに別の出典の記述を追記するとき、本文を新しい出典に沿って書き直してしまい、先行出典の段落がまとめて消えることがある。形式は壊れないので `kb validate` は通る。
+
+```bash
+python3 scripts/check_source_attrition.py [PATH ...] [--base REV] [--strict]
+```
+
+改版前（既定は `HEAD`）と現在を突き合わせ、front matter の `sources` が挙げる ref-id ごとに主張単位の出典表記（`（出典: <ref-id>）`）の数を比べる。過半が失われた出典があれば内訳を標準エラーに出して終了コード 1 を返す。`sources` から ref-id が外された場合も、本文に表記が残っていても失われたものとして扱う（この状態は `kb validate` では検出できない）。
+
+引数を省略するとステージ済みの変更（`--diff-filter=M`）を対象にする。新規追加ファイルは比較対象がないので見ない。推敲で段落をまとめた程度の減少は見逃す。すべての減少を検出するには `--strict` を使う。意図した削除は `KB_ALLOW_SOURCE_ATTRITION=1` で通す。
+
+`.kb/hooks/pre-commit.d/` から呼び出して使う。
+
+### verify_turn.sh
+
+Claude Code の Stop hook から呼び、ターンの終了を `kb validate` と `kb sync --check` で閉じる。pre-commit が閉じるのはコミットするときだけで、コミットせずに終わるターンでは検証が一度も走らない。
+
+標準入力でフックのペイロードを受け取り、検証に失敗すると終了コード 2 を返す。終了コード 2 のとき標準エラーがそのまま Claude に返るため、指示しなくてもその場で修正してからターンを終える。終了コード 1 ではブロックにならない。
+
+`stop_hook_active` が真のときは何もしない（停止と再開が繰り返されるのを防ぐ）。カレントディレクトリに `kb-domain.yml` がない場合も何もしないので、KB 以外の作業では起動しない。
+
+導入先の `.claude/settings.json` に登録する。
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash apm_modules/lostandfound/kb-harness-core/scripts/verify_turn.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```

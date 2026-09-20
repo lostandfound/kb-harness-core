@@ -85,6 +85,22 @@ bash apm_modules/lostandfound/kb-harness-core/scripts/install-hooks.sh
 
 ステージに `.md` / `.yml` / `.py` が含まれるとき `kb validate` → テスト（`tests/` がある場合）→ `kb eval smoke`（`evals/rag-eval.yml` がある場合）→ `.kb/hooks/pre-commit.d/*`（ある場合）を順に実行する。テンプレートは `kb` CLI だけを呼び、導入先の `scripts/` には依存しない。導入先固有のチェックは `kb-domain.yml` の `validate.extra_checks` か `.kb/hooks/pre-commit.d/` に置き、テンプレート自体は編集しない。
 
+### 出典の消失を検出する（任意）
+
+複数の出典を並存させる KB では、既存エンティティの改版で先行出典の記述が丸ごと消える事故が起きる。形式は壊れないため `kb validate` では検出できない。`.kb/hooks/pre-commit.d/20-source-attrition` を置いて pre-commit で止める。
+
+```bash
+#!/bin/bash
+set -euo pipefail
+python3 apm_modules/lostandfound/kb-harness-core/scripts/check_source_attrition.py
+```
+
+判定の基準と逃げ道は [スクリプト一覧](scripts.md#check_source_attritionpy) を参照。
+
+### ターンの終了を検証で閉じる（任意）
+
+pre-commit が閉じるのはコミットするときだけなので、コミットせずに終わるターンでは検証が走らない。`.claude/settings.json` の Stop hook に `scripts/verify_turn.sh` を登録すると、ターンの終了時に `kb validate` と `kb sync --check` を実行し、失敗したらその場で Claude に直させる。設定例は [スクリプト一覧](scripts.md#verify_turnsh) を参照。
+
 ## 7. 運用ファイルを置く（任意）
 
 `docs/CONCERNS.md`（懸念台帳）と `docs/BACKLOG.md`（拡張バックログ）は、README の推奨構成に載せている任意の運用ファイルである。ハーネスはこれらを自動生成しない。`explore-kb` `expand-kb` スキルは既存ファイルにだけ追記し、依頼がなければ新設しないため、使う場合は導入時に手で置く。存在しなくても `kb validate` は失敗しない。
