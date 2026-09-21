@@ -35,6 +35,11 @@ PERSON_DATE_RE = re.compile(r"^(\d{4}\??|\d{4}頃|不詳)$")
 FILENAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*\.md$")
 LIST_FIELDS = ("tags", "sources", "relations", "aliases")
 TITLE_PAREN_RE = re.compile(r"[（(]")
+# description は RAG の検索で最初に当たる値であり、index.md にも転記される。
+# 改版で前の版の断片が残っても形式は壊れないため、内容の側を検査する。
+DESCRIPTION_SENTENCE_RE = re.compile(r"[^。．.!?！？]+[。．.!?！？]?")
+DESCRIPTION_LONG = 240
+DESCRIPTION_MIN_SHARED = 8
 # 本文インライン出典表記（（出典: ref-id, ref-id））。全角括弧のみ対応。
 CITATION_MARKER_RE = re.compile(r"（出典")
 CITATION_RE = re.compile(r"（出典:\s*([^（）]*)）")
@@ -186,6 +191,47 @@ def _contains_todo(value) -> bool:
     return False
 
 
+
+def _check_description(rel: str, description: str) -> list[str]:
+    """description の内容が壊れていないかを検査する。
+
+    必須フィールドの有無だけでは、改版で前の版の断片が残った description を
+    検出できない。形式は正しいまま、検索結果と index に重複した文が出続ける。
+    """
+    errors: list[str] = []
+    text = description.strip()
+    if not text:
+        errors.append(f"ERROR {rel}: description が空である")
+        return errors
+
+    # 消し残りは前の版の完全な文とは限らず、途中で切れた断片が残る。完全一致では
+    # なく末尾の重なりを見ることでその形も拾う。短い語尾の一致は文体上ありうるので、
+    # 一定の長さを超える重なりだけを重複と見なす。
+    cores = [
+        core
+        for core in (
+            match.group().strip(" 　").rstrip("。．.!?！？").strip()
+            for match in DESCRIPTION_SENTENCE_RE.finditer(text)
+        )
+        if len(core) >= DESCRIPTION_MIN_SHARED
+    ]
+    for i, first in enumerate(cores):
+        for second in cores[i + 1:]:
+            shared = _common_suffix(first, second)
+            if len(shared) >= DESCRIPTION_MIN_SHARED:
+                errors.append(f"ERROR {rel}: description に同じ記述が繰り返されている '{shared}'")
+                return errors
+
+    return errors
+
+
+def _common_suffix(a: str, b: str) -> str:
+    """末尾から一致する部分を返す。"""
+    n = 0
+    while n < min(len(a), len(b)) and a[-1 - n] == b[-1 - n]:
+        n += 1
+    return a[len(a) - n:] if n else ""
+
 def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     errors: list[str] = []
     if warnings is None:
@@ -270,6 +316,16 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
         title = fm.get("title")
         if isinstance(title, str) and TITLE_PAREN_RE.search(title):
             errors.append(f"ERROR {rel}: title に括弧を含めてはならない '{title}'")
+
+        description = fm.get("description")
+        if isinstance(description, str):
+            errors.extend(_check_description(rel, description))
+            if isinstance(title, str) and description.strip() == title.strip():
+                warnings.append(f"{rel}: description が title と同一で説明になっていない")
+            if len(description.strip()) > DESCRIPTION_LONG:
+                warnings.append(
+                    f"{rel}: description が長い（{len(description.strip())} 文字）。検索結果に出る一文として読めるか見直す"
+                )
 
         aliases = fm.get("aliases")
         if isinstance(aliases, list):

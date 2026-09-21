@@ -115,6 +115,8 @@ timestamp: 2026-01-01T00:00:00Z # 任意。省略時は SOURCE_DATE_EPOCH → cl
 
 `type` / `slug` / `title` / `description` / `tags` / `sections` が必須。`sources` は型の `sources_required` が `false` でない限り必須。型ごとの章構成と `extra_fields` は `vocabulary.yml` を正本とする。
 
+`description` は有無だけでなく内容も検査する。空文字はエラー、同じ文が二度出るものもエラーとする（改版で前の版の断片が残ると、形式は正しいまま検索結果と index に重複が出続けるため）。`title` と同一のもの、240 文字を超えるものは警告にとどめる。
+
 ## Claim 型（任意）
 
 `Claim` という型を `vocabulary.yml` に定義すると、確定した relation と区別して、出典と評価を伴う関係主張を記録できる。
