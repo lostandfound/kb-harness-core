@@ -6,18 +6,17 @@
 
 Claude Design（claude.ai/design）で作った知識グラフビューアのエクスポート。**エクスポート日: 2026-09-22。** 生成物に版番号が無く、これが版の同定手段になる。
 
-取り込み時に次の改変を加えてある。
+取り込み時に次の改変を加えてある。`<helmet>` の Google Fonts の 3 行はエクスポートのまま残してある。
 
 - データの埋め込み（`const RAW` / `const DESC`）を差し込み口 `__KB_GRAPH__` / `__KB_DESC__` に置き換え
 - 型と述語の直書きを `__KB_VIEWER__` からの組み立てに変更
 - 見出しを差し込み口 `__KB_TITLE__` に置き換え（サーバが HTML エスケープした題名を入れる）
 - 語彙に無い型・述語で落ちないよう `typeOf()` / `predLabel()` を通す
 - `support.js` の参照を絶対パス `/support.js` に変更
-- `<helmet>` の Google Fonts（`fonts.googleapis.com` / `fonts.gstatic.com`）の 3 行を削除
 
 更新するときは Claude Design で再エクスポートし、上の 6 点を適用し直す。エクスポート日もこの節に書き直す。
 
-**書体について:** Google Fonts を外したため、`JetBrains Mono` と `Noto Sans JP` が端末に無ければ `monospace` / `sans-serif` に落ちる。ネットのない場所で動くことを書体より優先した。
+**書体について:** `JetBrains Mono` と `Noto Sans JP` は Google Fonts から読む。ここだけが唯一の外部依存で、届かなければ `monospace` / `sans-serif` に落ちるだけなので描画は壊れない。同梱しないのは、配布物が重くなるのとライセンス表記が要るのを避けるため。描画に必要な JavaScript は同梱してあり、ネットのない場所でもグラフは出る。
 
 ## support.js
 
