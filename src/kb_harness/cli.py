@@ -27,6 +27,7 @@ from .graph import plan_graph
 from .index import plan_index
 from .okf import OkfExportError, audit_okf_bundle, plan_okf_export
 from .project import Project, ProjectError
+from .serve import serve
 from .sync import (
     apply_changes_atomically,
     execute_write_plan,
@@ -101,6 +102,10 @@ def _parser() -> argparse.ArgumentParser:
 
     doctor_parser = subcommands.add_parser("doctor", help="check project health")
     _add_common_options(doctor_parser)
+    serve_parser = subcommands.add_parser("serve", help="view knowledge graph")
+    serve_parser.add_argument("--port", type=int, default=8000)
+    serve_parser.add_argument("--open", action="store_true", dest="open_browser")
+    _add_common_options(serve_parser)
     reference = subcommands.add_parser("reference", help="manage references")
     reference_commands = reference.add_subparsers(dest="reference_command", required=True)
     _add_common_options(reference_commands.add_parser("health"))
@@ -675,6 +680,10 @@ def _main(argv: Sequence[str] | None = None) -> int:
             stale_code=lambda path: "graph.stale" if path == "graph.json" else "index.stale",
             stale_message=lambda path: f"generated file is stale: {path}",
         )
+
+    if args.command == "serve":
+        serve(project, port=args.port, open_browser=args.open_browser)
+        return 0
 
     return 2
 

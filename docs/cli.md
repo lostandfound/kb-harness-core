@@ -33,6 +33,15 @@ KB 全体を検証する。frontmatter・リンク・relations の型制約・�
 
 設定、`kb-ontology-core` のインストール状態と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。
 
+### `kb serve`
+
+グラフの閲覧画面をローカルで起動する。`graph.json` を読むので、事前に `kb sync` で同期させておくこと。待ち受けは `127.0.0.1` に限定される。
+
+| オプション | 内容 |
+|---|---|
+| `--port PORT` | 待ち受けポート番号。デフォルト `8000` |
+| `--open` | ブラウザを自動的に開く（OS サポート時） |
+
 ## 生成物の同期
 
 ### `kb index build` / `kb index check`
