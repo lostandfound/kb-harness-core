@@ -16,9 +16,6 @@ window.__resources = {
 <body>
 <x-dc>
 <helmet>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
 <style>
   html, body { margin: 0; padding: 0; background: #05070f; }
   * { box-sizing: border-box; }
@@ -60,7 +57,7 @@ window.__resources = {
 
   <div style="position: absolute; left: 24px; top: 22px; width: {{ leftW }}px; display: flex; flex-direction: column; gap: 12px; z-index: 5;">
     <div style="display: flex; align-items: baseline; gap: 10px; padding-left: 2px;">
-      <div id="kb-title" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: .2em; color: #7f93b8;"></div>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: .2em; color: #7f93b8;">__KB_TITLE__</div>
     </div>
 
     <div style="display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 14px; border-radius: 10px; background: rgba(12,18,33,.82); border: 1px solid #1b2743; backdrop-filter: blur(12px); box-shadow: 0 8px 28px rgba(0,0,0,.45);">
@@ -169,17 +166,18 @@ window.__resources = {
 <script type="text/x-dc" data-dc-script data-props="{&quot;glowIntensity&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.3,&quot;max&quot;:2,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;表示&quot;},&quot;showGrid&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;表示&quot;}}">
 const VIEWER = __KB_VIEWER__;
 
-// 題名は kb-domain.yml 由来。dc のテンプレート式ではなく DOM へ直接入れる。
-document.addEventListener("DOMContentLoaded", () => {
-  const el = document.getElementById("kb-title");
-  if (el) el.textContent = VIEWER.title;
-});
-
 // 型は知識ベースごとに異なる。色は viewer.json（kb serve が導出）から受け取る。
 const TYPES = {};
 VIEWER.types.forEach(t => {
   TYPES[t.name.toLowerCase()] = { ja: t.name, en: t.name.toLowerCase(), color: t.color };
 });
+
+// グラフと語彙は別経路で読むため、語彙に無い型のノードが来うる。
+// 画面全体を落とさないよう、既定の色とラベルへ落とす。
+const TYPE_FALLBACK_COLOR = '#64748b';
+function typeOf(name) {
+  return TYPES[name] || { ja: name, en: name, color: TYPE_FALLBACK_COLOR };
+}
 
 function firstLine(d) {
   if (!d) return '';
@@ -189,6 +187,11 @@ function firstLine(d) {
 
 const PRED = {};
 VIEWER.predicates.forEach(p => { PRED[p.name] = p.label; });
+
+// 語彙に無い述語は、名前をそのまま表示名にする。
+function predLabel(name) {
+  return PRED[name] || name;
+}
 
 const DESC = __KB_DESC__;
 
@@ -511,7 +514,7 @@ class Component extends DCLogic {
 
     const nodes = NODES.map(n => {
       const p = this.P[n.id];
-      const c = TYPES[n.t].color;
+      const c = typeOf(n.t).color;
       const isSel = n.id === sel, isHov = n.id === hover, isNb = neighbors.has(n.id);
       const near = isSel || isHov || isNb;
       const dim = !vis[n.id] ? 0.07 : (near ? 1 : 0.22);
@@ -550,7 +553,7 @@ class Component extends DCLogic {
       return {
         s, t, pred, on,
         x1: Math.round(a.x), y1: Math.round(a.y), x2: Math.round(b.x), y2: Math.round(b.y),
-        stroke: !shown ? 'rgba(90,115,160,.05)' : (on ? TYPES[NMAP[s === focus ? t : s].t].color + 'b3' : 'rgba(130,162,214,.26)'),
+        stroke: !shown ? 'rgba(90,115,160,.05)' : (on ? typeOf(NMAP[s === focus ? t : s].t).color + 'b3' : 'rgba(130,162,214,.26)'),
         w: on && shown ? 1.6 : 0.9
       };
     });
@@ -559,8 +562,8 @@ class Component extends DCLogic {
     const selRelations = EDGES.filter(([a, , b]) => a === sel || b === sel).map(([a, pred, b]) => {
       const other = NMAP[a === sel ? b : a];
       return {
-        label: other.label, color: TYPES[other.t].color,
-        rel: (a === sel ? '→ ' : '← ') + PRED[pred] + ' · ' + pred,
+        label: other.label, color: typeOf(other.t).color,
+        rel: (a === sel ? '→ ' : '← ') + predLabel(pred) + ' · ' + pred,
         bg: hover === other.id ? 'rgba(45,62,96,.55)' : 'rgba(255,255,255,.015)',
         onClick: () => this.setState({ sel: other.id }),
         onEnter: () => this.setState({ hover: other.id }),
@@ -626,7 +629,7 @@ class Component extends DCLogic {
       tipShow: !!(hover && NMAP[hover] && NMAP[hover].desc),
       tipText: hover && NMAP[hover] ? firstLine(NMAP[hover].desc) : '',
       tipTitle: hover && NMAP[hover] ? NMAP[hover].label : '',
-      tipColor: hover && NMAP[hover] ? TYPES[NMAP[hover].t].color : '#22d3ee',
+      tipColor: hover && NMAP[hover] ? typeOf(NMAP[hover].t).color : '#22d3ee',
       tipLeft: Math.max(12, Math.min((this.state.w || 1200) - 332, (this.state.tipX || 0) - (this.stageBox ? this.stageBox.left : 0) + 16)),
       tipTop: (() => {
         const H = this.state.h || 800, TH = 108;
@@ -634,8 +637,8 @@ class Component extends DCLogic {
         return cy + 18 + TH > H - 12 ? Math.max(12, cy - 18 - TH) : Math.max(12, cy + 18);
       })(),
       sel: true, selId: selNode.id, selTitle: selNode.label, selDesc: selNode.desc,
-      selType: TYPES[selNode.t].ja + ' / ' + TYPES[selNode.t].en,
-      selColor: TYPES[selNode.t].color, selTags: selNode.tags, selDeg: this.deg[selNode.id],
+      selType: typeOf(selNode.t).ja + ' / ' + typeOf(selNode.t).en,
+      selColor: typeOf(selNode.t).color, selTags: selNode.tags, selDeg: this.deg[selNode.id],
       selPreds, selRelations, selRelCount: selRelations.length
     };
   }

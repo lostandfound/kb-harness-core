@@ -20,15 +20,24 @@ class AssetTest(unittest.TestCase):
         ):
             self.assertTrue((STATIC / name).is_file(), name)
 
-    def test_テンプレートが3つの差し込み口を持つ(self):
+    def test_テンプレートが4つの差し込み口を持つ(self):
         text = (STATIC / "graph.html").read_text(encoding="utf-8")
-        for marker in ("__KB_GRAPH__", "__KB_DESC__", "__KB_VIEWER__"):
+        for marker in ("__KB_GRAPH__", "__KB_DESC__", "__KB_VIEWER__", "__KB_TITLE__"):
             self.assertIn(marker, text, marker)
 
     def test_テンプレートがCDNを参照しない(self):
+        # src= だけでなく href= も見る。書体の読み込みが素通りしていた。
+        # unpkg の URL は window.__resources の写像キーとして残るため、属性の形で検査する。
         text = (STATIC / "graph.html").read_text(encoding="utf-8")
-        for host in ("unpkg.com", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"):
-            self.assertNotIn(f'src="https://{host}', text, host)
+        for host in (
+            "unpkg.com",
+            "cdn.jsdelivr.net",
+            "cdnjs.cloudflare.com",
+            "fonts.googleapis.com",
+            "fonts.gstatic.com",
+        ):
+            for attr in ("src", "href"):
+                self.assertNotIn(f'{attr}="https://{host}', text, f"{attr} {host}")
 
     def test_ランタイムが期待するReactを同梱している(self):
         # support.js は unpkg の React を SRI つきで読む。同梱物が同じものであること。
@@ -37,7 +46,9 @@ class AssetTest(unittest.TestCase):
             ("REACT_SRI", "react.production.min.js"),
             ("REACT_DOM_SRI", "react-dom.production.min.js"),
         ):
-            expected = re.search(rf'{const} = "sha384-([^"]+)"', runtime).group(1)
+            found = re.search(rf'{const} = "sha384-([^"]+)"', runtime)
+            self.assertIsNotNone(found, const)
+            expected = found.group(1)
             digest = hashlib.sha384((STATIC / "vendor" / name).read_bytes()).digest()
             self.assertEqual(base64.b64encode(digest).decode(), expected, name)
 
