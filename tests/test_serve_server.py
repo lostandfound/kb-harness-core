@@ -53,6 +53,19 @@ class ServerTest(unittest.TestCase):
         res = self.conn.getresponse()
         return res.status, res.getheader("Content-Type") or "", res.read()
 
+    def _rewrite_graph(self, graph):
+        (self.root / "graph.json").write_text(
+            json.dumps(graph, ensure_ascii=False), encoding="utf-8"
+        )
+
+    def _rewrite_title(self, title):
+        (self.root / "kb-domain.yml").write_text(
+            f'domain:\n  kb_title: "{title}"\n  content_root: knowledge\n',
+            encoding="utf-8",
+        )
+        self.project = Project.discover(self.root)
+        self.server.RequestHandlerClass = make_handler(self.project)
+
     def test_グラフ画面にデータが差し込まれて配られる(self):
         status, ctype, body = self._get("/")
         text = body.decode("utf-8")
@@ -79,6 +92,10 @@ class ServerTest(unittest.TestCase):
     def test_列挙外のパスは配らない(self):
         for path in (
             "/vendor/../../serve.py",
+            "/vendor/%2e%2e/%2e%2e/setup.py",
+            "/vendor/..%2f..%2fsetup.py",
+            "/vendor/./react.production.min.js",
+            "/VENDOR/react.production.min.js",
             "/vendor/unknown.js",
             "/etc/passwd",
             "/app.js",
@@ -91,6 +108,41 @@ class ServerTest(unittest.TestCase):
         status, _, body = self._get("/api/graph")
         self.assertEqual(status, 404)
         self.assertIn("kb sync", body.decode("utf-8"))
+
+    def test_graph_jsonがなければグラフ画面も案内つきで404を返す(self):
+        (self.root / "graph.json").unlink()
+        status, _, body = self._get("/")
+        self.assertEqual(status, 404)
+        self.assertIn("kb sync", body.decode("utf-8"))
+
+    def test_題名のhtmlがエスケープされる(self):
+        self._rewrite_title("<script>alert(1)</script>")
+        _, _, body = self._get("/")
+        text = body.decode("utf-8")
+        # 見出しの差し込み口は素のテキスト。タグとして解釈されてはならない
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", text)
+        # JSON 側にも生の閉じタグが残ってはならない（script ブロックが閉じる）
+        self.assertNotIn("</script>alert", text)
+        self.assertNotIn("<script>alert(1)</script>", text)
+
+    def test_説明文のscriptタグがブロックを閉じない(self):
+        graph = json.loads(json.dumps(GRAPH))
+        graph["nodes"][0]["description"] = "</script><img src=x onerror=alert(1)>"
+        self._rewrite_graph(graph)
+        _, _, body = self._get("/")
+        text = body.decode("utf-8")
+        self.assertNotIn("</script><img", text)
+        self.assertIn("<\\/script>", text)
+
+    def test_エンティティ題名がマーカー文字列でも差し込みが壊れない(self):
+        graph = json.loads(json.dumps(GRAPH))
+        graph["nodes"][0]["title"] = "__KB_DESC__"
+        self._rewrite_graph(graph)
+        _, _, body = self._get("/")
+        text = body.decode("utf-8")
+        # グラフに埋めた題名が、後続のマーカー置換で説明文の JSON に化けてはならない
+        self.assertIn('"__KB_DESC__"', text)
+        self.assertEqual(text.count("説明。"), 1)
 
 
 if __name__ == "__main__":

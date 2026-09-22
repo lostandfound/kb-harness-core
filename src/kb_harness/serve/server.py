@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -16,6 +17,7 @@ from urllib.parse import urlparse
 from ..project import Project
 from .viewer import build_viewer_config
 
+MARKER = re.compile(r"__KB_(GRAPH|DESC|VIEWER|TITLE)__")
 STATIC = Path(__file__).resolve().parent / "static"
 VENDOR = {
     "react.production.min.js",
@@ -23,33 +25,47 @@ VENDOR = {
 }
 
 
+def _short(path: str) -> str:
+    """グラフの識別子を、拡張子を落としたファイル名だけに詰める。"""
+    return path.rsplit("/", 1)[-1].removesuffix(".md")
+
+
+def _dump(value: object) -> str:
+    """JSON にして script ブロックの中へ置ける形にする。
+
+    `</` を `<\\/` へ写す。JSON 文字列中では `\\/` は `/` と等価で値は変わらないが、
+    これをしないと description や題名に含まれる `</script>` が script を閉じ、
+    以降の JS を殺して任意の HTML を注入できてしまう。
+    """
+    return json.dumps(value, ensure_ascii=False).replace("</", "<\\/")
+
+
 def _page(project: Project) -> bytes:
     """テンプレートにグラフ・説明文・表示情報を差し込む。"""
     graph = json.loads((project.repo_root / "graph.json").read_text(encoding="utf-8"))
-    short = lambda p: p.rsplit("/", 1)[-1].removesuffix(".md")  # noqa: E731
     nodes = [
-        [short(n["path"]), n["type"], n["title"], "|".join(n.get("tags") or [])]
+        [_short(n["path"]), n["type"], n["title"], "|".join(n.get("tags") or [])]
         for n in graph.get("nodes", [])
     ]
     edges = [
-        [short(e["source"]), e["predicate"], short(e["target"])]
+        [_short(e["source"]), e["predicate"], _short(e["target"])]
         for e in graph.get("edges", [])
     ]
     descriptions = {
-        short(n["path"]): n.get("description", "") for n in graph.get("nodes", [])
+        _short(n["path"]): n.get("description", "") for n in graph.get("nodes", [])
     }
-    dump = lambda value: json.dumps(value, ensure_ascii=False)  # noqa: E731
     viewer = build_viewer_config(project)
-    return (
-        (STATIC / "graph.html")
-        .read_text(encoding="utf-8")
-        .replace("__KB_GRAPH__", dump({"nodes": nodes, "edges": edges}))
-        .replace("__KB_DESC__", dump(descriptions))
-        .replace("__KB_VIEWER__", dump(viewer))
+    table = {
+        "GRAPH": _dump({"nodes": nodes, "edges": edges}),
+        "DESC": _dump(descriptions),
+        "VIEWER": _dump(viewer),
         # 題名は dc が描き直す領域の中にあるため、JS ではなく静的に埋める
-        .replace("__KB_TITLE__", html.escape(viewer["title"]))
-        .encode("utf-8")
-    )
+        "TITLE": html.escape(viewer["title"]),
+    }
+    template = (STATIC / "graph.html").read_text(encoding="utf-8")
+    # 置換を 1 度だけ走らせる。replace を連ねると、先に埋めた値の中に次のマーカー
+    # 文字列が含まれていたとき、そこまで置換されてページが壊れる。
+    return MARKER.sub(lambda m: table[m.group(1)], template).encode("utf-8")
 
 
 def make_handler(project: Project) -> type[BaseHTTPRequestHandler]:
