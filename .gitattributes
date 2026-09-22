@@ -1,0 +1,4 @@
+# Claude Design の生成物。正本は Anthropic 側にあり、このリポジトリでは編集しない。
+src/kb_harness/serve/static/support.js linguist-generated
+# 配布物をそのまま置いた第三者ライブラリ。
+src/kb_harness/serve/static/vendor/* linguist-vendored
