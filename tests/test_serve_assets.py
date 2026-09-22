@@ -8,7 +8,14 @@ STATIC = Path(__file__).resolve().parents[1] / "src" / "kb_harness" / "serve" / 
 
 class AssetTest(unittest.TestCase):
     def test_必要なファイルが揃っている(self):
-        for name in ("graph.html", "README.md"):
+        for name in (
+            "graph.html",
+            "README.md",
+            "vendor/graphology.umd.min.js",
+            "vendor/sigma.min.js",
+            "vendor/GRAPHOLOGY-LICENSE.txt",
+            "vendor/SIGMA-LICENSE.txt",
+        ):
             self.assertTrue((STATIC / name).is_file(), name)
 
     def test_テンプレートが4つの差し込み口を持つ(self):
