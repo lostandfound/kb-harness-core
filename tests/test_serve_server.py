@@ -144,6 +144,27 @@ class ServerTest(unittest.TestCase):
         self.assertIn('"__KB_DESC__"', text)
         self.assertEqual(text.count("説明。"), 1)
 
+    def test_同名ファイルが別ノードとして配られる(self):
+        graph = {
+            "nodes": [
+                {"path": "/concepts/x.md", "type": "Concept", "title": "概念"},
+                {"path": "/tools/x.md", "type": "Concept", "title": "道具"},
+            ],
+            "edges": [
+                {
+                    "source": "/concepts/x.md",
+                    "predicate": "related-to",
+                    "target": "/tools/x.md",
+                }
+            ],
+        }
+        self._rewrite_graph(graph)
+        _, _, body = self._get("/")
+        text = body.decode("utf-8")
+        self.assertIn('"/concepts/x", "Concept", "概念"', text)
+        self.assertIn('"/tools/x", "Concept", "道具"', text)
+        self.assertIn('"/concepts/x", "related-to", "/tools/x"', text)
+
 
 if __name__ == "__main__":
     unittest.main()

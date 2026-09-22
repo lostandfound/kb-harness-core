@@ -16,8 +16,8 @@
 - `scripts/check_source_attrition.py` を追加。改版で先行する出典の記述が失われたエンティティを検出する。`kb validate` は形式しか見ないため、複数出典を並存させる本文が新しい出典で上書きされても通ってしまう。`.kb/hooks/pre-commit.d/` から呼んで止める
 - `scripts/verify_turn.sh` を追加。Claude Code の Stop hook からターンの終了時に `kb validate` と `kb sync --check` を実行する。pre-commit が閉じるのはコミット時だけで、コミットせずに終わるターンでは検証が走らないため
 
-### Known Issues
-- `kb serve` のノード ID は `graph.json` の `path` からファイル名（拡張子抜き）へ縮めている（`src/kb_harness/serve/server.py` の `_short()`）。別ディレクトリに同名のエンティティ（例 `concepts/x.md` と `tools/x.md`）があると ID が衝突し、グラフ画面でノードが融合し辺が誤配線される。`content_root` 配下でファイル名が一意であるプロジェクトでは顕在化しないが、汎用ハーネスとしては直す必要がある。フルパスまたはハッシュを ID にする改修を要する
+### Fixed
+- `kb serve` のノード ID をファイル名だけでなく KB 相対パスから生成するよう修正。同名ファイルが別ディレクトリにあっても、グラフ画面でノードが融合しない
 
 ## 0.2.1 — 2026-09-11
 

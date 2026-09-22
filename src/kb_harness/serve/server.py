@@ -25,9 +25,9 @@ VENDOR = {
 }
 
 
-def _short(path: str) -> str:
-    """グラフの識別子を、拡張子を落としたファイル名だけに詰める。"""
-    return path.rsplit("/", 1)[-1].removesuffix(".md")
+def _node_id(path: str) -> str:
+    """グラフの識別子を、拡張子を落とした KB 相対パスにする。"""
+    return path.removesuffix(".md")
 
 
 def _dump(value: object) -> str:
@@ -44,15 +44,15 @@ def _page(project: Project) -> bytes:
     """テンプレートにグラフ・説明文・表示情報を差し込む。"""
     graph = json.loads((project.repo_root / "graph.json").read_text(encoding="utf-8"))
     nodes = [
-        [_short(n["path"]), n["type"], n["title"], "|".join(n.get("tags") or [])]
+        [_node_id(n["path"]), n["type"], n["title"], "|".join(n.get("tags") or [])]
         for n in graph.get("nodes", [])
     ]
     edges = [
-        [_short(e["source"]), e["predicate"], _short(e["target"])]
+        [_node_id(e["source"]), e["predicate"], _node_id(e["target"])]
         for e in graph.get("edges", [])
     ]
     descriptions = {
-        _short(n["path"]): n.get("description", "") for n in graph.get("nodes", [])
+        _node_id(n["path"]): n.get("description", "") for n in graph.get("nodes", [])
     }
     viewer = build_viewer_config(project)
     table = {
