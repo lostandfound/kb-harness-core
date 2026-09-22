@@ -19,10 +19,6 @@ from .viewer import build_viewer_config
 
 MARKER = re.compile(r"__KB_(GRAPH|DESC|VIEWER|TITLE)__")
 STATIC = Path(__file__).resolve().parent / "static"
-VENDOR = {
-    "react.production.min.js",
-    "react-dom.production.min.js",
-}
 
 
 def _node_id(path: str) -> str:
@@ -91,22 +87,6 @@ def make_handler(project: Project) -> type[BaseHTTPRequestHandler]:
                     return
                 self._send(graph_json.read_bytes(), "application/json; charset=utf-8")
                 return
-
-            if path == "/support.js":
-                self._send(
-                    (STATIC / "support.js").read_bytes(),
-                    "text/javascript; charset=utf-8",
-                )
-                return
-
-            if path.startswith("/vendor/"):
-                name = path.removeprefix("/vendor/")
-                if name in VENDOR:
-                    self._send(
-                        (STATIC / "vendor" / name).read_bytes(),
-                        "text/javascript; charset=utf-8",
-                    )
-                    return
 
             self.send_error(404)
 

@@ -1,651 +1,93 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script>
-// dc ランタイムは React を unpkg から実行時に読む。ローカルで完結させるため、
-// 取得先を app/vendor/ の同一版に差し替える（SRI が support.js の期待値と一致することを確認済み）。
-window.__resources = {
-  "https://unpkg.com/react@18.3.1/umd/react.production.min.js": "/vendor/react.production.min.js",
-  "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js": "/vendor/react-dom.production.min.js"
-};
-</script>
-<script src="/support.js"></script>
+<title>__KB_TITLE__</title>
+<style>
+:root { color-scheme: dark; --bg:#070b16; --panel:#0c1221; --line:#243452; --muted:#8ea3c6; }
+* { box-sizing:border-box; }
+html,body { margin:0; width:100%; height:100%; overflow:hidden; background:var(--bg); color:#dbe4f5; font:14px system-ui,sans-serif; }
+button,input { font:inherit; }
+button { color:inherit; cursor:pointer; }
+.app { width:100%; height:100%; position:relative; background:radial-gradient(ellipse 70% 65% at 45% 45%,#1e3c6e66,#05070fe8 72%); }
+.toolbar { position:absolute; z-index:2; left:22px; top:18px; width:310px; display:grid; gap:10px; }
+.title { color:#a9bad8; font:12px ui-monospace,monospace; letter-spacing:.16em; }
+.search { width:100%; padding:10px 13px; border:1px solid var(--line); border-radius:9px; outline:0; background:#0c1221d9; color:#eef4ff; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { border:1px solid var(--line); border-radius:99px; padding:5px 9px; background:#0c1221d9; color:#b8c6e0; }
+.chip.active { border-color:var(--color); background:color-mix(in srgb,var(--color) 18%,transparent); }
+.stats { color:#536786; font:11px ui-monospace,monospace; }
+.stage { position:absolute; inset:0; touch-action:none; }
+.stage svg { width:100%; height:100%; user-select:none; }
+.edge { stroke:#7894c544; stroke-width:1.2; }
+.edge.active { stroke:#7dd3fc; stroke-width:2.4; }
+.node { cursor:pointer; }
+.node circle { stroke-width:2; transition:opacity .15s; }
+.node text { fill:#dbe4f5; font-size:12px; paint-order:stroke; stroke:#070b16; stroke-width:4px; stroke-linejoin:round; pointer-events:none; }
+.node.dim circle,.node.dim text { opacity:.14; }
+.node.selected circle { stroke:#fff; stroke-width:3; }
+.panel { position:absolute; z-index:2; right:20px; top:18px; bottom:18px; width:320px; overflow:auto; padding:20px; border:1px solid var(--line); border-radius:13px; background:#0a0f1ee8; box-shadow:0 18px 60px #0009; }
+.panel h2 { margin:0 0 5px; color:#f0f5ff; font-size:21px; }
+.panel .type { color:#67e8f9; font:11px ui-monospace,monospace; text-transform:uppercase; }
+.panel .id,.relation .predicate { color:#60769d; font:11px ui-monospace,monospace; overflow-wrap:anywhere; }
+.section { margin-top:22px; }
+.section-label { margin-bottom:8px; color:#60769d; font:10px ui-monospace,monospace; letter-spacing:.14em; text-transform:uppercase; }
+.description { color:#c3d1e8; line-height:1.8; }
+.tags { display:flex; flex-wrap:wrap; gap:5px; }
+.tag { padding:4px 8px; border:1px solid #304365; border-radius:5px; color:#a8badd; font:11px ui-monospace,monospace; }
+.relation { display:block; width:100%; margin:3px 0; padding:9px; border:0; border-radius:7px; background:transparent; text-align:left; }
+.relation:hover { background:#2d3e6090; }
+.relation .name { color:#dce6f8; }
+.controls { position:absolute; z-index:2; left:22px; bottom:18px; display:flex; gap:6px; align-items:center; }
+.controls button { min-width:32px; height:30px; border:1px solid var(--line); border-radius:7px; background:#0c1221dd; }
+.controls span { margin-left:5px; color:#536786; font:11px ui-monospace,monospace; }
+@media (max-width:700px) { .toolbar { width:calc(100% - 40px); } .panel { top:auto; left:12px; right:12px; bottom:58px; width:auto; max-height:36%; } }
+</style>
 </head>
 <body>
-<x-dc>
-<helmet>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
-<style>
-  html, body { margin: 0; padding: 0; background: #05070f; }
-  * { box-sizing: border-box; }
-  a { color: #22d3ee; text-decoration: none; }
-  a:hover { color: #67e8f9; }
-  @keyframes dashflow { to { stroke-dashoffset: -600; } }
-  @keyframes haloPulse { 0%,100% { opacity: .55; transform: scale(1); } 50% { opacity: .95; transform: scale(1.12); } }
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: #1d2740; border-radius: 8px; }
-</style>
-</helmet>
-<div style="position: relative; width: 100%; height: 100vh; overflow: hidden; background: #070b16; color: #dbe4f5; font-family: 'Noto Sans JP', 'Helvetica Neue', sans-serif;">
-
-  <div style="position: absolute; inset: 0; opacity: {{ gridOpacity }}; background-image: linear-gradient(rgba(120,160,220,.16) 1px, transparent 1px), linear-gradient(90deg, rgba(120,160,220,.16) 1px, transparent 1px); background-size: 48px 48px;"></div>
-  <div style="position: absolute; inset: 0; background: radial-gradient(ellipse 70% 60% at 48% 45%, rgba(30,60,110,.45), rgba(5,7,15,.9) 70%);"></div>
-
-  <div ref="{{ stageRef }}" onWheel="{{ onWheel }}" onMouseDown="{{ onStageDown }}" onMouseMove="{{ onMove }}" onMouseUp="{{ onUp }}" onMouseLeave="{{ onUp }}" onClick="{{ onBlank }}" style="position: absolute; inset: 0; cursor: default; overflow: hidden;">
-    <div style="position: absolute; inset: 0; transform-origin: 0 0; transform: translate({{ panX }}px, {{ panY }}px) scale({{ zoom }});">
-      <svg width="100%" height="100%" style="position: absolute; inset: 0; overflow: visible;">
-        <sc-for list="{{ edges }}" as="e" hint-placeholder-count="40">
-          <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" stroke="{{ e.stroke }}" stroke-width="{{ e.w }}"></line>
-        </sc-for>
-        <sc-for list="{{ liveEdges }}" as="e" hint-placeholder-count="0">
-          <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" stroke="{{ e.stroke }}" stroke-width="2.2" stroke-dasharray="10 150" stroke-linecap="round" style="animation: dashflow 2.6s linear infinite;"></line>
-        </sc-for>
-      </svg>
-
-      <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="40">
-        <div onMouseDown="{{ n.onDown }}" onClick="{{ n.onClick }}" onMouseEnter="{{ n.onEnter }}" onMouseLeave="{{ n.onLeave }}" style="position: absolute; left: 0; top: 0; transform: translate({{ n.x }}px, {{ n.y }}px) translate(-50%, -50%); z-index: {{ n.labelZ }}; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; transition: opacity .25s ease; will-change: transform;">
-          <div style="position: relative; width: {{ n.r }}px; height: {{ n.r }}px; opacity: {{ n.op }}; transition: opacity .25s ease; display: grid; place-items: center;">
-            <div style="position: absolute; inset: -{{ n.halo }}px; border-radius: 999px; background: radial-gradient(circle, {{ n.glow }}, rgba(0,0,0,0) 70%); animation: haloPulse {{ n.pulse }}s ease-in-out infinite;"></div>
-            <div style="position: absolute; inset: 0; border-radius: 999px; background: {{ n.fill }}; border: {{ n.ring }}; box-shadow: 0 0 {{ n.blur }}px {{ n.glowSolid }}, inset 0 0 12px rgba(255,255,255,.35);"></div>
-          </div>
-          <div style="position: absolute; top: 100%; margin-top: 6px; opacity: {{ n.labelOp }}; pointer-events: none; transition: opacity .2s ease; font-size: 11.5px; font-weight: 500; letter-spacing: .01em; color: {{ n.labelColor }}; padding: 1px 5px; border-radius: 4px; background: rgba(5,8,17,.62); text-shadow: 0 0 8px #05070f, 0 1px 2px #05070f; white-space: nowrap;">{{ n.label }}</div>
-        </div>
-      </sc-for>
-    </div>
-  </div>
-
-  <div style="position: absolute; left: 24px; top: 22px; width: {{ leftW }}px; display: flex; flex-direction: column; gap: 12px; z-index: 5;">
-    <div style="display: flex; align-items: baseline; gap: 10px; padding-left: 2px;">
-      <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: .2em; color: #7f93b8;">__KB_TITLE__</div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 14px; border-radius: 10px; background: rgba(12,18,33,.82); border: 1px solid #1b2743; backdrop-filter: blur(12px); box-shadow: 0 8px 28px rgba(0,0,0,.45);">
-      <div style="width: 13px; height: 13px; border-radius: 999px; border: 1.5px solid #4a5f85; flex: none;"></div>
-      <input value="{{ q }}" onChange="{{ onQuery }}" placeholder="ノードを検索 / search entities" style="flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: #e6edfb; font-family: 'Noto Sans JP', sans-serif; font-size: 13px;" />
-      <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #3f4f6d; border: 1px solid #23324f; border-radius: 4px; padding: 2px 5px;">⌘K</div>
-    </div>
-
-    <div style="display: flex; flex-wrap: wrap; gap: 7px;">
-      <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
-        <div onClick="{{ c.onClick }}" style="display: flex; align-items: center; gap: 7px; padding: 5px 11px 5px 9px; border-radius: 999px; cursor: pointer; background: {{ c.bg }}; border: 1px solid {{ c.border }}; transition: all .18s ease;">
-          <div style="width: 7px; height: 7px; border-radius: 999px; background: {{ c.dot }}; box-shadow: 0 0 8px {{ c.dot }};"></div>
-          <div style="font-size: 12px; color: {{ c.fg }};">{{ c.label }}</div>
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: {{ c.meta }};">{{ c.count }}</div>
-        </div>
-      </sc-for>
-    </div>
-
-    <div style="display: flex; flex-wrap: wrap; gap: 6px 14px; padding-left: 3px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #44557a;">
-      <div>{{ statNodes }}</div>
-      <div>{{ statEdges }}</div>
-      <div>{{ statLayout }}</div>
-    </div>
-  </div>
-
-  <sc-if value="{{ tipShow }}" hint-placeholder-val="{{ false }}">
-    <div style="position: absolute; left: {{ tipLeft }}px; top: {{ tipTop }}px; z-index: 8; width: 320px; pointer-events: none; padding: 11px 13px; border-radius: 10px; background: rgba(8,13,25,.95); border: 1px solid #22304e; box-shadow: 0 14px 40px rgba(0,0,0,.6); display: flex; flex-direction: column; gap: 6px;">
-      <div style="display: flex; align-items: center; gap: 7px;">
-        <div style="width: 6px; height: 6px; border-radius: 999px; flex: none; background: {{ tipColor }}; box-shadow: 0 0 8px {{ tipColor }};"></div>
-        <div style="font-size: 12.5px; font-weight: 700; color: #f0f5ff;">{{ tipTitle }}</div>
-      </div>
-      <div style="font-size: 11.5px; line-height: 1.75; color: #b2c1dc; text-wrap: pretty;">{{ tipText }}</div>
-    </div>
-  </sc-if>
-
-  <div style="position: absolute; left: 24px; bottom: 22px; z-index: 5; display: flex; align-items: center; gap: 8px;">
-    <div onClick="{{ zoomOut }}" style="width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; cursor: pointer; background: rgba(12,18,33,.85); border: 1px solid #1b2743; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #8ea3c6;">−</div>
-    <div onClick="{{ zoomIn }}" style="width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; cursor: pointer; background: rgba(12,18,33,.85); border: 1px solid #1b2743; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #8ea3c6;">+</div>
-    <div onClick="{{ resetView }}" style="height: 30px; display: grid; place-items: center; padding: 0 11px; border-radius: 8px; cursor: pointer; background: rgba(12,18,33,.85); border: 1px solid #1b2743; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; color: #6d80a6;">RESET</div>
-    <div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #44557a; padding-left: 4px;">{{ zoomLabel }} · labels {{ labelCount }}</div>
-  </div>
-
-  <sc-if value="{{ sel }}" hint-placeholder-val="{{ true }}">
-    <div style="position: absolute; right: 22px; top: 22px; bottom: 22px; width: {{ rightW }}px; z-index: 5; display: flex; flex-direction: column; border-radius: 14px; background: rgba(10,15,28,.9); border: 1px solid #1b2743; backdrop-filter: blur(14px); box-shadow: 0 18px 60px rgba(0,0,0,.6); overflow: hidden;">
-      <div style="height: 3px; background: {{ selColor }}; box-shadow: 0 0 18px {{ selColor }};"></div>
-      <div style="padding: 20px 22px 16px; border-bottom: 1px solid #16203a; display: flex; flex-direction: column; gap: 10px;">
-        <div style="display: flex; align-items: center; gap: 9px;">
-          <div style="width: 8px; height: 8px; border-radius: 999px; background: {{ selColor }}; box-shadow: 0 0 10px {{ selColor }};"></div>
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: {{ selColor }};">{{ selType }}</div>
-          <div style="flex: 1;"></div>
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #3f4f6d;">deg {{ selDeg }}</div>
-        </div>
-        <div style="font-size: 20px; font-weight: 700; line-height: 1.4; color: #f0f5ff; text-wrap: pretty;">{{ selTitle }}</div>
-        <div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #4d5f83; word-break: break-all;">{{ selId }}</div>
-      </div>
-
-      <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 18px 22px 24px; display: flex; flex-direction: column; gap: 22px;">
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: #46577a;">説明 / description</div>
-          <div style="font-size: 13.5px; line-height: 1.9; color: #c3d1e8; text-wrap: pretty; overflow-wrap: anywhere;">{{ selDesc }}</div>
-        </div>
-
-        <div style="display: flex; flex-direction: column; gap: 9px;">
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: #46577a;">タグ / tags</div>
-          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-            <sc-for list="{{ selTags }}" as="t" hint-placeholder-count="3">
-              <div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8ea3c6; padding: 4px 9px; border-radius: 5px; background: rgba(38,52,80,.45); border: 1px solid #1f2b47;">{{ t }}</div>
-            </sc-for>
-          </div>
-        </div>
-
-        <div style="display: flex; flex-direction: column; gap: 9px;">
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: #46577a;">述語の内訳 / predicates</div>
-          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-            <sc-for list="{{ selPreds }}" as="p" hint-placeholder-count="2">
-              <div style="display: flex; align-items: baseline; gap: 6px; padding: 4px 9px; border-radius: 5px; background: rgba(16,24,42,.8); border: 1px solid #1c2947;">
-                <div style="font-size: 11.5px; color: #b8c6e0;">{{ p.ja }}</div>
-                <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #4f6187;">{{ p.n }}</div>
-              </div>
-            </sc-for>
-          </div>
-        </div>
-
-        <div style="display: flex; flex-direction: column; gap: 9px;">
-          <div style="display: flex; align-items: baseline; gap: 8px;">
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: #46577a;">関係 / relations</div>
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #35435f;">{{ selRelCount }}</div>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 2px;">
-            <sc-for list="{{ selRelations }}" as="r" hint-placeholder-count="6">
-              <div onClick="{{ r.onClick }}" onMouseEnter="{{ r.onEnter }}" onMouseLeave="{{ r.onLeave }}" style="display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 8px; cursor: pointer; background: {{ r.bg }}; transition: background .16s ease;">
-                <div style="width: 7px; height: 7px; border-radius: 999px; flex: none; background: {{ r.color }}; box-shadow: 0 0 9px {{ r.color }};"></div>
-                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
-                  <div style="font-size: 12.5px; color: #dce6f8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.label }}</div>
-                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #4f6187;">{{ r.rel }}</div>
-                </div>
-              </div>
-            </sc-for>
-          </div>
-        </div>
-      </div>
-    </div>
-  </sc-if>
-</div>
-</x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;glowIntensity&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.3,&quot;max&quot;:2,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;表示&quot;},&quot;showGrid&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;表示&quot;}}">
-const VIEWER = __KB_VIEWER__;
-
-// 型は知識ベースごとに異なる。色は viewer.json（kb serve が導出）から受け取る。
-const TYPES = {};
-VIEWER.types.forEach(t => {
-  TYPES[t.name.toLowerCase()] = { ja: t.name, en: t.name.toLowerCase(), color: t.color };
-});
-
-// グラフと語彙は別経路で読むため、語彙に無い型のノードが来うる。
-// 画面全体を落とさないよう、既定の色とラベルへ落とす。
-const TYPE_FALLBACK_COLOR = '#64748b';
-function typeOf(name) {
-  return TYPES[name] || { ja: name, en: name, color: TYPE_FALLBACK_COLOR };
-}
-
-function firstLine(d) {
-  if (!d) return '';
-  const i = d.indexOf('。');
-  return i > 0 ? d.slice(0, i + 1) : d;
-}
-
-const PRED = {};
-VIEWER.predicates.forEach(p => { PRED[p.name] = p.label; });
-
-// 語彙に無い述語は、名前をそのまま表示名にする。
-function predLabel(name) {
-  return PRED[name] || name;
-}
-
-const DESC = __KB_DESC__;
-
+<main class="app">
+  <section class="toolbar">
+    <div class="title" id="title">__KB_TITLE__</div>
+    <input class="search" id="search" placeholder="ノードを検索 / search entities" aria-label="ノードを検索">
+    <div class="chips" id="chips"></div>
+    <div class="stats" id="stats"></div>
+  </section>
+  <div class="stage" id="stage"><svg id="graph" viewBox="0 0 1500 1000" role="img" aria-label="知識グラフ"></svg></div>
+  <aside class="panel" id="panel" aria-live="polite"></aside>
+  <div class="controls"><button id="out" aria-label="縮小">−</button><button id="in" aria-label="拡大">+</button><button id="reset">RESET</button><span id="zoom"></span></div>
+</main>
+<script>
 const RAW = __KB_GRAPH__;
-
-const NODES = RAW.nodes.map(r => ({ id: r[0], t: r[1].toLowerCase(), label: r[2], tags: r[3].split('|'), desc: DESC[r[0]] || '' }));
-const NMAP = {};
-NODES.forEach(n => { NMAP[n.id] = n; });
-const EDGES = RAW.edges.filter(e => NMAP[e[0]] && NMAP[e[2]]);
-
-const CW = 1500, CH = 1050; // virtual layout canvas
-
-class Component extends DCLogic {
-  state = { sel: 'claude-code', hover: null, q: '', off: {}, tick: 0, w: 1280, h: 800, settled: false, zoom: 0.7, panX: 0, panY: 0 };
-
-  constructor(props) {
-    super(props);
-    this.P = {};
-    NODES.forEach((n, i) => {
-      const a = i * 2.39996;
-      const rad = 50 + 470 * Math.sqrt((i + 0.5) / NODES.length);
-      this.P[n.id] = { x: CW / 2 + Math.cos(a) * rad, y: CH / 2 + Math.sin(a) * rad * 0.72, vx: 0, vy: 0 };
-    });
-    this.lw = {}; this.sw = {}; this.short = {};
-    this.measureLabels();
-    this.fitZoom = 0.7;
-    this.deg = {};
-    NODES.forEach(n => { this.deg[n.id] = 0; });
-    EDGES.forEach(([a, , b]) => { this.deg[a]++; this.deg[b]++; });
-    this.rank = NODES.slice().sort((a, b) => this.deg[b.id] - this.deg[a.id]).map(n => n.id);
-    this.rankIx = {};
-    this.rank.forEach((id, i) => { this.rankIx[id] = i; });
-    this.alpha = 1;
-    this.stageRef = React.createRef();
-  }
-
-  componentDidMount() {
-    const el = this.stageRef.current;
-    if (el) {
-      const r = el.getBoundingClientRect();
-      this.stageBox = r;
-      if (r.width > 0 && r.height > 0) this.setState({ w: r.width, h: r.height }, () => this.fitView());
-      else requestAnimationFrame(() => {
-        const b = el.getBoundingClientRect();
-        if (b.width > 0) this.setState({ w: b.width, h: b.height }, () => this.fitView());
-      });
-      this.ro = new ResizeObserver(() => {
-        const b = el.getBoundingClientRect();
-        if (b.width <= 0 || b.height <= 0) return;
-        this.setState({ w: b.width, h: b.height }, () => { if (!this.userView) this.fitView(); });
-      });
-      this.ro.observe(el);
-    }
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(() => { this.measureLabels(); this.settle(); });
-    }
-    this.run();
-  }
-
-  measureLabels() {
-    const c = document.createElement('canvas').getContext('2d');
-    c.font = '500 11.5px "Noto Sans JP", sans-serif';
-    this.short = {};
-    NODES.forEach(n => {
-      this.short[n.id] = n.label.length > 12 ? n.label.slice(0, 12) + '…' : n.label;
-      this.lw[n.id] = c.measureText(n.label).width * 1.04 + 8;
-      this.sw[n.id] = c.measureText(this.short[n.id]).width * 1.04 + 8;
-    });
-  }
-
-  bbox() {
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    NODES.forEach(n => {
-      const p = this.P[n.id], e = this.extent(n);
-      x0 = Math.min(x0, p.x - e.hw); x1 = Math.max(x1, p.x + e.hw);
-      y0 = Math.min(y0, p.y - e.hh); y1 = Math.max(y1, p.y + e.hh);
-    });
-    return { x0, y0, x1, y1 };
-  }
-
-  fitView() {
-    const { w, h } = this.state;
-    if (!(w > 0) || !(h > 0)) { requestAnimationFrame(() => this.fitView()); return; }
-    const b = this.bbox();
-    const pad = 44;
-    const raw = Math.min((w - pad * 2) / (b.x1 - b.x0), (h - pad * 2) / (b.y1 - b.y0));
-    const z = Math.max(0.3, Math.min(0.8, raw)); // shrink only when the viewport is tight
-    this.fitZoom = z;
-    this.setState({
-      zoom: z,
-      panX: w / 2 - ((b.x0 + b.x1) / 2) * z,
-      panY: h / 2 - ((b.y0 + b.y1) / 2) * z
-    }, () => this.settle());
-  }
-
-  settle() {
-    try { this.relax(); } catch (err) { console.warn('relax failed', err); }
-    this.recenter();
-  }
-
-  recenter() {
-    const { w, h, zoom } = this.state;
-    if (this.userView || !(w > 0)) { this.setState(s => ({ tick: s.tick + 1 })); return; }
-    const b = this.bbox();
-    const pad = 44;
-    const raw = Math.min((w - pad * 2) / Math.max(1, b.x1 - b.x0), (h - pad * 2) / Math.max(1, b.y1 - b.y0));
-    const z = Math.max(0.3, Math.min(0.8, raw));
-    this.fitZoom = z;
-    this.setState(s => ({
-      tick: s.tick + 1, zoom: z,
-      panX: w / 2 - ((b.x0 + b.x1) / 2) * z,
-      panY: h / 2 - ((b.y0 + b.y1) / 2) * z
-    }));
-  }
-  componentWillUnmount() { cancelAnimationFrame(this.raf); if (this.ro) this.ro.disconnect(); }
-
-  radius(id) { return 9 + Math.min(19, Math.sqrt(this.deg[id] || 1) * 3.6); }
-  extent(n) {
-    const r = this.radius(n.id);
-    if (this.rankIx[n.id] >= 48) return { hw: r / 2 + 7, hh: r / 2 + 7 };
-    return { hw: Math.max(r / 2 + 7, (this.sw[n.id] || n.label.length * 11) / 2), hh: r / 2 + 19 };
-  }
-
-  panels() {
-    const w = this.state.w;
-    return {
-      leftW: Math.round(Math.max(200, Math.min(300, w * 0.26))),
-      rightW: Math.round(Math.max(240, Math.min(350, w * 0.30)))
-    };
-  }
-
-  bounds() { return { x0: 40, x1: CW - 40, y0: 40, y1: CH - 40 }; }
-
-  reheat(a) { this.alpha = Math.max(this.alpha, a); this.run(); }
-
-  run() {
-    cancelAnimationFrame(this.raf);
-    const step = () => {
-      const iters = this.alpha > 0.25 ? 3 : 1;
-      for (let i = 0; i < iters; i++) this.tickSim();
-      const done = this.alpha <= 0.02;
-      if (done) {
-        try { this.relax(); } catch (err) { console.warn('relax failed', err); }
-        this.setState(s => ({ tick: s.tick + 1, settled: true }), () => this.recenter());
-        return;
-      }
-      this.setState(s => ({ tick: s.tick + 1, settled: false }));
-      this.raf = requestAnimationFrame(step);
-    };
-    this.raf = requestAnimationFrame(step);
-  }
-
-  // run label-box separation to convergence once the force phase ends
-  relax() {
-    const b = this.bounds();
-    const t0 = Date.now();
-    for (let it = 0; it < 40; it++) {
-      if (Date.now() - t0 > 250) break;
-      let moved = 0;
-      for (let i = 0; i < NODES.length; i++) {
-        const A = NODES[i], p = this.P[A.id], ea = this.extent(A);
-        for (let j = i + 1; j < NODES.length; j++) {
-          const B = NODES[j], q = this.P[B.id], eb = this.extent(B);
-          const ox = (ea.hw + eb.hw + 9) - Math.abs(p.x - q.x);
-          const oy = (ea.hh + eb.hh + 7) - Math.abs(p.y - q.y);
-          if (ox <= 0 || oy <= 0) continue;
-          moved++;
-          const sx = p.x < q.x ? -1 : 1, sy = p.y < q.y ? -1 : 1;
-          if (ox / (ea.hw + eb.hw) < oy / (ea.hh + eb.hh)) {
-            const m = ox / 2; p.x += sx * m; q.x -= sx * m;
-          } else {
-            const m = oy / 2; p.y += sy * m; q.y -= sy * m;
-          }
-        }
-      }
-      this.clampAll(b);
-      if (!moved) break;
-    }
-  }
-
-  clampAll(b) {
-    NODES.forEach(n => {
-      const p = this.P[n.id], ex = this.extent(n);
-      const lo = b.x0 + ex.hw, hi = b.x1 - ex.hw;
-      p.x = hi > lo ? Math.max(lo, Math.min(hi, p.x)) : (b.x0 + b.x1) / 2;
-      const ty = b.y0 + ex.hh, by = b.y1 - ex.hh;
-      p.y = by > ty ? Math.max(ty, Math.min(by, p.y)) : (b.y0 + b.y1) / 2;
-    });
-  }
-
-  tickSim() {
-    const b = this.bounds();
-    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
-    const k = Math.sqrt(Math.max(160000, (b.x1 - b.x0) * (b.y1 - b.y0)) / NODES.length) * 2.05;
-    const a = this.alpha;
-    for (let i = 0; i < NODES.length; i++) {
-      const p = this.P[NODES[i].id];
-      for (let j = i + 1; j < NODES.length; j++) {
-        const q = this.P[NODES[j].id];
-        let dx = p.x - q.x, dy = p.y - q.y;
-        const d = Math.hypot(dx, dy) || 0.01;
-        if (d > k * 4) continue;
-        const f = (k * k / d) * 0.085 * a;
-        dx /= d; dy /= d;
-        p.vx += dx * f; p.vy += dy * f; q.vx -= dx * f; q.vy -= dy * f;
-      }
-    }
-    EDGES.forEach(([s, , t]) => {
-      const p = this.P[s], q = this.P[t];
-      let dx = q.x - p.x, dy = q.y - p.y;
-      const d = Math.hypot(dx, dy) || 0.01;
-      const f = (d * d / k) * 0.004 * a;
-      dx /= d; dy /= d;
-      p.vx += dx * f; p.vy += dy * f; q.vx -= dx * f; q.vy -= dy * f;
-    });
-    NODES.forEach(n => {
-      const p = this.P[n.id];
-      if (this.drag && this.drag.id === n.id) { p.vx = 0; p.vy = 0; return; }
-      const g = 0.25 + Math.min(1, (this.deg[n.id] || 0) / 10); // hubs anchor, leaves stay out
-      p.vx += (cx - p.x) * 0.010 * a * g;
-      p.vy += (cy - p.y) * 0.015 * a * g;
-      p.vx *= 0.8; p.vy *= 0.8;
-      p.x += Math.max(-26, Math.min(26, p.vx));
-      p.y += Math.max(-26, Math.min(26, p.vy));
-    });
-    this.clampAll(b);
-    this.alpha *= 0.97;
-  }
-
-  local(e) {
-    const r = this.stageRef.current.getBoundingClientRect();
-    this.stageBox = r;
-    const { zoom, panX, panY } = this.state;
-    return { x: (e.clientX - r.left - panX) / zoom, y: (e.clientY - r.top - panY) / zoom };
-  }
-
-  onStageDown = (e) => { this.pan = { x: e.clientX, y: e.clientY, px: this.state.panX, py: this.state.panY }; };
-
-  onMove = (e) => {
-    if (!this.stageBox && this.stageRef.current) this.stageBox = this.stageRef.current.getBoundingClientRect();
-    if (this.drag) {
-      const l = this.local(e);
-      const p = this.P[this.drag.id];
-      p.x = l.x + this.drag.dx; p.y = l.y + this.drag.dy;
-      this.reheat(0.12);
-    } else if (this.pan) {
-      const dx = e.clientX - this.pan.x, dy = e.clientY - this.pan.y;
-      if (Math.abs(dx) + Math.abs(dy) > 2) { this.userView = true; this.setState({ panX: this.pan.px + dx, panY: this.pan.py + dy }); }
-    }
-  };
-  onUp = () => { if (this.drag) { this.drag = null; this.reheat(0.1); } this.pan = null; };
-
-  setZoom(z, cx, cy) {
-    const { zoom, panX, panY } = this.state;
-    this.userView = true;
-    const nz = Math.max(0.3, Math.min(3, z));
-    const ax = cx === undefined ? this.state.w / 2 : cx;
-    const ay = cy === undefined ? this.state.h / 2 : cy;
-    this.setState({ zoom: nz, panX: ax - (ax - panX) * (nz / zoom), panY: ay - (ay - panY) * (nz / zoom) });
-  }
-
-  onWheel = (e) => {
-    e.preventDefault();
-    const r = this.stageRef.current.getBoundingClientRect();
-    this.setZoom(this.state.zoom * (e.deltaY > 0 ? 0.9 : 1.1), e.clientX - r.left, e.clientY - r.top);
-  };
-
-  visible(n) {
-    if (this.state.off[n.t]) return false;
-    const q = this.state.q.trim().toLowerCase();
-    if (!q) return true;
-    return (n.label + ' ' + n.id + ' ' + n.tags.join(' ')).toLowerCase().includes(q);
-  }
-
-  renderVals() {
-    const { sel, hover, q, zoom } = this.state;
-    const focus = hover || sel;
-    const glowK = this.props.glowIntensity ?? 1;
-    const neighbors = new Set();
-    EDGES.forEach(([a, , b]) => { if (a === focus) neighbors.add(b); if (b === focus) neighbors.add(a); });
-
-    const vis = {};
-    NODES.forEach(n => { vis[n.id] = this.visible(n); });
-    let labelCount = 0;
-    const pan = this.panels(), W = this.state.w, H = this.state.h;
-    const panX = this.state.panX, panY = this.state.panY;
-    const occluded = (n) => {
-      const p = this.P[n.id];
-      const sx = p.x * zoom + panX, sy = p.y * zoom + panY;
-      const hw = ((this.lw[n.id] || 60) / 2) * zoom + 2;
-      const top = sy + (this.radius(n.id) / 2 + 6) * zoom, bot = top + 15 * zoom;
-      const hit = (r) => sx - hw < r.x1 && sx + hw > r.x0 && bot > r.y0 && top < r.y1;
-      return hit({ x0: 16, x1: 24 + pan.leftW + 8, y0: 14, y1: 250 })
-        || hit({ x0: W - (22 + pan.rightW + 8), x1: W, y0: 14, y1: H - 14 })
-        || hit({ x0: 16, x1: 330, y0: H - 60, y1: H });
-    };
-
-    const labelRect = (n, full) => {
-      const p = this.P[n.id];
-      const wpx = ((full ? this.lw[n.id] : this.sw[n.id]) || 60) * zoom;
-      const sx = p.x * zoom + panX, sy = p.y * zoom + panY;
-      const top = sy + (this.radius(n.id) / 2 + 6) * zoom;
-      return { x0: sx - wpx / 2, x1: sx + wpx / 2, y0: top, y1: top + 15 * zoom + 2 };
-    };
-    const hits = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
-    const shows = {}, placed = [];
-    const warmup = this.state.tick < 3;
-    const order = [sel].concat(Array.from(neighbors), this.rank);
-    const seen = {};
-    order.forEach(id => {
-      if (seen[id] || !NMAP[id] || !vis[id]) return;
-      seen[id] = 1;
-      const n = NMAP[id], full = id === sel || id === hover;
-      if (warmup) return;
-      const rect = labelRect(n, full);
-      if (occluded(n)) return;
-      if (placed.some(r => hits(r, rect))) return;
-      placed.push(rect); shows[id] = 1;
-    });
-
-    const nodes = NODES.map(n => {
-      const p = this.P[n.id];
-      const c = typeOf(n.t).color;
-      const isSel = n.id === sel, isHov = n.id === hover, isNb = neighbors.has(n.id);
-      const near = isSel || isHov || isNb;
-      const dim = !vis[n.id] ? 0.07 : (near ? 1 : 0.22);
-      const labelOpacity = !vis[n.id] ? 0 : (near ? 1 : 0.62);
-      const r = this.radius(n.id);
-      const showLabel = !!shows[n.id];
-      const fullText = isSel || isHov;
-      if (showLabel) labelCount++;
-      return {
-        id: n.id, label: fullText ? n.label : (this.short[n.id] || n.label), x: Math.round(p.x), y: Math.round(p.y), op: dim,
-        r: Math.round(isSel ? r * 1.2 : r),
-        halo: Math.round((isSel ? 20 : 11) * glowK),
-        blur: Math.round((isSel ? 28 : 12) * glowK),
-        pulse: isSel ? 2.4 : 5 + (this.rankIx[n.id] % 4),
-        fill: 'radial-gradient(circle at 34% 30%, #ffffff, ' + c + ' 62%, ' + c + ' 100%)',
-        ring: isSel ? '2px solid #ffffff' : '1px solid ' + c,
-        glow: c + '4d', glowSolid: c + (isSel ? 'cc' : '55'),
-        labelOp: showLabel ? labelOpacity : 0,
-        labelColor: isSel || isHov ? '#ffffff' : (isNb ? '#eaf1ff' : '#dbe5f6'),
-        labelZ: fullText ? 3 : 1,
-        onClick: (e) => { e.stopPropagation(); this.setState({ sel: n.id }); },
-        onEnter: (e) => this.setState({ hover: n.id, tipX: e.clientX, tipY: e.clientY }),
-        onLeave: () => this.setState({ hover: null }),
-        onDown: (e) => {
-          e.stopPropagation();
-          const l = this.local(e);
-          this.drag = { id: n.id, dx: this.P[n.id].x - l.x, dy: this.P[n.id].y - l.y };
-        }
-      };
-    });
-
-    const edgeGeo = EDGES.map(([s, pred, t]) => {
-      const a = this.P[s], b = this.P[t];
-      const on = s === focus || t === focus;
-      const shown = vis[s] && vis[t];
-      return {
-        s, t, pred, on,
-        x1: Math.round(a.x), y1: Math.round(a.y), x2: Math.round(b.x), y2: Math.round(b.y),
-        stroke: !shown ? 'rgba(90,115,160,.05)' : (on ? typeOf(NMAP[s === focus ? t : s].t).color + 'b3' : 'rgba(130,162,214,.26)'),
-        w: on && shown ? 1.6 : 0.9
-      };
-    });
-
-    const selNode = NMAP[sel] || NODES[0];
-    const selRelations = EDGES.filter(([a, , b]) => a === sel || b === sel).map(([a, pred, b]) => {
-      const other = NMAP[a === sel ? b : a];
-      return {
-        label: other.label, color: typeOf(other.t).color,
-        rel: (a === sel ? '→ ' : '← ') + predLabel(pred) + ' · ' + pred,
-        bg: hover === other.id ? 'rgba(45,62,96,.55)' : 'rgba(255,255,255,.015)',
-        onClick: () => this.setState({ sel: other.id }),
-        onEnter: () => this.setState({ hover: other.id }),
-        onLeave: () => this.setState({ hover: null })
-      };
-    }).sort((x, y) => x.rel.localeCompare(y.rel));
-
-    const pc = {};
-    EDGES.forEach(([a, pred, b]) => { if (a === sel || b === sel) pc[pred] = (pc[pred] || 0) + 1; });
-    const selPreds = Object.keys(PRED).filter(k => pc[k]).map(k => ({ ja: PRED[k], n: pc[k] }));
-
-    const counts = {};
-    NODES.forEach(n => { counts[n.t] = (counts[n.t] || 0) + 1; });
-    const keys = Object.keys(TYPES);
-    const anyOff = keys.some(t => this.state.off[t]);
-    const chips = keys.map(t => {
-      const active = !this.state.off[t];
-      const c = TYPES[t].color;
-      return {
-        label: TYPES[t].ja, count: counts[t],
-        dot: active ? c : '#33415c',
-        bg: active ? c + '1f' : 'rgba(12,18,33,.75)',
-        border: active ? c + '66' : '#1b2743',
-        fg: active ? '#eef4ff' : '#5d6c8c', meta: active ? c + 'cc' : '#3b4864',
-        onClick: (e) => {
-          const add = e.shiftKey || e.metaKey || e.ctrlKey;
-          this.setState(s => {
-            if (add) return { off: Object.assign({}, s.off, { [t]: !s.off[t] }) };
-            const isolated = !s.off[t] && keys.every(k => k === t || s.off[k]);
-            const off = {};
-            if (!isolated) keys.forEach(k => { if (k !== t) off[k] = true; });
-            return { off };
-          });
-        }
-      };
-    });
-    chips.unshift({
-      label: 'すべて', count: NODES.length,
-      dot: anyOff ? '#33415c' : '#93a6c6',
-      bg: anyOff ? 'rgba(12,18,33,.75)' : 'rgba(147,166,198,.16)',
-      border: anyOff ? '#1b2743' : '#3a4c70',
-      fg: anyOff ? '#5d6c8c' : '#eef4ff', meta: anyOff ? '#3b4864' : '#93a6c6',
-      onClick: () => this.setState({ off: {} })
-    });
-
-    const p = this.panels();
-    return {
-      stageRef: this.stageRef, nodes, edges: edgeGeo,
-      liveEdges: edgeGeo.filter(e => e.on && vis[e.s] && vis[e.t]),
-      chips, q, leftW: p.leftW, rightW: p.rightW,
-      zoom, panX: this.state.panX, panY: this.state.panY,
-      zoomLabel: Math.round(zoom * 100) + '%', labelCount,
-      onWheel: this.onWheel, onStageDown: this.onStageDown, onMove: this.onMove, onUp: this.onUp,
-      zoomIn: (e) => { e.stopPropagation(); this.setZoom(this.state.zoom * 1.25); },
-      zoomOut: (e) => { e.stopPropagation(); this.setZoom(this.state.zoom / 1.25); },
-      resetView: (e) => { e.stopPropagation(); this.userView = false; this.fitView(); },
-      onQuery: (e) => this.setState({ q: e.target.value }),
-      onBlank: () => this.setState({ hover: null }),
-      gridOpacity: (this.props.showGrid ?? true) ? 1 : 0,
-      statNodes: 'nodes ' + NODES.filter(n => vis[n.id]).length + '/' + NODES.length,
-      statEdges: 'edges ' + EDGES.length,
-      statLayout: this.state.settled ? 'force · settled' : 'force · simulating',
-      tipShow: !!(hover && NMAP[hover] && NMAP[hover].desc),
-      tipText: hover && NMAP[hover] ? firstLine(NMAP[hover].desc) : '',
-      tipTitle: hover && NMAP[hover] ? NMAP[hover].label : '',
-      tipColor: hover && NMAP[hover] ? typeOf(NMAP[hover].t).color : '#22d3ee',
-      tipLeft: Math.max(12, Math.min((this.state.w || 1200) - 332, (this.state.tipX || 0) - (this.stageBox ? this.stageBox.left : 0) + 16)),
-      tipTop: (() => {
-        const H = this.state.h || 800, TH = 108;
-        const cy = (this.state.tipY || 0) - (this.stageBox ? this.stageBox.top : 0);
-        return cy + 18 + TH > H - 12 ? Math.max(12, cy - 18 - TH) : Math.max(12, cy + 18);
-      })(),
-      sel: true, selId: selNode.id, selTitle: selNode.label, selDesc: selNode.desc,
-      selType: typeOf(selNode.t).ja + ' / ' + typeOf(selNode.t).en,
-      selColor: typeOf(selNode.t).color, selTags: selNode.tags, selDeg: this.deg[selNode.id],
-      selPreds, selRelations, selRelCount: selRelations.length
-    };
-  }
+const DESC = __KB_DESC__;
+const VIEWER = __KB_VIEWER__;
+const NS = 'http://www.w3.org/2000/svg';
+const colors = new Map(VIEWER.types.map((t, i) => [String(t.name).toLowerCase(), t.color]));
+const nodes = RAW.nodes.map((r, i) => ({id:r[0], type:r[1], title:r[2], tags:(r[3] || '').split('|').filter(Boolean), desc:DESC[r[0]] || '', color:colors.get(String(r[1]).toLowerCase()) || ['#f5a524','#22d3ee','#a78bfa','#fb7185','#4ade80'][i % 5], x:0, y:0}));
+const byId = new Map(nodes.map(n => [n.id, n]));
+const edges = RAW.edges.filter(e => byId.has(e[0]) && byId.has(e[2]));
+const state = {query:'', hidden:new Set(), selected:nodes[0]?.id || '', zoom:1, panX:0, panY:0};
+const svg = document.getElementById('graph');
+const ns = (tag, attrs = {}) => { const el = document.createElementNS(NS, tag); for (const [k,v] of Object.entries(attrs)) el.setAttribute(k,v); return el; };
+function layout() { const r = Math.max(220, Math.min(390, 80 + nodes.length * 7)); nodes.forEach((n,i) => { const a = i * 2.39996; n.x = 750 + Math.cos(a) * r * Math.sqrt((i + 1) / Math.max(1,nodes.length)); n.y = 500 + Math.sin(a) * r * .7 * Math.sqrt((i + 1) / Math.max(1,nodes.length)); }); }
+function visible(n) { return !state.hidden.has(n.type.toLowerCase()) && (!state.query || `${n.title} ${n.id} ${n.tags.join(' ')}`.toLowerCase().includes(state.query)); }
+function render() {
+  const selected = byId.get(state.selected) || nodes[0];
+  svg.replaceChildren();
+  const viewport = ns('g', {transform:`translate(${state.panX} ${state.panY}) scale(${state.zoom})`});
+  for (const [source,predicate,target] of edges) { const a=byId.get(source), b=byId.get(target), line=ns('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,class:`edge ${source===state.selected||target===state.selected?'active':''}`}); viewport.append(line); }
+  for (const n of nodes) { const group=ns('g',{class:`node ${visible(n)?'':'dim'} ${n.id===state.selected?'selected':''}`}); group.dataset.id=n.id; group.append(ns('circle',{cx:n.x,cy:n.y,r:n.id===state.selected?18:13,fill:n.color,stroke:n.color})); const text=ns('text',{x:n.x,y:n.y+34,'text-anchor':'middle'}); text.textContent=n.title.length>18?n.title.slice(0,18)+'…':n.title; group.append(text); group.addEventListener('click', e => { e.stopPropagation(); state.selected=n.id; render(); }); viewport.append(group); }
+  svg.append(viewport); renderChips(); renderPanel(selected); document.getElementById('stats').textContent=`nodes ${nodes.filter(visible).length}/${nodes.length} · edges ${edges.length}`; document.getElementById('zoom').textContent=`${Math.round(state.zoom*100)}%`;
 }
+function renderChips() { const chips=document.getElementById('chips'); chips.replaceChildren(); const types=[...new Set(nodes.map(n=>n.type))]; for (const type of types) { const key=type.toLowerCase(), button=document.createElement('button'); button.className=`chip ${!state.hidden.has(key)?'active':''}`; button.style.setProperty('--color',colors.get(key)||'#64748b'); button.textContent=`${type} ${nodes.filter(n=>n.type===type).length}`; button.onclick=()=>{ state.hidden.has(key)?state.hidden.delete(key):state.hidden.add(key); render(); }; chips.append(button); } }
+function renderPanel(n) { const panel=document.getElementById('panel'); if (!n) { panel.textContent='グラフにノードがありません。'; return; } panel.replaceChildren(); const type=document.createElement('div'); type.className='type'; type.textContent=n.type; const title=document.createElement('h2'); title.textContent=n.title; const id=document.createElement('div'); id.className='id'; id.textContent=n.id; panel.append(type,title,id); addSection(panel,'説明 / description', n.desc || '説明はありません。'); if (n.tags.length) { const tags=document.createElement('div'); tags.className='tags'; n.tags.forEach(t=>{const tag=document.createElement('span');tag.className='tag';tag.textContent=t;tags.append(tag);}); addSection(panel,'タグ / tags',tags); } const relations=edges.filter(e=>e[0]===n.id||e[2]===n.id); const list=document.createElement('div'); relations.forEach(([a,p,b])=>{const other=byId.get(a===n.id?b:a), button=document.createElement('button');button.className='relation';const name=document.createElement('div');name.className='name';name.textContent=`${a===n.id?'→':'←'} ${other?.title || (a===n.id?b:a)}`;const pred=document.createElement('div');pred.className='predicate';pred.textContent=`${p} · ${label(p)}`;button.append(name,pred);button.onclick=()=>{state.selected=other.id;render();};list.append(button);}); addSection(panel,`関係 / relations (${relations.length})`,list); }
+function addSection(parent,label,value) { const section=document.createElement('section');section.className='section';const heading=document.createElement('div');heading.className='section-label';heading.textContent=label;section.append(heading);if(typeof value==='string'){const body=document.createElement('div');body.className='description';body.textContent=value;section.append(body);}else section.append(value);parent.append(section); }
+function label(predicate) { return VIEWER.predicates.find(p=>p.name===predicate)?.label || predicate; }
+function reset() { state.zoom=1; state.panX=0; state.panY=0; render(); }
+document.getElementById('search').addEventListener('input', e => { state.query=e.target.value.trim().toLowerCase(); render(); });
+document.getElementById('in').onclick=()=>{state.zoom=Math.min(3,state.zoom*1.2);render();}; document.getElementById('out').onclick=()=>{state.zoom=Math.max(.35,state.zoom/1.2);render();}; document.getElementById('reset').onclick=reset;
+let drag=null; svg.addEventListener('pointerdown', e=>{drag={x:e.clientX,y:e.clientY,panX:state.panX,panY:state.panY};svg.setPointerCapture(e.pointerId);}); svg.addEventListener('pointermove', e=>{if(!drag)return;state.panX=drag.panX+(e.clientX-drag.x);state.panY=drag.panY+(e.clientY-drag.y);render();}); svg.addEventListener('pointerup',()=>drag=null); svg.addEventListener('wheel',e=>{e.preventDefault();state.zoom=Math.max(.35,Math.min(3,state.zoom*(e.deltaY<0?1.1:.9)));render();},{passive:false});
+layout(); render();
 </script>
 </body>
 </html>
