@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from kb_harness.project import Project
+from kb_harness.project import Project, ProjectError
 from kb_harness.serve.viewer import PALETTE, build_viewer_config
 
 DOMAIN = """domain:
@@ -86,6 +86,36 @@ class ViewerConfigTest(unittest.TestCase):
         types = build_viewer_config(Project.discover(self.root))["types"]
         self.assertEqual(len(types), len(PALETTE) + 2)
         self.assertEqual(types[len(PALETTE)]["color"], PALETTE[0])
+
+    def test_typesがリストでも型なしとして扱う(self):
+        (self.root / "knowledge" / "vocabulary.yml").write_text(
+            "types:\n  - Course\npredicates: {}\ntags: [index]\n", encoding="utf-8"
+        )
+        self.assertEqual(build_viewer_config(Project.discover(self.root))["types"], [])
+
+    def test_predicatesがリストでも述語なしとして扱う(self):
+        (self.root / "knowledge" / "vocabulary.yml").write_text(
+            "types: {}\npredicates:\n  - teaches\ntags: [index]\n", encoding="utf-8"
+        )
+        config = build_viewer_config(Project.discover(self.root))
+        self.assertEqual(config["predicates"], [])
+
+    def test_vocabularyの最上位がリストでも空の定義として扱う(self):
+        (self.root / "knowledge" / "vocabulary.yml").write_text(
+            "- Course\n- Concept\n", encoding="utf-8"
+        )
+        config = build_viewer_config(Project.discover(self.root))
+        self.assertEqual(config["types"], [])
+        self.assertEqual(config["predicates"], [])
+        self.assertEqual(config["title"], "テスト知識ベース")
+
+    def test_vocabularyが壊れていればProjectErrorになる(self):
+        (self.root / "knowledge" / "vocabulary.yml").write_text(
+            "types:\n  Course: [\n", encoding="utf-8"
+        )
+        with self.assertRaises(ProjectError) as caught:
+            build_viewer_config(Project.discover(self.root))
+        self.assertIn("invalid YAML", str(caught.exception))
 
 
 if __name__ == "__main__":

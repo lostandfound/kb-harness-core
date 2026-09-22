@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from ..project import Project
+from ..project import Project, ProjectError
 
 # 深い紺黒の地で発光して見える 8 色。型の定義順に割り当てる。
 PALETTE = (
@@ -27,23 +27,38 @@ PALETTE = (
 
 
 def _load_yaml(path: Path) -> dict:
+    """YAML を辞書として読む。壊れていれば ProjectError に包んで投げる。
+
+    マッピング以外（リストやスカラー）が書かれていても呼び出し側を
+    AttributeError で落とさず、空の定義として扱う。
+    """
     if not path.is_file():
         return {}
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as error:
+        raise ProjectError(f"{path}: invalid YAML: {error}") from error
+    return data if isinstance(data, dict) else {}
+
+
+def _section(data: dict, key: str) -> dict:
+    """マッピングとして書かれた節だけを返す。それ以外は空とみなす。"""
+    value = data.get(key)
+    return value if isinstance(value, dict) else {}
 
 
 def build_viewer_config(project: Project) -> dict:
     """型の色・述語の表示名・題名をまとめた辞書を返す。"""
     vocabulary = _load_yaml(project.content_root / "vocabulary.yml")
-    domain = _load_yaml(project.repo_root / "kb-domain.yml").get("domain") or {}
+    domain = _section(_load_yaml(project.repo_root / "kb-domain.yml"), "domain")
 
     types = [
         {"name": str(name), "color": PALETTE[i % len(PALETTE)]}
-        for i, name in enumerate((vocabulary.get("types") or {}).keys())
+        for i, name in enumerate(_section(vocabulary, "types"))
     ]
 
     predicates = []
-    for name, value in (vocabulary.get("predicates") or {}).items():
+    for name, value in _section(vocabulary, "predicates").items():
         label = value.get("description") if isinstance(value, dict) else value
         predicates.append(
             {"name": str(name), "label": str(label) if label else str(name)}
