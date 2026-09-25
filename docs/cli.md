@@ -42,6 +42,17 @@ KB 全体を検証する。frontmatter・リンク・relations の型制約・�
 | `--port PORT` | 待ち受けポート番号。デフォルト `8000` |
 | `--open` | ブラウザを自動的に開く（OS サポート時） |
 
+### `kb flashcards`
+
+設定中の KB から学習カードを生成し、ローカルで起動する。`kb-domain.yml` の `content_root` からエンティティ・タグ・関係を読み、概要と Markdown 本文をカードに表示する。タグがない KB でも型ごとに出題できる。ユーザーの回答は保存しない。待ち受けは `127.0.0.1` に限定される。
+
+```bash
+kb flashcards
+kb flashcards --port 8123 --open
+```
+
+出題数は10問が初期値。ジャンルと出題数を開始前に選択できる。UI は英語を既定とし、ブラウザーの優先言語が日本語の場合は日本語で表示する。KB 本文そのものの言語は変換しない。
+
 ## 生成物の同期
 
 ### `kb index build` / `kb index check`

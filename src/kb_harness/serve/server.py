@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from ..project import Project
+from ..flashcards import export_flashcards
 from .viewer import build_viewer_config
 
 MARKER = re.compile(r"__KB_(GRAPH|DESC|VIEWER|TITLE)__")
@@ -68,13 +69,16 @@ def _page(project: Project) -> bytes:
     return MARKER.sub(lambda m: table[m.group(1)], template).encode("utf-8")
 
 
-def make_handler(project: Project) -> type[BaseHTTPRequestHandler]:
+def make_handler(project: Project, view: str = "graph") -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802 （BaseHTTPRequestHandler の命名規約）
             path = urlparse(self.path).path
             graph_json = project.repo_root / "graph.json"
 
             if path == "/":
+                if view == "flashcards":
+                    self._send((STATIC / "flashcards.html").read_bytes(), "text/html; charset=utf-8")
+                    return
                 if not graph_json.is_file():
                     self._send_text(
                         404, "graph.json がない。kb sync を実行してから開く。"
@@ -90,6 +94,17 @@ def make_handler(project: Project) -> type[BaseHTTPRequestHandler]:
                     )
                     return
                 self._send(graph_json.read_bytes(), "application/json; charset=utf-8")
+                return
+
+            if path == "/api/flashcards":
+                body = json.dumps(export_flashcards(project), ensure_ascii=False).encode("utf-8")
+                self._send(body, "application/json; charset=utf-8")
+                return
+
+            if path in {"/flashcards.css", "/flashcards.js"}:
+                name = path.removeprefix("/")
+                content_type = "text/css; charset=utf-8" if name.endswith(".css") else "text/javascript; charset=utf-8"
+                self._send((STATIC / name).read_bytes(), content_type)
                 return
 
             if path == "/support.js":
@@ -131,9 +146,9 @@ def make_handler(project: Project) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
-def serve(project: Project, port: int = 8000, open_browser: bool = False) -> None:
+def serve(project: Project, port: int = 8000, open_browser: bool = False, view: str = "graph") -> None:
     """127.0.0.1 でだけ待ち受ける。外部へ公開しない。"""
-    server = HTTPServer(("127.0.0.1", port), make_handler(project))
+    server = HTTPServer(("127.0.0.1", port), make_handler(project, view=view))
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     print(f"kb serve: {url}")
     if open_browser:

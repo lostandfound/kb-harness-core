@@ -89,6 +89,7 @@ kb sync --check                                                   # index.md や
 | コマンド | 役割 |
 |---|---|
 | `kb project show` | `kb-domain.yml` の設定解決結果を表示 |
+| `kb flashcards` | 任意の KB をローカルの学習カード画面で学ぶ |
 | `kb validate` | KB 全体のスキーマ・リンク・リレーションを検証 |
 | `kb index build\|check` / `kb graph build\|check` / `kb sync` | `index.md` と `graph.json` の自動生成・差分検査 |
 | `kb entity create --from spec.yml` | spec ファイルからエンティティを検証付きで原子的に作成 |

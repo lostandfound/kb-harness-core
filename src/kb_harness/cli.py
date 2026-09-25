@@ -106,6 +106,11 @@ def _parser() -> argparse.ArgumentParser:
     serve_parser.add_argument("--port", type=int, default=8000)
     serve_parser.add_argument("--open", action="store_true", dest="open_browser")
     _add_common_options(serve_parser)
+
+    flashcards_parser = subcommands.add_parser("flashcards", help="study the KB with flashcards")
+    flashcards_parser.add_argument("--port", type=int, default=8000)
+    flashcards_parser.add_argument("--open", action="store_true", dest="open_browser")
+    _add_common_options(flashcards_parser)
     reference = subcommands.add_parser("reference", help="manage references")
     reference_commands = reference.add_subparsers(dest="reference_command", required=True)
     _add_common_options(reference_commands.add_parser("health"))
@@ -683,6 +688,10 @@ def _main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "serve":
         serve(project, port=args.port, open_browser=args.open_browser)
+        return 0
+
+    if args.command == "flashcards":
+        serve(project, port=args.port, open_browser=args.open_browser, view="flashcards")
         return 0
 
     return 2

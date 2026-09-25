@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11151c">
+  <title>Knowledge Flashcards</title>
+  <link rel="stylesheet" href="/flashcards.css">
+  <script src="/flashcards.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Knowledge Flashcards home">
+        <span class="brand-mark" aria-hidden="true">K</span>
+        <span>Knowledge <span class="brand-light">Flashcards</span></span>
+      </a>
+      <span id="kb-title" class="topbar-note">Review concepts, one card at a time</span>
+    </header>
+
+    <main id="app" aria-live="polite">
+      <div class="loading-state">Loading study cards…</div>
+    </main>
+    <footer class="site-footer">Your answers stay in this session only</footer>
+  </div>
+
+  <dialog id="entity-dialog" aria-labelledby="dialog-title">
+    <div class="dialog-head">
+      <div><p class="eyebrow" data-i18n="related">Related items</p><h2 id="dialog-title"></h2></div>
+      <button class="icon-button" type="button" data-close-dialog aria-label="Close" data-i18n-aria="close">×</button>
+    </div>
+    <p id="dialog-type" class="dialog-type"></p>
+    <p id="dialog-description" class="dialog-description"></p>
+    <div id="dialog-detail-body" class="detail-body"></div>
+  </dialog>
+</body>
+</html>
