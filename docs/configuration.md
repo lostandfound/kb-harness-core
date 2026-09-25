@@ -47,6 +47,8 @@ validate:
 | `exploration.wikipedia_categories` | 任意 | `explore_diff.py` が既定で走査する Wikipedia カテゴリ名の一覧。 |
 | `index.by_tag` | 任意 | `true` のとき `kb sync` / `kb index build` が `<content_root>/index.md` の `<!-- tag-index:start -->` 〜 `<!-- tag-index:end -->` 区間にタグ別一覧を生成する。区間がなければ末尾に追記し、区間外の本文は保持する。並び順は `vocabulary.yml` の `tags` 順、該当エンティティのないタグは省く。`kb sync --check` が陳腐化を検出する。既定は無効。 |
 | `index.tag_labels` | 任意 | タグ ID から見出し表示名への対応。未登録のタグは ID をそのまま見出しにする。 |
+| `views.root` | 任意 | ビュー定義 YAML を置くディレクトリ（`repo_root` 相対）。指定するとビュー機能が有効になり、`kb validate` が定義を検査し、`kb sync` / `kb graph build` がビュー一覧と `graph.json` の `views` 配列を生成する。リポジトリの内側かつ `content_root` の外でなければならず、外れる設定は読み込み時にエラーになる。契約は[ビュー](#ビュー任意)を参照。既定は無効。 |
+| `views.index` | 任意 | `kb sync` が生成するビュー一覧の出力先（`repo_root` 相対、`.md`）。既定は `<views.root>/index.md`。リポジトリの内側かつ `content_root` の外で、`graph.json` / `kb-domain.yml` / `views.root` 自身と衝突してはならない。 |
 | `validate.extra_checks` | 任意 | シェルコマンド文字列の一覧。`kb validate` が本体の検証後にリポジトリルートを作業ディレクトリとして順に実行し、非ゼロ終了を `validation.extra_check.failed`（ERROR）として集約する。`--format json` では `extra_checks` にコマンドごとの `returncode` / `ok` / `stderr` が出る。`kb doctor` は先頭語が PATH 上に見つからないコマンドを `doctor.extra_check.unavailable`（WARNING）として報告する。YAML で `true` などは真偽値になるので引用符で囲む。 |
 
 上記以外のキーはハーネスは読まない。導入先が独自の設定を同じファイルに置いても支障はない。
@@ -147,6 +149,47 @@ Claim frontmatter の契約:
 - `status` の遷移は `kb claim transition` で明示的に行う。
 - `kb graph build` は Claim を `nodes` / `edges` に混ぜず、独立した `claims` 配列へ出力する。
 - 期間付き主張は現時点の共通契約に含まれない。
+
+## ビュー（任意）
+
+ビューは、エンティティ本文に書かずに束ねや導出を定義する層である。`kb-domain.yml` の `views.root` で有効化し、そのディレクトリに 1 件 1 YAML で置く。ファイル名の stem がビュー ID になる（ケバブケース）。
+
+出典で支えられた事実はエンティティに、書き手の見方による束ねはビューに置く、という分離を機械的に保つためのもので、ハーネスはビューの内容をエンティティ Markdown へ書き戻さない。RAG などの消費者には `kb sync` が生成するビュー一覧（`views.index`）と `graph.json` の `views` 配列を通して露出する。
+
+```yaml
+# list: 割り当てビュー。メンバーを列挙する
+name: 一度定義して各所で使う
+description: 定義を一か所に置き、利用側はそれを参照するだけにする姿勢を共有するもの。
+kind: list
+basis: interpretation
+members:
+  - /concepts/dont-repeat-yourself.md
+  - path: /concepts/semantic-layer.md
+    note: 指標を一度定義し、各ツールから参照させる
+```
+
+```yaml
+# query: 導出ビュー。where の AND 条件でメンバーを計算する。新しい情報を持たない
+name: 客家料理の料理
+description: 客家料理に属する料理。
+kind: query
+where:
+  type: Dish
+  relation: { predicate: part-of, target: /concepts/hakka-ryori.md }
+```
+
+| フィールド | 内容 |
+|---|---|
+| `name` / `description` | 必須。`name` は全ビューで一意 |
+| `kind` | `list`（割り当て）または `query`（導出） |
+| `basis` | `list` で必須。`interpretation`（書き手の見方。`sources` を持てない）または `source`（出典に基づく。`sources` 必須） |
+| `members` | `list` で必須。ルート相対パスの文字列、または `{path, note}`。Claim は指定できない |
+| `sources` | `basis: source` のときのみ。`ref: <id>` は `references.yml` に存在すること |
+| `where` | `query` で必須。`type` / `tags`（すべて含む）/ `relation: {predicate, target}` の AND 条件。語彙と実在エンティティに照らして検証する |
+
+- `list` に `where`、`query` に `members` / `basis` / `sources` を書くとエラー。上記以外のキーもエラー。同じ stem を `.yml` と `.yaml` の両方で置く（ID の重複）のもエラー。
+- `basis: source` を書きたくなったビューは、Claim かエンティティへ昇格する候補である。ビューは出典を持たないのが原則で、`source` は昇格前の一時的な状態として許す。
+- `kb graph build` はビューを `nodes` / `edges` に混ぜず、独立した `views` 配列へ出力する（`id` / `name` / `description` / `kind` / `basis` / `where` / 解決済み `members`）。
 
 ## evals/rag-eval.yml（任意）
 

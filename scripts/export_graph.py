@@ -44,6 +44,11 @@ def main() -> None:
     )
     args = parser.parse_args()
     root = Path(args.root) if args.root else Project.discover().content_root
+    # views.root を設定した KB では graph.json に views 配列が入る。kb graph build と同じ出力にする
+    try:
+        views_root = Project.discover(root).views_root
+    except Exception:
+        views_root = None
     if not args.force:
         errors = validate(root)
         if errors:
@@ -52,12 +57,12 @@ def main() -> None:
             raise SystemExit(1)
     warnings: list[str] = []
     export_graph(root, warnings=warnings)
-    output = render_graph(root)
+    output = render_graph(root, views_root)
     if args.out:
         output_path = Path(args.out).resolve()
         # Keep the compatibility entry point on the same atomic writer as
         # ``kb graph build`` and ``kb sync``.
-        apply_changes_atomically(plan_graph(root, output_path))
+        apply_changes_atomically(plan_graph(root, output_path, views_root))
     else:
         print(output, end="")
 

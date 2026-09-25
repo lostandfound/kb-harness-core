@@ -277,8 +277,9 @@ def test_installed_wheels_run_every_cli_family_from_isolated_directory(tmp_path)
     content = project / "knowledge"
     (content / "notes").mkdir(parents=True)
     (project / "kb-domain.yml").write_text(
-        "domain:\n  content_root: knowledge\n", encoding="utf-8"
+        "domain:\n  content_root: knowledge\nviews:\n  root: views\n", encoding="utf-8"
     )
+    (project / "views").mkdir()
     (content / "vocabulary.yml").write_text(
         "types:\n  Note:\n    directory: notes\n    graph: false\n"
         "predicates: {}\ntags: []\n",
@@ -311,6 +312,7 @@ def test_installed_wheels_run_every_cli_family_from_isolated_directory(tmp_path)
         ["sync", "--check"],
         ["entity", "create", "--from", str(spec), "--dry-run"],
         ["claim", "list"],
+        ["view", "list"],
         ["reference", "health"],
         ["eval", "summary"],
         ["doctor"],

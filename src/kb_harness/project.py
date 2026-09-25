@@ -8,6 +8,17 @@ from pathlib import Path
 import yaml
 
 
+def _contained(config_path: Path, label: str, raw: str) -> Path:
+    """repo_root 相対の設定値を解決し、リポジトリの外を指すものを拒否する。"""
+    repo_root = config_path.parent.resolve()
+    candidate = (repo_root / raw).resolve()
+    if candidate != repo_root and repo_root not in candidate.parents:
+        raise ProjectError(f"{config_path}: {label} must stay inside the repository root: {raw}")
+    if candidate == repo_root:
+        raise ProjectError(f"{config_path}: {label} must not be the repository root itself: {raw}")
+    return candidate
+
+
 class ProjectError(ValueError):
     """Raised when a KB project cannot be discovered or is misconfigured."""
 
@@ -25,6 +36,10 @@ class Project:
     tag_labels: dict[str, str] = field(default_factory=dict)
     # kb-domain.yml の任意セクション validate.extra_checks:。kb validate が repo_root で順に実行する。
     extra_checks: tuple[str, ...] = ()
+    # kb-domain.yml の任意セクション views:。未指定なら無効。
+    # views_root はビュー定義 YAML を置くディレクトリ、views_index は kb sync が生成する一覧。
+    views_root: Path | None = None
+    views_index: Path | None = None
 
     @classmethod
     def discover(cls, start: str | Path | None = None) -> "Project":
@@ -66,10 +81,35 @@ class Project:
             raise ProjectError(
                 f"{path}: validate.extra_checks must be a list of non-empty strings"
             )
+        views_section = data.get("views") if isinstance(data.get("views"), dict) else {}
+        views_root: Path | None = None
+        views_index: Path | None = None
+        if views_section:
+            raw_root = views_section.get("root")
+            if not isinstance(raw_root, str) or not raw_root.strip():
+                raise ProjectError(f"{path}: views.root must be a non-empty string")
+            raw_index = views_section.get("index", f"{raw_root.rstrip('/')}/index.md")
+            if not isinstance(raw_index, str) or not raw_index.strip():
+                raise ProjectError(f"{path}: views.index must be a non-empty string")
+            views_root = _contained(path, "views.root", raw_root)
+            views_index = _contained(path, "views.index", raw_index)
+            resolved_content = (path.parent / content_root).resolve()
+            for label, candidate in (("views.root", views_root), ("views.index", views_index)):
+                if candidate == resolved_content or resolved_content in candidate.parents:
+                    raise ProjectError(
+                        f"{path}: {label} must not be inside domain.content_root (views live outside entities)"
+                    )
+            reserved = {path.resolve(), (path.parent / "graph.json").resolve(), views_root}
+            if views_index in reserved or views_index.suffix != ".md":
+                raise ProjectError(
+                    f"{path}: views.index must be a .md path distinct from graph.json, kb-domain.yml and views.root"
+                )
         return cls(
             repo_root=path.parent,
             content_root=path.parent / content_root,
             index_by_tag=bool(index.get("by_tag", False)),
             tag_labels=tag_labels,
             extra_checks=tuple(raw_checks),
+            views_root=views_root,
+            views_index=views_index,
         )
