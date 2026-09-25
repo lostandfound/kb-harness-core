@@ -16,6 +16,8 @@ class AssetTest(unittest.TestCase):
             "README.md",
             "vendor/graphology.umd.min.js",
             "vendor/sigma.min.js",
+            "vendor/graphology-library.min.js",
+            "vendor/GRAPHOLOGY-LIBRARY-LICENSE.txt",
             "vendor/GRAPHOLOGY-LICENSE.txt",
             "vendor/SIGMA-LICENSE.txt",
             "ds/styles.css",
@@ -58,6 +60,11 @@ class AssetTest(unittest.TestCase):
     def test_グラフ画面がデザインシステムを読み込む(self):
         text = (STATIC / "graph.html").read_text(encoding="utf-8")
         self.assertIn('href="/ds/styles.css"', text)
+
+    def test_グラフ画面が力学配置を読み込む(self):
+        text = (STATIC / "graph.html").read_text(encoding="utf-8")
+        self.assertIn('src="/vendor/graphology-library.min.js"', text)
+        self.assertIn("layoutForceAtlas2.assign", text)
 
 
 if __name__ == "__main__":

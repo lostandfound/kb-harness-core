@@ -149,6 +149,7 @@ button { cursor: pointer; }
 </main>
 <script src="/vendor/graphology.umd.min.js"></script>
 <script src="/vendor/sigma.min.js"></script>
+<script src="/vendor/graphology-library.min.js"></script>
 <script>
 const RAW = __KB_GRAPH__, DESC = __KB_DESC__, VIEWER = __KB_VIEWER__;
 const css = getComputedStyle(document.documentElement);
@@ -210,7 +211,8 @@ function solid(color, alpha = 1) {
 }
 
 // ---- グラフ ----
-// 力学配置は持たないので、黄金角の螺旋に並べる。次数の大きい順に中心へ寄せる。
+// 初期位置は黄金角の螺旋（次数の大きい順に中心へ）。乱数を使わないので、
+// 同じ graph.json からは毎回同じ配置になる。
 const graph = new graphology.Graph();
 [...nodes].sort((a, b) => degree.get(b.id) - degree.get(a.id)).forEach((n, i) => {
   const a = i * 2.39996, r = 2.2 + Math.sqrt((i + 1) / Math.max(1, nodes.length)) * 8;
@@ -221,6 +223,16 @@ const graph = new graphology.Graph();
   });
 });
 edges.forEach((e, i) => graph.addEdgeWithKey(`edge-${i}`, e.source, e.target, { size: .9, color: solid(token('--edge-rest')) }));
+
+// 力学配置: ForceAtlas2 で関係の近いものを寄せ、noverlap でノードの重なりを解く。
+// 描画前に同期で回す。反復回数はノード数に反比例させ、大きな KB でも待ち時間を 1 秒前後に抑える。
+if (graph.order > 1) {
+  const { layoutForceAtlas2, layoutNoverlap } = graphologyLibrary;
+  const settings = { ...layoutForceAtlas2.inferSettings(graph), barnesHutOptimize: graph.order > 400 };
+  const iterations = Math.max(60, Math.min(400, Math.round(120000 / graph.order)));
+  layoutForceAtlas2.assign(graph, { iterations, settings });
+  layoutNoverlap.assign(graph, { maxIterations: 80, settings: { margin: 6, ratio: 1.4 } });
+}
 
 // NodeLabel: 半透明の板に載せ、ノードの下へ中央揃えで置く
 function drawLabel(ctx, data, settings) {
@@ -255,7 +267,9 @@ const renderer = new Sigma(graph, document.getElementById('graph'), {
     out.labelAlpha = !visible(n) ? 0 : close ? 1 : .62;
     if (!visible(n)) out.label = '';
     if (id === state.selected && visible(n)) { out.size = data.size * 1.2; out.forceLabel = true; out.labelStrong = true; out.zIndex = 3; }
-    else if (f && close && visible(n)) { out.forceLabel = true; out.zIndex = 2; }
+    // 近傍のラベルまで強制すると密なところで重なるので、強制はフォーカス中の 1 点に留める
+    else if (id === f && visible(n)) { out.forceLabel = true; out.zIndex = 2; }
+    else if (f && close && visible(n)) out.zIndex = 1;
     return out;
   },
   edgeReducer: (key, data) => {
@@ -512,9 +526,31 @@ addEventListener('keydown', event => {
 });
 
 const camera = renderer.getCamera();
+// 右の詳細パネルに隠れない幅の中へ、ノードの外接矩形が余白つきで収まる視点を作る。
+// Sigma の既定はパネルを知らずに画面全体へ合わせる。狭い画面ではパネルが下に回るので横は削らない。
+function home() {
+  const { width, height } = renderer.getDimensions(), margin = 48;
+  const covered = width > 700 ? Math.max(240, Math.min(350, width * .3)) + 22 : 0;
+  const base = { x: .5, y: .5, angle: 0, ratio: 1 };
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  graph.forEachNode((id, attrs) => {
+    const p = renderer.graphToViewport(attrs, { cameraState: base });
+    x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
+  });
+  if (!Number.isFinite(x0)) return base;
+  const avail = width - covered;
+  const ratio = Math.max((x1 - x0) / Math.max(1, avail - margin * 2), (y1 - y0) / Math.max(1, height - margin * 2), .1);
+  // 外接矩形の中心が、パネルを除いた幅の中央に来るようカメラを右へずらす
+  const center = renderer.viewportToFramedGraph(
+    { x: (x0 + x1) / 2 + (width - avail) / 2 * ratio, y: (y0 + y1) / 2 },
+    { cameraState: base },
+  );
+  return { x: center.x, y: center.y, angle: 0, ratio };
+}
+camera.setState(home());
 el('in').onclick = () => camera.animatedZoom({ duration: 250 });
 el('out').onclick = () => camera.animatedUnzoom({ duration: 250 });
-el('reset').onclick = () => camera.animatedReset({ duration: 250 });
+el('reset').onclick = () => camera.animate(home(), { duration: 250 });
 const level = () => { el('level').textContent = `${Math.round(100 / camera.getState().ratio)}%`; };
 camera.on('updated', () => { level(); el('tooltip').hidden = true; });
 level();

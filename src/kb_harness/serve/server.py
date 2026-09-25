@@ -23,6 +23,7 @@ STATIC = Path(__file__).resolve().parent / "static"
 VENDOR = {
     "graphology.umd.min.js",
     "sigma.min.js",
+    "graphology-library.min.js",
 }
 # neon-graph-design-system から写したトークンと書体。CSS 内の相対参照
 # （styles.css → tokens/ → ../assets/fonts/）が解決できるよう、上流の配置を保つ。

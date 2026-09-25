@@ -103,7 +103,11 @@ class ServerTest(unittest.TestCase):
             self.assertEqual(status, 404, path)
 
     def test_グラフライブラリが配られる(self):
-        for path in ("/vendor/graphology.umd.min.js", "/vendor/sigma.min.js"):
+        for path in (
+            "/vendor/graphology.umd.min.js",
+            "/vendor/sigma.min.js",
+            "/vendor/graphology-library.min.js",
+        ):
             status, ctype, body = self._get(path)
             self.assertEqual(status, 200, path)
             self.assertTrue(ctype.startswith("text/javascript"), path)

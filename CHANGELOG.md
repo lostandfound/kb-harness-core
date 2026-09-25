@@ -13,6 +13,8 @@
 - `kb validate --check-urls` を追加。出典 URL・DOI の到達性確認を `scripts/validate.py` と同じく CLI からも行える。スキルが前提にしていたが CLI に無かった
 - `kb serve` を追加。知識グラフをローカルでブラウザ閲覧するコマンド。`graph.json` を読み、127.0.0.1 に限定して待ち受ける。表示情報（型の色・述語表示名・題名）は `vocabulary.yml` と `kb-domain.yml` から導出し、新規の設定項目は増やさない
 - `kb serve` の閲覧画面を neon-graph-design-system のトークンと書体で描き直した。Sigma.js の描画に発光・艶・選択輪・フォーカス中の辺の流れを重ね、フォーカス時は近傍以外を減光する。トークンと JetBrains Mono は同梱し、外部の書体や CDN は読まない
+- `kb serve` のノードを力学配置（ForceAtlas2 + noverlap）で並べるようにした。関係の近いエンティティが寄り、初期表示は右の詳細パネルを避けて収まる。同じ `graph.json` からは毎回同じ配置になる
+- `kb serve` の型の色が 8 型を超えると循環して重なっていたのを、12 色のパレットとそれ以降の生成色で重ならないようにした
 - `kb-domain.yml` に `views.root` / `views.index` を追加。エンティティ本文の外に置く「ビュー」（`kind: list` の割り当てと `kind: query` の導出）を 1 件 1 YAML で定義でき、`kb validate` が語彙と実在エンティティに照らして検査し、`kb sync` / `kb entity create` がビュー一覧と `graph.json` の `views` 配列を生成する。`kb view list|resolve|validate` を追加。出典で支えられた事実はエンティティに、書き手の見方による束ねはビューに置く分離を機械的に保つための層で、ビューの内容はエンティティへ書き戻さない
 - `kb-domain.yml` に `index.by_tag` / `index.tag_labels` を追加。有効にすると `kb sync` / `kb index build` / `kb entity create` がルート `index.md` のマーカー区間にタグ別（分野別）一覧を生成し、`kb sync --check` が陳腐化を検出する（#1）
 - `kb-domain.yml` に `validate.extra_checks` を追加。`kb validate` が本体の検証後に導入先固有のコマンドを順に実行して失敗を ERROR に集約し、`kb doctor` がコマンドの存在を WARNING で報告する（#2）
