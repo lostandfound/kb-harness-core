@@ -83,13 +83,19 @@ def export_graph(root: Path, warnings: list[str] | None = None) -> dict[str, obj
     return {"nodes": nodes, "edges": edges, "claims": claims}
 
 
-def render_graph(root: Path) -> str:
-    return json.dumps(export_graph(root), ensure_ascii=False, indent=2) + "\n"
+def render_graph(root: Path, views_root: Path | None = None) -> str:
+    graph = export_graph(root)
+    # views は kb-domain.yml で有効化した KB だけに出す。未設定の KB の graph.json は変えない。
+    if views_root is not None:
+        from .views import export_views
+
+        graph["views"] = export_views(root, views_root)
+    return json.dumps(graph, ensure_ascii=False, indent=2) + "\n"
 
 
-def plan_graph(root: Path, output_path: Path) -> dict[Path, str]:
+def plan_graph(root: Path, output_path: Path, views_root: Path | None = None) -> dict[Path, str]:
     output = output_path.resolve()
-    rendered = render_graph(root)
+    rendered = render_graph(root, views_root)
     current = output.read_text(encoding="utf-8") if output.is_file() else None
     if current == rendered:
         return {}

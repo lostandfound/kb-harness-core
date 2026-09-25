@@ -27,7 +27,7 @@
 
 ### `kb validate [--check-urls]`
 
-KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml` を対象とする。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。`--check-urls` を付けると、エンティティの `sources` と `references.yml` の URL・DOI に到達できるかも HTTP で確認する。ネットワークに依存するため既定では行わない。
+KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml` を対象とする。`kb-domain.yml` に `views.root` があればビュー定義も検査する（[設定リファレンス](configuration.md#ビュー任意)）。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。 `--check-urls` を付けると、エンティティの `sources` と `references.yml` の URL・DOI に到達できるかも HTTP で確認する。ネットワークに依存するため既定では行わない。
 
 ### `kb doctor`
 
@@ -61,11 +61,11 @@ kb flashcards --port 8123 --open
 
 ### `kb graph build` / `kb graph check`
 
-ルートの `graph.json`（`nodes` / `edges` / `claims`）を生成・同期確認する。`build` は `--dry-run` に対応する。
+ルートの `graph.json`（`nodes` / `edges` / `claims`）を生成・同期確認する。`build` は `--dry-run` に対応する。`views.root` が設定されていれば、`kb sync` と同じく解決済みメンバーを持つ `views` 配列も出力する（未設定の KB の `graph.json` は変わらない）。
 
 ### `kb sync` / `kb sync --check`
 
-index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。`index.by_tag` が有効ならタグ別一覧の陳腐化も `--check` で検出する。
+index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。`index.by_tag` が有効ならタグ別一覧の陳腐化も `--check` で検出する。`views.root` が設定されていればビュー一覧（`views.index`）も生成し、陳腐化を `views.stale` として検出する。
 
 ## 書き込み（原子的）
 
@@ -94,6 +94,10 @@ Claim の照会・一覧・単体検証。
 ### `kb claim transition PATH --to STATUS`
 
 Claim の `status` を明示的に遷移させる。許容される遷移は `kb-ontology-core` の `plan_transition` が定義する。`--dry-run` に対応する。
+
+### `kb view list` / `kb view resolve VIEW_ID` / `kb view validate`
+
+エンティティ本文の外に置いたビュー（[設定リファレンス](configuration.md#ビュー任意)）の一覧・解決・検証。`list` は各ビューの `kind` / `basis` と解決後のメンバー数を、`resolve` は指定したビュー（ファイル名の stem）のメンバーを `path` / `title` / `note` で返す。`views.root` が未設定なら `view.disabled` で終了コード 2。ビューの作成は YAML を手で書く（雛形生成コマンドは持たない）。
 
 ### `kb reference health`
 

@@ -35,6 +35,7 @@ from .sync import (
     plan_write,
 )
 from .validation import check_urls, run_extra_checks, validate
+from .views import ViewError, load_entities as _load_view_entities, load_views, resolve_view, validate_views
 
 Result = dict[str, Any]
 
@@ -100,6 +101,13 @@ def _parser() -> argparse.ArgumentParser:
     create_parser.add_argument("--format", choices=("text", "json"), default="text")
     claim_parser = subcommands.add_parser("claim", help="manage claims")
     _configure_claim_commands(claim_parser)
+    view_parser = subcommands.add_parser("view", help="inspect views defined outside entities")
+    view_commands = view_parser.add_subparsers(dest="view_command", required=True)
+    _add_common_options(view_commands.add_parser("list", help="list views with resolved member counts"))
+    resolve_parser = view_commands.add_parser("resolve", help="resolve one view to its members")
+    resolve_parser.add_argument("view_id")
+    _add_common_options(resolve_parser)
+    _add_common_options(view_commands.add_parser("validate", help="validate view definitions"))
 
     doctor_parser = subcommands.add_parser("doctor", help="check project health")
     _add_common_options(doctor_parser)
@@ -256,9 +264,104 @@ def _run_derived(
         return _internal_error(error, output_format)
 
 
+def _sync_stale_code(project: Project, path: str) -> str:
+    if path == "graph.json":
+        return "graph.stale"
+    if project.views_index is not None:
+        try:
+            if path == str(project.views_index.resolve().relative_to(project.repo_root.resolve())):
+                return "views.stale"
+        except ValueError:
+            pass
+    return "index.stale"
+
+
+def _view_action(project: Project, args: Any) -> int:
+    if project.views_root is None:
+        _emit(
+            {
+                "ok": False,
+                "changed": [],
+                "diagnostics": [
+                    {"code": "view.disabled", "message": "views are not configured (kb-domain.yml views.root)"}
+                ],
+            },
+            args.format,
+            error=True,
+        )
+        return 2
+    try:
+        if args.view_command == "validate":
+            errors = validate_views(project.content_root, project.views_root)
+            diagnostics = [{"code": "view.error", "message": error} for error in errors]
+            _emit({"ok": not diagnostics, "changed": [], "diagnostics": diagnostics}, args.format)
+            return 1 if diagnostics else 0
+        entities = _load_view_entities(project.content_root)
+        views = load_views(project.views_root)
+        if args.view_command == "list":
+            items = [
+                {
+                    "id": view.id,
+                    "name": view.name,
+                    "kind": view.kind,
+                    "basis": view.basis,
+                    "members": len(resolve_view(view, entities)),
+                }
+                for view in views
+            ]
+            if args.format == "json":
+                print(json.dumps({"ok": True, "views": items}, ensure_ascii=False, sort_keys=True))
+            else:
+                for item in items:
+                    basis = f" basis={item['basis']}" if item["basis"] else ""
+                    print(f"{item['id']}\t{item['kind']}{basis}\t{item['members']}\t{item['name']}")
+            return 0
+        matches = [view for view in views if view.id == args.view_id]
+        if not matches:
+            _emit(
+                {
+                    "ok": False,
+                    "changed": [],
+                    "diagnostics": [{"code": "view.not_found", "message": f"view not found: {args.view_id}"}],
+                },
+                args.format,
+                error=True,
+            )
+            return 1
+        view = matches[0]
+        members = [
+            {"path": member.path, "note": member.note, "title": (entities.get(member.path) or {}).get("title")}
+            for member in resolve_view(view, entities)
+        ]
+        if args.format == "json":
+            print(
+                json.dumps(
+                    {"ok": True, "id": view.id, "name": view.name, "kind": view.kind, "basis": view.basis, "members": members},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            )
+        else:
+            for member in members:
+                note = f" — {member['note']}" if member["note"] else ""
+                print(f"{member['path']}\t{member['title'] or ''}{note}")
+        return 0
+    except ViewError as error:
+        _emit(
+            {"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]},
+            args.format,
+            error=True,
+        )
+        return 1
+    except Exception as error:
+        return _internal_error(error, args.format)
+
+
 def _validate(project: Project, output_format: str, *, urls: bool = False) -> int:
     try:
         errors = validate(project.content_root)
+        if project.views_root is not None:
+            errors.extend(validate_views(project.content_root, project.views_root))
         if urls:
             errors += check_urls(project.content_root)
         checks = run_extra_checks(project.extra_checks, project.repo_root)
@@ -631,6 +734,8 @@ def _main(argv: Sequence[str] | None = None) -> int:
         return _entity_create(project, args)
     if args.command == "claim":
         return _claim_create(project, args) if args.claim_command == "create" else _claim_action(project, args)
+    if args.command == "view":
+        return _view_action(project, args)
 
     if args.command == "doctor":
         try:
@@ -672,7 +777,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             dry_run=args.dry_run,
             output_format=args.format,
             planner=lambda: plan_graph(
-                project.content_root, project.repo_root / "graph.json"
+                project.content_root, project.repo_root / "graph.json", project.views_root
             ),
             stale_code=lambda _path: "graph.stale",
             stale_message=lambda path: f"graph is stale: {path}",
@@ -685,7 +790,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             dry_run=args.dry_run,
             output_format=args.format,
             planner=lambda: plan_sync(project),
-            stale_code=lambda path: "graph.stale" if path == "graph.json" else "index.stale",
+            stale_code=lambda path: _sync_stale_code(project, path),
             stale_message=lambda path: f"generated file is stale: {path}",
         )
 
