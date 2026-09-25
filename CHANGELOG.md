@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Fixed
+- `kb validate --check-urls` が DOI を出版社サイトまで辿って到達性を見ていたため、ボット遮断で登録済みの DOI まで失敗扱いになっていた。DOI（`references.yml` の `doi` と `doi.org` の URL）は DOI レジストリ（Handle API）で登録の有無だけを確かめるよう修正
 - pre-commit テンプレートが `tests/` と `evals/rag-eval.yml` の存在を前提にしていたのを、存在するときだけ実行するよう修正。併せて `.kb/hooks/pre-commit.d/*` を名前順に実行し、テンプレートを編集せず導入先固有のチェックを足せるようにした（#3）
 
 ### Changed
