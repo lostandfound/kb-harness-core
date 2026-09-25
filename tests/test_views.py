@@ -104,7 +104,8 @@ class ProjectViewsConfigTest(unittest.TestCase):
 
     def test_views_index_defaults_under_root(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            root = Path(tempdir)
+            # Project はパスを resolve する。macOS の一時ディレクトリは /var → /private/var の symlink
+            root = Path(tempdir).resolve()
             (root / "kb-domain.yml").write_text(
                 "domain:\n  content_root: knowledge\nviews:\n  root: views\n", encoding="utf-8"
             )
@@ -315,7 +316,7 @@ class SyncAndGraphTest(unittest.TestCase):
 
     def test_entity_create_keeps_views_in_sync(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            root = Path(tempdir)
+            root = Path(tempdir).resolve()
             project = build_kb(root)
             spec = root / "spec.yml"
             spec.write_text(

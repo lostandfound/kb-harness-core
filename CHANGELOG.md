@@ -23,6 +23,7 @@
 - `scripts/verify_turn.sh` を追加。Claude Code の Stop hook からターンの終了時に `kb validate` と `kb sync --check` を実行する。pre-commit が閉じるのはコミット時だけで、コミットせずに終わるターンでは検証が走らないため
 
 ### Fixed
+- `scripts/` の互換スクリプト（`validate.py` / `export_graph.py` など）が、同じチェックアウトの `src/` より pip で入った `kb_harness` を優先して読んでいたのを修正。導入先に古い版が入っていると submodule 側の修正が効かなかった
 - ビュー YAML に形式の不備があると `kb sync` / `kb graph build` / `kb entity create` / `kb claim create` が internal error で落ちていたのを、ビューの診断（`view.*`）または検証エラーとして返すよう修正
 - `views.root` が `content_root` を含む配置（例 `content_root: kb/entities` と `views.root: kb`）で、一時 KB にビュー定義が写らず entity / claim create が必ず `entity.sync.failed` になっていたのを修正
 - query ビューが `Index` 型と `graph: false` の型のエンティティも拾い、`graph.json` の `views[].members` が `nodes` に無いパスを指していたのを修正
