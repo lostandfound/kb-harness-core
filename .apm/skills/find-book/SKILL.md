@@ -11,7 +11,7 @@ description: NDL サーチ（国立国会図書館）API で書籍・資料を�
 
 3. JSON 出力は `kb reference spec --from search-result.json --output reference.yml --dry-run`（いずれも作業用ディレクトリ内のパス）で決定論的な spec に変換し、内容を確認してから `kb reference create --from reference.yml --dry-run` で登録差分を確認する。登録 ID は規約に沿って編集する（著者ローマ字姓-年、例: `miyagi-1934`。仮 ID は必ず直す）。`<content_root>/references.yml`（content_root は `kb-domain.yml` の `domain.content_root`）への反映は `kb reference create --from reference.yml` を使う。フィールドは確認できた値のみ書く。特定系統内の資料と判断できる場合は optional key `lineage`（系統名の文字列。単位の例は `kb-domain.yml` の `domain.lineage_example`）を付与する（判断がつかない場合は省略）。
 
-4. 出典として使うエンティティの `sources` に `- "ref: <id>"` を追記する。本文の主張は必ず自分の言葉で書く。資料本文・スキャンのファイルは `content_root` 配下に保存しない。パブリックドメインが確認できた資料の翻刻テキストのみ、`kb-domain.yml` の `corpus_root` が指すコーパス（規約は CONTRIBUTING.md §13 とコーパスの README）へ置ける。
+4. 出典として使うエンティティの `sources` に `- "ref: <id>"` を追記する。本文の主張は必ず自分の言葉で書く。資料本文・スキャンのファイルは `content_root` 配下に保存しない。パブリックドメインが確認できた資料の翻刻テキストのみ、`kb-domain.yml` の `corpus_root` が指すコーパス（規約は CONTRIBUTING.md のコーパス規定とコーパスの README）へ置ける。
 
 5. `kb validate` でエラーゼロ、URL を登録した場合は `--check-urls` も実行する。
 
