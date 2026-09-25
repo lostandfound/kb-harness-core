@@ -33,7 +33,7 @@ from .sync import (
     plan_sync,
     plan_write,
 )
-from .validation import run_extra_checks, validate
+from .validation import check_urls, run_extra_checks, validate
 from .views import ViewError, load_entities as _load_view_entities, load_views, resolve_view, validate_views
 
 Result = dict[str, Any]
@@ -54,6 +54,7 @@ def _parser() -> argparse.ArgumentParser:
     _add_common_options(show)
 
     validate_parser = subcommands.add_parser("validate", help="validate the KB")
+    validate_parser.add_argument("--check-urls", action="store_true", help="also check that source URLs are reachable")
     _add_common_options(validate_parser)
 
     okf = subcommands.add_parser("okf", help="inspect OKF bundles")
@@ -346,11 +347,13 @@ def _view_action(project: Project, args: Any) -> int:
         return _internal_error(error, args.format)
 
 
-def _validate(project: Project, output_format: str) -> int:
+def _validate(project: Project, output_format: str, *, urls: bool = False) -> int:
     try:
         errors = validate(project.content_root)
         if project.views_root is not None:
             errors.extend(validate_views(project.content_root, project.views_root))
+        if urls:
+            errors += check_urls(project.content_root)
         checks = run_extra_checks(project.extra_checks, project.repo_root)
     except Exception as error:
         return _internal_error(error, output_format)
@@ -715,7 +718,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
         _emit(result, args.format, error=not result["ok"])
         return 0 if result["ok"] else 1
     if args.command == "validate":
-        return _validate(project, args.format)
+        return _validate(project, args.format, urls=args.check_urls)
 
     if args.command == "entity" and args.entity_command == "create":
         return _entity_create(project, args)

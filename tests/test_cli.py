@@ -136,6 +136,39 @@ class CliTest(unittest.TestCase):
                 {"changed": [], "diagnostics": [], "ok": True},
             )
 
+    def test_validate_check_urls_reports_unreachable_source_url(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            content = root / "knowledge"
+            notes = content / "notes"
+            notes.mkdir(parents=True)
+            (root / "kb-domain.yml").write_text(
+                "domain:\n  content_root: knowledge\n",
+                encoding="utf-8",
+            )
+            (content / "vocabulary.yml").write_text(
+                "types:\n  Note:\n    directory: notes\n    graph: false\n"
+                "predicates: {}\ntags: []\n",
+                encoding="utf-8",
+            )
+            (notes / "note.md").write_text(
+                "---\ntype: Note\ntitle: note\ndescription: Description.\n"
+                "sources:\n  - https://example.invalid/page\n---\n\nBody\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with patch("kb_harness.validation._url_reachable", return_value=False) as reachable:
+                with redirect_stdout(output):
+                    exit_code = main(
+                        ["validate", "--check-urls", "--start", str(root), "--format", "json"]
+                    )
+
+            result = json.loads(output.getvalue())
+            reachable.assert_called_once_with("https://example.invalid/page")
+            self.assertEqual(exit_code, 1)
+            self.assertIn("unreachable URL", result["diagnostics"][-1]["message"])
+
     def test_validate_outputs_structured_diagnostic_and_exit_one(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
