@@ -57,6 +57,8 @@ kb sync --check                                                   # index.md や
 <repo_root>/
 ├── kb-domain.yml                 # 【必須】ドメイン定義・パス設定
 ├── graph.json                    # 【生成物】関連グラフ（kb sync 等で自動生成）
+├── views/                        # 【任意】ビュー定義（kb-domain.yml の views.root で有効化）
+│   └── index.md                  # 【生成物】ビュー一覧（kb sync が生成）
 ├── evals/
 │   └── rag-eval.yml              # 【任意】RAG 評価クエリ設定
 ├── docs/
@@ -93,6 +95,7 @@ kb sync --check                                                   # index.md や
 | `kb index build\|check` / `kb graph build\|check` / `kb sync` | `index.md` と `graph.json` の自動生成・差分検査 |
 | `kb entity create --from spec.yml` | spec ファイルからエンティティを検証付きで原子的に作成 |
 | `kb claim create\|inspect\|list\|validate\|transition` | Claim の作成・照会・一覧表示・検証・状態遷移 |
+| `kb view list\|resolve\|validate` | エンティティの外に置いたビュー（束ね・導出）の一覧・解決・検証 |
 | `kb reference health\|spec\|create` | `references.yml` の点検・登録 spec への変換・原子的追加 |
 | `kb eval summary\|smoke` | RAG 評価履歴の集計および検索可能性の回帰確認 |
 | `kb okf validate` / `kb export okf` | OKF v0.2 バンドルの検証およびエクスポート |

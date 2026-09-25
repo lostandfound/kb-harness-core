@@ -1,0 +1,361 @@
+"""ビュー: エンティティ本文の外に置く束ね（list）と導出（query）。"""
+
+import io
+import json
+import tempfile
+import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
+
+from kb_harness.cli import main
+from kb_harness.entity import plan_entity_create
+from kb_harness.graph import render_graph
+from kb_harness.project import Project, ProjectError
+from kb_harness.sync import apply_changes_atomically, plan_sync
+from kb_harness.views import (
+    ViewError,
+    load_entities,
+    load_view,
+    load_views,
+    plan_views_index,
+    render_views_index,
+    resolve_view,
+    validate_views,
+)
+
+
+VOCABULARY = (
+    "types:\n"
+    "  Concept:\n    directory: concepts\n"
+    "  Dish:\n    directory: dishes\n"
+    "predicates:\n"
+    "  part-of:\n    description: 構成要素→全体\n    domain: [Concept, Dish]\n    range: [Concept, Dish]\n"
+    "  related-to:\n    description: 汎用\n    domain: [Concept, Dish]\n    range: [Concept, Dish]\n"
+    "tags:\n  - cooking\n  - cs\n"
+)
+
+
+def _entity(directory: str, slug: str, type_name: str, title: str, tags: str, relations: str = "[]") -> tuple[str, str]:
+    return (
+        f"{directory}/{slug}.md",
+        f"---\ntype: {type_name}\ntitle: {title}\ndescription: {title} の説明である。\n"
+        f"tags: {tags}\ntimestamp: 2026-09-01T00:00:00Z\nsources: [Test]\nrelations: {relations}\n"
+        f"---\n\n## 概要\n\n本文。\n",
+    )
+
+
+def build_kb(root: Path, *, with_views_config: bool = True) -> Project:
+    content = root / "knowledge"
+    for directory in ("concepts", "dishes"):
+        (content / directory).mkdir(parents=True)
+        (content / directory / "index.md").write_text(
+            f"---\ntype: Index\ntitle: {directory}\ndescription: 一覧である。\ntags: []\n"
+            f"timestamp: 2026-09-01T00:00:00Z\n---\n\n## エンティティ一覧\n\n",
+            encoding="utf-8",
+        )
+    (content / "vocabulary.yml").write_text(VOCABULARY, encoding="utf-8")
+    (content / "references.yml").write_text(
+        "ref-a:\n  type: web\n  title: A\n  url: https://example.com/a\n", encoding="utf-8"
+    )
+    for rel, text in (
+        _entity("concepts", "hakka", "Concept", "客家料理", "[cooking]"),
+        _entity("concepts", "dry", "Concept", "DRY", "[cs]"),
+        _entity("concepts", "semantic-layer", "Concept", "セマンティックレイヤー", "[cs]"),
+        _entity(
+            "dishes", "meicai", "Dish", "梅菜", "[cooking]",
+            "[{predicate: part-of, target: /concepts/hakka.md}]",
+        ),
+        _entity("dishes", "pasta", "Dish", "パスタ", "[cooking]"),
+    ):
+        (content / rel).write_text(text, encoding="utf-8")
+    config = "domain:\n  content_root: knowledge\n"
+    if with_views_config:
+        config += "views:\n  root: views\n"
+    (root / "kb-domain.yml").write_text(config, encoding="utf-8")
+    (root / "views").mkdir()
+    (root / "views" / "teigi-once.yml").write_text(
+        "name: 一度定義して各所で使う\n"
+        "description: 定義を一か所に置く姿勢を共有するもの。\n"
+        "kind: list\nbasis: interpretation\n"
+        "members:\n"
+        "  - /concepts/dry.md\n"
+        "  - path: /concepts/semantic-layer.md\n    note: 指標を一度定義する\n",
+        encoding="utf-8",
+    )
+    (root / "views" / "hakka-dishes.yml").write_text(
+        "name: 客家料理の料理\ndescription: 客家料理に属する料理。\nkind: query\n"
+        "where:\n  type: Dish\n  relation: {predicate: part-of, target: /concepts/hakka.md}\n",
+        encoding="utf-8",
+    )
+    project = Project.from_config(root / "kb-domain.yml")
+    apply_changes_atomically(plan_sync(project))
+    return project
+
+
+class ProjectViewsConfigTest(unittest.TestCase):
+    def test_views_disabled_by_default(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / "kb-domain.yml").write_text("domain:\n  content_root: knowledge\n", encoding="utf-8")
+            project = Project.from_config(root / "kb-domain.yml")
+            self.assertIsNone(project.views_root)
+            self.assertIsNone(project.views_index)
+
+    def test_views_index_defaults_under_root(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / "kb-domain.yml").write_text(
+                "domain:\n  content_root: knowledge\nviews:\n  root: views\n", encoding="utf-8"
+            )
+            project = Project.from_config(root / "kb-domain.yml")
+            self.assertEqual(project.views_root, root / "views")
+            self.assertEqual(project.views_index, root / "views" / "index.md")
+
+    def test_views_root_must_be_string(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / "kb-domain.yml").write_text(
+                "domain:\n  content_root: knowledge\nviews:\n  root: 1\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ProjectError, "views.root"):
+                Project.from_config(root / "kb-domain.yml")
+
+
+class LoadViewTest(unittest.TestCase):
+    def _load(self, text: str):
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "v.yml"
+            path.write_text(text, encoding="utf-8")
+            return load_view(path)
+
+    def test_list_view_requires_basis(self):
+        with self.assertRaisesRegex(ViewError, "basis"):
+            self._load("name: n\ndescription: d\nkind: list\nmembers: [/a.md]\n")
+
+    def test_interpretation_must_not_carry_sources(self):
+        with self.assertRaisesRegex(ViewError, "interpretation"):
+            self._load(
+                "name: n\ndescription: d\nkind: list\nbasis: interpretation\n"
+                "members: [/a.md]\nsources: ['ref: x']\n"
+            )
+
+    def test_source_basis_requires_sources(self):
+        with self.assertRaisesRegex(ViewError, "sources"):
+            self._load("name: n\ndescription: d\nkind: list\nbasis: source\nmembers: [/a.md]\n")
+
+    def test_query_view_rejects_members(self):
+        with self.assertRaisesRegex(ViewError, "members"):
+            self._load("name: n\ndescription: d\nkind: query\nwhere: {type: Dish}\nmembers: [/a.md]\n")
+
+    def test_query_view_rejects_unknown_where_key(self):
+        with self.assertRaisesRegex(ViewError, "unknown key"):
+            self._load("name: n\ndescription: d\nkind: query\nwhere: {title: x}\n")
+
+    def test_unknown_top_level_key_is_rejected(self):
+        with self.assertRaisesRegex(ViewError, "unknown key"):
+            self._load("name: n\ndescription: d\nkind: query\nwhere: {type: Dish}\nextra: 1\n")
+
+
+class ResolveAndRenderTest(unittest.TestCase):
+    def test_query_view_resolves_by_type_and_relation(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            entities = load_entities(project.content_root)
+            views = {view.id: view for view in load_views(project.views_root)}
+            self.assertEqual(
+                [m.path for m in resolve_view(views["hakka-dishes"], entities)],
+                ["/dishes/meicai.md"],
+            )
+            self.assertEqual(
+                [(m.path, m.note) for m in resolve_view(views["teigi-once"], entities)],
+                [("/concepts/dry.md", ""), ("/concepts/semantic-layer.md", "指標を一度定義する")],
+            )
+
+    def test_query_by_tags_is_and_condition(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            (project.views_root / "cs-things.yml").write_text(
+                "name: cs\ndescription: cs のもの。\nkind: query\nwhere:\n  tags: [cs]\n", encoding="utf-8"
+            )
+            entities = load_entities(project.content_root)
+            view = {v.id: v for v in load_views(project.views_root)}["cs-things"]
+            self.assertEqual(
+                [m.path for m in resolve_view(view, entities)],
+                ["/concepts/dry.md", "/concepts/semantic-layer.md"],
+            )
+
+    def test_render_index_is_deterministic_and_marks_basis(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            first = render_views_index(project.content_root, project.views_root)
+            second = render_views_index(project.content_root, project.views_root)
+            self.assertEqual(first, second)
+            self.assertIn("## 一度定義して各所で使う", first)
+            self.assertIn("kind: list / basis: interpretation / 定義: views/teigi-once.yml", first)
+            self.assertIn("- [セマンティックレイヤー](/concepts/semantic-layer.md) — 指標を一度定義する", first)
+            self.assertIn("## 客家料理の料理", first)
+            self.assertIn("- [梅菜](/dishes/meicai.md)", first)
+            # 導出ビューはエンティティ本文に書き戻さない
+            self.assertNotIn("views", (project.content_root / "dishes" / "meicai.md").read_text(encoding="utf-8"))
+
+    def test_plan_views_index_is_empty_when_disabled_or_in_sync(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            self.assertEqual(plan_views_index(project.content_root, None, None), {})
+            self.assertEqual(plan_views_index(project.content_root, project.views_root, project.views_index), {})
+            (project.views_root / "teigi-once.yml").write_text(
+                "name: 改名\ndescription: d\nkind: list\nbasis: interpretation\nmembers: [/concepts/dry.md]\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                list(plan_views_index(project.content_root, project.views_root, project.views_index)),
+                [project.views_index.resolve()],
+            )
+
+
+class ValidateViewsTest(unittest.TestCase):
+    def test_reports_missing_member_and_unknown_vocabulary(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            (project.views_root / "broken.yml").write_text(
+                "name: 壊れ\ndescription: d\nkind: list\nbasis: source\nsources: ['ref: nope']\n"
+                "members: [/concepts/missing.md]\n",
+                encoding="utf-8",
+            )
+            (project.views_root / "bad-query.yml").write_text(
+                "name: 悪い問い合わせ\ndescription: d\nkind: query\n"
+                "where: {type: Nope, tags: [nope], relation: {predicate: nope, target: /concepts/none.md}}\n",
+                encoding="utf-8",
+            )
+            errors = validate_views(project.content_root, project.views_root)
+            joined = "\n".join(errors)
+            self.assertIn("member '/concepts/missing.md' does not exist", joined)
+            self.assertIn("'ref: nope' が references.yml に存在しない", joined)
+            self.assertIn("未知の型 'Nope'", joined)
+            self.assertIn("未知のタグ 'nope'", joined)
+            self.assertIn("未知の述語 'nope'", joined)
+            self.assertIn("target '/concepts/none.md' does not exist", joined)
+
+    def test_duplicate_names_and_bad_filenames_are_reported(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            (project.views_root / "Bad_Name.yml").write_text(
+                "name: 一度定義して各所で使う\ndescription: d\nkind: list\nbasis: interpretation\n"
+                "members: [/concepts/dry.md]\n",
+                encoding="utf-8",
+            )
+            joined = "\n".join(validate_views(project.content_root, project.views_root))
+            self.assertIn("ケバブケース", joined)
+            self.assertIn("重複", joined)
+
+    def test_clean_kb_has_no_errors(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            self.assertEqual(validate_views(project.content_root, project.views_root), [])
+
+
+class SyncAndGraphTest(unittest.TestCase):
+    def test_graph_carries_views_only_when_configured(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            with_views = json.loads(render_graph(project.content_root, project.views_root))
+            without = json.loads(render_graph(project.content_root))
+            self.assertNotIn("views", without)
+            self.assertEqual(
+                [(v["id"], v["kind"], v["members"]) for v in with_views["views"]],
+                [
+                    ("hakka-dishes", "query", ["/dishes/meicai.md"]),
+                    ("teigi-once", "list", ["/concepts/dry.md", "/concepts/semantic-layer.md"]),
+                ],
+            )
+            self.assertEqual(with_views["views"][1]["basis"], "interpretation")
+            self.assertEqual(with_views["views"][0]["where"]["type"], "Dish")
+
+    def test_sync_generates_views_index_and_check_detects_staleness(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            self.assertTrue(project.views_index.is_file())
+            self.assertEqual(plan_sync(project), {})
+            (project.views_root / "pasta-only.yml").write_text(
+                "name: パスタだけ\ndescription: d\nkind: list\nbasis: interpretation\nmembers: [/dishes/pasta.md]\n",
+                encoding="utf-8",
+            )
+            stale = plan_sync(project)
+            self.assertEqual(
+                sorted(str(p.relative_to(project.repo_root)) for p in stale),
+                ["graph.json", "views/index.md"],
+            )
+
+    def test_entity_create_keeps_views_in_sync(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            project = build_kb(root)
+            spec = root / "spec.yml"
+            spec.write_text(
+                "type: Dish\nslug: yanju\ntitle: 塩焗鶏\ndescription: 客家の鶏料理である。\n"
+                "tags: [cooking]\nsources: [Test]\n"
+                "relations:\n  - predicate: part-of\n    target: /concepts/hakka.md\n"
+                "sections:\n  概要: 概要である。\n  詳細: 詳細である。\n  関連項目: なし。\n",
+                encoding="utf-8",
+            )
+            plan = plan_entity_create(project, spec, timestamp="2026-09-02T00:00:00Z")
+            changed = {str(path.relative_to(root)) for path in plan.changes}
+            self.assertIn("views/index.md", changed)
+            self.assertIn("graph.json", changed)
+            new_index = plan.changes[project.views_index.resolve()]
+            self.assertIn("- [塩焗鶏](/dishes/yanju.md)", new_index)
+
+
+class ViewCliTest(unittest.TestCase):
+    def _run(self, project: Project, *argv: str) -> tuple[int, str]:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = main([*argv, "--start", str(project.repo_root)])
+        return code, buffer.getvalue()
+
+    def test_list_resolve_validate(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            code, out = self._run(project, "view", "list", "--format", "json")
+            self.assertEqual(code, 0)
+            listed = json.loads(out)["views"]
+            self.assertEqual([(v["id"], v["members"]) for v in listed], [("hakka-dishes", 1), ("teigi-once", 2)])
+
+            code, out = self._run(project, "view", "resolve", "teigi-once", "--format", "json")
+            self.assertEqual(code, 0)
+            self.assertEqual(
+                [m["path"] for m in json.loads(out)["members"]],
+                ["/concepts/dry.md", "/concepts/semantic-layer.md"],
+            )
+
+            code, _ = self._run(project, "view", "resolve", "nope")
+            self.assertEqual(code, 1)
+
+            code, _ = self._run(project, "view", "validate")
+            self.assertEqual(code, 0)
+            code, _ = self._run(project, "validate")
+            self.assertEqual(code, 0)
+
+    def test_kb_validate_reports_view_errors(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            (project.views_root / "broken.yml").write_text(
+                "name: x\ndescription: d\nkind: list\nbasis: interpretation\nmembers: [/concepts/none.md]\n",
+                encoding="utf-8",
+            )
+            code, out = self._run(project, "validate", "--format", "json")
+            self.assertEqual(code, 1)
+            self.assertIn("/concepts/none.md", out)
+            code, out = self._run(project, "sync", "--check", "--format", "json")
+            self.assertEqual(code, 1)
+            self.assertIn("views.stale", out)
+
+    def test_view_commands_fail_cleanly_when_disabled(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir), with_views_config=False)
+            code, _ = self._run(project, "view", "list")
+            self.assertEqual(code, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

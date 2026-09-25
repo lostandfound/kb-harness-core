@@ -12,6 +12,7 @@ from typing import Callable, Mapping
 from .graph import plan_graph
 from .index import plan_index
 from .project import Project
+from .views import plan_views_index
 
 
 @dataclass(frozen=True)
@@ -100,7 +101,8 @@ def plan_sync(project: Project) -> dict[Path, str]:
             by_tag=project.index_by_tag,
             tag_labels=project.tag_labels,
         ),
-        **plan_graph(project.content_root, project.repo_root / "graph.json"),
+        **plan_graph(project.content_root, project.repo_root / "graph.json", project.views_root),
+        **plan_views_index(project.content_root, project.views_root, project.views_index),
     }
     return dict(sorted(changes.items(), key=lambda item: str(item[0])))
 
