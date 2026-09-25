@@ -56,7 +56,7 @@ def stage_and_validate(
         if views_root is not None and views_index is not None:
             staged_views_root = stage_root / views_root.resolve().relative_to(repo_root)
             staged_views_index = stage_root / views_index.resolve().relative_to(repo_root)
-            if views_root.is_dir():
+            if views_root.is_dir() and not staged_views_root.exists():
                 copytree(views_root, staged_views_root, symlinks=True)
             if views_index.is_file():
                 staged_views_index.parent.mkdir(parents=True, exist_ok=True)

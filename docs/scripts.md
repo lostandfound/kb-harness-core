@@ -39,7 +39,7 @@ python3 scripts/generate_index.py [--root DIR]
 
 ### export_graph.py
 
-ナレッジグラフ（`nodes` / `edges` / `claims`）を JSON でエクスポートする。既定では出力前に `validate()` を実行し、エラーがあれば中断する。
+ナレッジグラフ（`nodes` / `edges` / `claims`、`views.root` を設定した KB では `views` も）を JSON でエクスポートする。既定では出力前に `validate()` を実行し、エラーがあれば中断する。
 
 ```bash
 python3 scripts/export_graph.py [--root DIR] [--out FILE] [--force]

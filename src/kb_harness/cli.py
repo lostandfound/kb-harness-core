@@ -764,7 +764,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             dry_run=args.dry_run,
             output_format=args.format,
             planner=lambda: plan_graph(
-                project.content_root, project.repo_root / "graph.json"
+                project.content_root, project.repo_root / "graph.json", project.views_root
             ),
             stale_code=lambda _path: "graph.stale",
             stale_message=lambda path: f"graph is stale: {path}",

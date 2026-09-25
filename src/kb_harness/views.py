@@ -181,9 +181,22 @@ def load_view(path: Path) -> View:
     )
 
 
+def _duplicate_ids(paths: list[Path]) -> dict[str, list[str]]:
+    """同じ stem を .yml と .yaml で置くと id が衝突する。id → ファイル名一覧を返す。"""
+    by_id: dict[str, list[str]] = {}
+    for path in paths:
+        by_id.setdefault(path.stem, []).append(path.name)
+    return {view_id: names for view_id, names in by_id.items() if len(names) > 1}
+
+
 def load_views(views_root: Path) -> list[View]:
     """views_root 配下の全ビューを id 順に返す。形式不備は最初の 1 件で ViewError。"""
-    views = [load_view(path) for path in _view_files(views_root)]
+    paths = _view_files(views_root)
+    duplicates = _duplicate_ids(paths)
+    if duplicates:
+        view_id, names = sorted(duplicates.items())[0]
+        raise ViewError(f"duplicate view id '{view_id}': {', '.join(names)}", "view.duplicate")
+    views = [load_view(path) for path in paths]
     views.sort(key=lambda view: view.id)
     return views
 
@@ -230,7 +243,10 @@ def validate_views(content_root: Path, views_root: Path) -> list[str]:
     types = _load_types(content_root)
     references, _ref_errors = _load_references(content_root)
     seen_names: dict[str, str] = {}
-    for path in _view_files(views_root):
+    paths = _view_files(views_root)
+    for view_id, names in sorted(_duplicate_ids(paths).items()):
+        errors.append(f"ERROR {views_root.name}/{names[0]}: view id '{view_id}' が重複している（{', '.join(names)}）")
+    for path in paths:
         rel = f"{views_root.name}/{path.name}"
         if not FILENAME_RE.match(path.stem + ".md"):
             errors.append(f"ERROR {rel}: ファイル名がケバブケース規約に反する '{path.name}'")

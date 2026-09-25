@@ -359,3 +359,94 @@ class ViewCliTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProjectViewsSafetyTest(unittest.TestCase):
+    """views.root / views.index はリポジトリ内、content_root の外、生成物と衝突しない。"""
+
+    def _project(self, views_section: str) -> Project:
+        root = Path(self._tempdir.name)
+        (root / "kb-domain.yml").write_text(
+            f"domain:\n  content_root: knowledge\nviews:\n{views_section}", encoding="utf-8"
+        )
+        return Project.from_config(root / "kb-domain.yml")
+
+    def setUp(self):
+        self._tempdir = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self._tempdir.cleanup()
+
+    def test_rejects_paths_escaping_repo_root(self):
+        with self.assertRaisesRegex(ProjectError, "inside the repository root"):
+            self._project("  root: ../elsewhere\n")
+        with self.assertRaisesRegex(ProjectError, "inside the repository root"):
+            self._project("  root: views\n  index: /tmp/index.md\n")
+
+    def test_rejects_views_inside_content_root(self):
+        with self.assertRaisesRegex(ProjectError, "content_root"):
+            self._project("  root: knowledge/views\n")
+        with self.assertRaisesRegex(ProjectError, "content_root"):
+            self._project("  root: views\n  index: knowledge/index.md\n")
+
+    def test_rejects_index_colliding_with_generated_or_config_files(self):
+        with self.assertRaisesRegex(ProjectError, "distinct"):
+            self._project("  root: views\n  index: graph.json\n")
+        with self.assertRaisesRegex(ProjectError, "distinct"):
+            self._project("  root: views\n  index: kb-domain.yml\n")
+        with self.assertRaisesRegex(ProjectError, "distinct"):
+            self._project("  root: views\n  index: views/all.yml\n")
+
+    def test_accepts_index_outside_views_root(self):
+        project = self._project("  root: views\n  index: docs/views.md\n")
+        self.assertEqual(project.views_index, (Path(self._tempdir.name) / "docs" / "views.md").resolve())
+
+
+class DuplicateViewIdTest(unittest.TestCase):
+    def test_same_stem_in_yml_and_yaml_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            (project.views_root / "teigi-once.yaml").write_text(
+                "name: 別名\ndescription: d\nkind: list\nbasis: interpretation\nmembers: [/concepts/dry.md]\n",
+                encoding="utf-8",
+            )
+            joined = "\n".join(validate_views(project.content_root, project.views_root))
+            self.assertIn("view id 'teigi-once' が重複している", joined)
+            with self.assertRaisesRegex(ViewError, "duplicate view id"):
+                load_views(project.views_root)
+
+
+class GraphCommandViewsTest(unittest.TestCase):
+    """kb graph build / check は sync と同じ graph.json（views 付き）を作る。"""
+
+    def _run(self, project: Project, *argv: str) -> tuple[int, str]:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = main([*argv, "--start", str(project.repo_root)])
+        return code, buffer.getvalue()
+
+    def test_graph_check_agrees_with_sync_and_build_emits_views(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            code, _ = self._run(project, "graph", "check")
+            self.assertEqual(code, 0)
+            (project.repo_root / "graph.json").write_text("{}\n", encoding="utf-8")
+            code, _ = self._run(project, "graph", "build")
+            self.assertEqual(code, 0)
+            graph = json.loads((project.repo_root / "graph.json").read_text(encoding="utf-8"))
+            self.assertEqual([v["id"] for v in graph["views"]], ["hakka-dishes", "teigi-once"])
+            self.assertEqual(plan_sync(project), {})
+
+    def test_export_graph_script_emits_views(self):
+        import subprocess
+        import sys
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            script = Path(__file__).resolve().parents[1] / "scripts" / "export_graph.py"
+            result = subprocess.run(
+                [sys.executable, str(script), "--root", str(project.content_root)],
+                capture_output=True, text=True, check=True,
+            )
+            self.assertIn('"views"', result.stdout)
+            self.assertIn('"hakka-dishes"', result.stdout)

@@ -41,7 +41,7 @@ KB 全体を検証する。frontmatter・リンク・relations の型制約・�
 
 ### `kb graph build` / `kb graph check`
 
-ルートの `graph.json`（`nodes` / `edges` / `claims`）を生成・同期確認する。`build` は `--dry-run` に対応する。`views.root` が設定されていれば、解決済みメンバーを持つ `views` 配列も出力する（未設定の KB の `graph.json` は変わらない）。
+ルートの `graph.json`（`nodes` / `edges` / `claims`）を生成・同期確認する。`build` は `--dry-run` に対応する。`views.root` が設定されていれば、`kb sync` と同じく解決済みメンバーを持つ `views` 配列も出力する（未設定の KB の `graph.json` は変わらない）。
 
 ### `kb sync` / `kb sync --check`
 
