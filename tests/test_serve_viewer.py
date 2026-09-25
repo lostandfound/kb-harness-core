@@ -78,14 +78,25 @@ class ViewerConfigTest(unittest.TestCase):
         config = build_viewer_config(Project.discover(self.root))
         self.assertEqual(config["title"], "フォールバック")
 
-    def test_型が多くてもパレットを循環して色が付く(self):
+    def _types(self, count):
         many = "types:\n" + "".join(
-            f"  T{i}:\n    directory: d{i}\n" for i in range(len(PALETTE) + 2)
+            f"  T{i}:\n    directory: d{i}\n" for i in range(count)
         ) + "predicates: {}\ntags: [index]\n"
         (self.root / "knowledge" / "vocabulary.yml").write_text(many, encoding="utf-8")
-        types = build_viewer_config(Project.discover(self.root))["types"]
-        self.assertEqual(len(types), len(PALETTE) + 2)
-        self.assertEqual(types[len(PALETTE)]["color"], PALETTE[0])
+        return build_viewer_config(Project.discover(self.root))["types"]
+
+    def test_パレットを超える型にも他と重ならない色が付く(self):
+        types = self._types(len(PALETTE) * 3)
+        colors = [t["color"] for t in types]
+        self.assertEqual(colors[: len(PALETTE)], list(PALETTE))
+        self.assertEqual(len(set(c.lower() for c in colors)), len(colors))
+        for color in colors:
+            self.assertRegex(color, r"^#[0-9a-f]{6}$")
+
+    def test_パレットを超えて付けた色も型を足して動かない(self):
+        before = [t["color"] for t in self._types(len(PALETTE) + 3)]
+        after = [t["color"] for t in self._types(len(PALETTE) + 6)]
+        self.assertEqual(after[: len(before)], before)
 
     def test_typesがリストでも型なしとして扱う(self):
         (self.root / "knowledge" / "vocabulary.yml").write_text(

@@ -7,15 +7,16 @@ vocabulary.yml にも書かせない。型の定義順に機械的に割り当�
 
 from __future__ import annotations
 
+import colorsys
 from pathlib import Path
 
 import yaml
 
 from ..project import Project, ProjectError
 
-# 深い紺黒の地で発光して見える 8 色。型の定義順に割り当てる。
-# 先頭 4 色は neon-graph-design-system の neon 4 色と同じ並び。型が 8 を超えて
-# 色が重なるようになったら、循環させず末尾に色を足す。
+# 深い紺黒の地で発光して見える 12 色。型の定義順に割り当てる。
+# 先頭 4 色は neon-graph-design-system の neon 4 色と同じ並び。以降は色相の
+# 空いたところを埋める順に足してある。
 PALETTE = (
     "#f5a524",
     "#22d3ee",
@@ -25,7 +26,23 @@ PALETTE = (
     "#facc15",
     "#38bdf8",
     "#fb923c",
+    "#f87171",
+    "#a3e635",
+    "#e879f9",
+    "#60a5fa",
 )
+# パレットを使い切った後の色相の歩幅（黄金角）。循環させると別の型と同色になるので、
+# 色相を少しずつずらして生成し続ける。
+GOLDEN_ANGLE = 137.508
+
+
+def _color(index: int) -> str:
+    """型の順番から色を決める。パレットの外は彩度と明度を揃えて色相だけを回す。"""
+    if index < len(PALETTE):
+        return PALETTE[index]
+    hue = ((index - len(PALETTE)) * GOLDEN_ANGLE + 15) % 360 / 360
+    r, g, b = colorsys.hls_to_rgb(hue, 0.64, 0.86)
+    return "#" + "".join(f"{round(c * 255):02x}" for c in (r, g, b))
 
 
 def _load_yaml(path: Path) -> dict:
@@ -55,7 +72,7 @@ def build_viewer_config(project: Project) -> dict:
     domain = _section(_load_yaml(project.repo_root / "kb-domain.yml"), "domain")
 
     types = [
-        {"name": str(name), "color": PALETTE[i % len(PALETTE)]}
+        {"name": str(name), "color": _color(i)}
         for i, name in enumerate(_section(vocabulary, "types"))
     ]
 
