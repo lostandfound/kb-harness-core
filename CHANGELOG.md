@@ -6,6 +6,7 @@
 - pre-commit テンプレートが `tests/` と `evals/rag-eval.yml` の存在を前提にしていたのを、存在するときだけ実行するよう修正。併せて `.kb/hooks/pre-commit.d/*` を名前順に実行し、テンプレートを編集せず導入先固有のチェックを足せるようにした（#3）
 
 ### Changed
+- 同梱スキルから導入先固有の記述（AGENTS.md の行数上限、`packages/kb-harness-core` パス、born/died、特定考証エージェント名、CONTRIBUTING の節番号）を除き、正本参照に置き換えた
 - 導入先ルートの `scripts/` をモジュールへの symlink にする手順を廃止。補助スクリプトは `apm_modules/lostandfound/kb-harness-core/scripts/<name>.py` で直接呼び、pre-commit テンプレートは `kb validate` / `kb eval smoke` のみを呼ぶ。`install-hooks.sh` は自身の位置から `hooks/pre-commit` を探すので `apm_modules` 配下から実行できる（#4）
 
 ### Added
