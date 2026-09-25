@@ -59,6 +59,18 @@ class FlashcardsTest(unittest.TestCase):
         self.assertEqual(first["related"][0]["id"], second["id"])
         self.assertEqual(second["related"][0]["id"], first["id"])
 
+    def test_exports_predicate_labels_from_vocabulary(self) -> None:
+        payload = export_flashcards(self.project)
+        self.assertEqual(payload["predicates"], {"related-to": "Related"})
+
+    def test_script_has_no_domain_specific_predicates(self) -> None:
+        script = (Path(__file__).resolve().parents[1] / "src" / "kb_harness" / "serve" / "static" / "flashcards.js")
+        text = script.read_text(encoding="utf-8")
+        for predicate in ("used-for", "production-involves"):
+            self.assertNotIn(predicate, text)
+        self.assertIn("data.predicates", text)
+        self.assertNotIn('brandFirst: "学習"', text)
+
     def test_flashcards_view_and_api_work_without_graph_json(self) -> None:
         server = HTTPServer(("127.0.0.1", 0), make_handler(self.project, view="flashcards"))
         thread = threading.Thread(target=server.serve_forever, daemon=True)

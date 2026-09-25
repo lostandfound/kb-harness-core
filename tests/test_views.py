@@ -2,6 +2,7 @@
 
 import io
 import json
+import shutil
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -253,6 +254,32 @@ class ValidateViewsTest(unittest.TestCase):
             project = build_kb(Path(tempdir))
             self.assertEqual(validate_views(project.content_root, project.views_root), [])
 
+    def test_query_excludes_entities_that_are_not_graph_nodes(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = build_kb(Path(tempdir))
+            vocabulary = project.content_root / "vocabulary.yml"
+            vocabulary.write_text(
+                VOCABULARY.replace("predicates:", "  Memo:\n    directory: memos\n    graph: false\npredicates:"),
+                encoding="utf-8",
+            )
+            (project.content_root / "memos").mkdir()
+            (project.content_root / "memos" / "note.md").write_text(
+                _entity("memos", "note", "Memo", "メモ", "[cs]")[1], encoding="utf-8"
+            )
+            (project.content_root / "concepts" / "index.md").write_text(
+                "---\ntype: Index\ntitle: concepts\ndescription: 一覧である。\ntags: [cs]\n"
+                "timestamp: 2026-09-01T00:00:00Z\n---\n\n## エンティティ一覧\n\n",
+                encoding="utf-8",
+            )
+            (project.views_root / "cs-things.yml").write_text(
+                "name: cs\ndescription: cs のもの。\nkind: query\nwhere:\n  tags: [cs]\n", encoding="utf-8"
+            )
+            graph = json.loads(render_graph(project.content_root, project.views_root))
+            nodes = {node["path"] for node in graph["nodes"]}
+            members = {v["id"]: v["members"] for v in graph["views"]}["cs-things"]
+            self.assertEqual(members, ["/concepts/dry.md", "/concepts/semantic-layer.md"])
+            self.assertTrue(set(members) <= nodes)
+
 
 class SyncAndGraphTest(unittest.TestCase):
     def test_graph_carries_views_only_when_configured(self):
@@ -304,6 +331,78 @@ class SyncAndGraphTest(unittest.TestCase):
             self.assertIn("graph.json", changed)
             new_index = plan.changes[project.views_index.resolve()]
             self.assertIn("- [塩焗鶏](/dishes/yanju.md)", new_index)
+
+
+class BrokenViewTest(unittest.TestCase):
+    """形式不備のビューがあっても、生成系は内部エラーでなくビューの診断で止まる。"""
+
+    def _run(self, project: Project, *argv: str) -> tuple[int, dict]:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = main([*argv, "--start", str(project.repo_root), "--format", "json"])
+        return code, json.loads(buffer.getvalue())
+
+    def _broken(self, root: Path) -> Project:
+        project = build_kb(root)
+        (project.views_root / "broken.yml").write_text("name: 壊れた\nkind: list\n", encoding="utf-8")
+        return project
+
+    def test_sync_and_graph_build_report_view_diagnostic(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = self._broken(Path(tempdir).resolve())
+            for argv in (("sync",), ("graph", "build")):
+                code, result = self._run(project, *argv)
+                self.assertEqual(code, 1, argv)
+                codes = [d["code"] for d in result["diagnostics"]]
+                self.assertNotIn("internal.error", codes, argv)
+                self.assertTrue(all(c.startswith("view.") for c in codes), codes)
+                self.assertIn("broken.yml", result["diagnostics"][0]["message"])
+
+    def test_entity_create_reports_view_errors_as_validation(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir).resolve()
+            project = self._broken(root)
+            spec = root / "spec.yml"
+            spec.write_text(
+                "type: Dish\nslug: yanju\ntitle: 塩焗鶏\ndescription: 客家の鶏料理である。\n"
+                "tags: [cooking]\nsources: [Test]\n"
+                "sections:\n  概要: 概要である。\n  詳細: 詳細である。\n  関連項目: なし。\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(Exception, "broken.yml") as caught:
+                plan_entity_create(project, spec, timestamp="2026-09-02T00:00:00Z")
+            self.assertNotIsInstance(caught.exception, ViewError)
+
+
+class StagedViewsTest(unittest.TestCase):
+    def test_views_root_that_contains_content_root_is_staged(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir).resolve()
+            project = build_kb(root)
+            # content_root を kb/entities、views.root を kb に置く（content の外なので許される）
+            kb = root / "kb"
+            kb.mkdir()
+            project.content_root.rename(kb / "entities")
+            for name in ("teigi-once.yml", "hakka-dishes.yml"):
+                (project.views_root / name).rename(kb / name)
+            shutil.rmtree(project.views_root)
+            (root / "kb-domain.yml").write_text(
+                "domain:\n  content_root: kb/entities\nviews:\n  root: kb\n  index: views.md\n", encoding="utf-8"
+            )
+            project = Project.from_config(root / "kb-domain.yml")
+            apply_changes_atomically(plan_sync(project))
+            spec = root / "spec.yml"
+            spec.write_text(
+                "type: Dish\nslug: yanju\ntitle: 塩焗鶏\ndescription: 客家の鶏料理である。\n"
+                "tags: [cooking]\nsources: [Test]\n"
+                "relations:\n  - predicate: part-of\n    target: /concepts/hakka.md\n"
+                "sections:\n  概要: 概要である。\n  詳細: 詳細である。\n  関連項目: なし。\n",
+                encoding="utf-8",
+            )
+            plan = plan_entity_create(project, spec, timestamp="2026-09-02T00:00:00Z")
+            graph = json.loads(plan.changes[(root / "graph.json").resolve()])
+            members = {v["id"]: v["members"] for v in graph["views"]}["hakka-dishes"]
+            self.assertIn("/dishes/yanju.md", members)
 
 
 class ViewCliTest(unittest.TestCase):

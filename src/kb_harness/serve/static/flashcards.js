@@ -2,6 +2,7 @@ const app = document.querySelector("#app");
 const dialog = document.querySelector("#entity-dialog");
 const entityById = new Map();
 let tagLabels = {};
+let predicateLabels = {};
 const preferredLanguage = navigator.languages?.[0] || navigator.language || "en";
 const locale = preferredLanguage.toLowerCase().startsWith("ja") ? "ja" : "en";
 
@@ -39,7 +40,7 @@ const messages = {
     answer: "ANSWER",
     overview: "OVERVIEW",
     details: "Read detailed notes",
-    relatedBy: { "used-for": "Used for", "production-involves": "Made with", default: "Related" },
+    relatedBy: "Related",
     showAnswer: "Reveal answer",
     review: "Review again",
     known: "Got it",
@@ -64,7 +65,7 @@ const messages = {
     pageSuffix: "学習カード",
     brandAria: "学習カード ホーム",
     brandMark: "学",
-    brandFirst: "学習",
+    brandFirst: "知識",
     brandSecond: "学習カード",
     headerNote: "",
     loading: "学習項目を読み込んでいます…",
@@ -92,7 +93,7 @@ const messages = {
     answer: "答え",
     overview: "概要",
     details: "詳しい内容を見る",
-    relatedBy: { "used-for": "使用先", "production-involves": "製作に関係", default: "関連" },
+    relatedBy: "関連",
     showAnswer: "回答を表示",
     review: "要復習",
     known: "わかった",
@@ -185,7 +186,7 @@ function renderQuiz() {
   const total = state.deck.length;
   const progress = ((state.index + 1) / total) * 100;
   const related = (entity.related || []).filter((item) => entityById.has(item.id));
-  const relationName = (relation) => t.relatedBy[relation] || t.relatedBy.default;
+  const relationName = (relation) => predicateLabels[relation] || t.relatedBy;
 
   app.innerHTML = `
     <section class="quiz" aria-label="${escapeHtml(t.quiz)}">
@@ -305,6 +306,7 @@ fetch("/api/flashcards")
   })
   .then((data) => {
     tagLabels = data.tagLabels || {};
+    predicateLabels = data.predicates || {};
     document.querySelector("#kb-title").textContent = data.title || t.headerNote;
     document.title = `${data.title || t.pageTitle} · ${t.pageSuffix}`;
     for (const entity of data.entities || []) entityById.set(entity.id, entity);

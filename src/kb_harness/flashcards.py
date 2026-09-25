@@ -10,6 +10,9 @@ from .project import Project
 
 
 def export_flashcards(project: Project) -> dict[str, object]:
+    # serve.server がこのモジュールを読むので、先頭で serve を読むと循環する
+    from .serve.viewer import build_viewer_config
+
     graph = export_graph(project.content_root)
     entities: dict[str, dict[str, object]] = {}
     for node in graph["nodes"]:
@@ -42,5 +45,7 @@ def export_flashcards(project: Project) -> dict[str, object]:
     return {
         "title": domain.get("kb_title") or domain.get("name") or project.repo_root.name,
         "tagLabels": project.tag_labels,
+        # 述語の表示名は vocabulary.yml の description。画面側に述語名を持たせない
+        "predicates": {item["name"]: item["label"] for item in build_viewer_config(project)["predicates"]},
         "entities": list(entities.values()),
     }

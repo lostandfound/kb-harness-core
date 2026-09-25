@@ -35,7 +35,14 @@ from .sync import (
     plan_write,
 )
 from .validation import check_urls, run_extra_checks, validate
-from .views import ViewError, load_entities as _load_view_entities, load_views, resolve_view, validate_views
+from .views import (
+    ViewError,
+    load_entities as _load_view_entities,
+    load_views,
+    query_excluded_types,
+    resolve_view,
+    validate_views,
+)
 
 Result = dict[str, Any]
 
@@ -260,6 +267,14 @@ def _run_derived(
             output_format=output_format,
             dry_run=dry_run,
         )
+    except ViewError as error:
+        # ビュー定義の不備は利用者が直すものなので、内部エラーではなくビューの診断として返す
+        _emit(
+            {"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]},
+            output_format,
+            error=output_format != "json",
+        )
+        return 1
     except Exception as error:
         return _internal_error(error, output_format)
 
@@ -297,6 +312,7 @@ def _view_action(project: Project, args: Any) -> int:
             _emit({"ok": not diagnostics, "changed": [], "diagnostics": diagnostics}, args.format)
             return 1 if diagnostics else 0
         entities = _load_view_entities(project.content_root)
+        excluded = query_excluded_types(project.content_root)
         views = load_views(project.views_root)
         if args.view_command == "list":
             items = [
@@ -305,7 +321,7 @@ def _view_action(project: Project, args: Any) -> int:
                     "name": view.name,
                     "kind": view.kind,
                     "basis": view.basis,
-                    "members": len(resolve_view(view, entities)),
+                    "members": len(resolve_view(view, entities, excluded)),
                 }
                 for view in views
             ]
@@ -331,7 +347,7 @@ def _view_action(project: Project, args: Any) -> int:
         view = matches[0]
         members = [
             {"path": member.path, "note": member.note, "title": (entities.get(member.path) or {}).get("title")}
-            for member in resolve_view(view, entities)
+            for member in resolve_view(view, entities, excluded)
         ]
         if args.format == "json":
             print(

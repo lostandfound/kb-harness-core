@@ -23,6 +23,10 @@
 - `scripts/verify_turn.sh` を追加。Claude Code の Stop hook からターンの終了時に `kb validate` と `kb sync --check` を実行する。pre-commit が閉じるのはコミット時だけで、コミットせずに終わるターンでは検証が走らないため
 
 ### Fixed
+- ビュー YAML に形式の不備があると `kb sync` / `kb graph build` / `kb entity create` / `kb claim create` が internal error で落ちていたのを、ビューの診断（`view.*`）または検証エラーとして返すよう修正
+- `views.root` が `content_root` を含む配置（例 `content_root: kb/entities` と `views.root: kb`）で、一時 KB にビュー定義が写らず entity / claim create が必ず `entity.sync.failed` になっていたのを修正
+- query ビューが `Index` 型と `graph: false` の型のエンティティも拾い、`graph.json` の `views[].members` が `nodes` に無いパスを指していたのを修正
+- 学習カード画面に別 KB の述語名がハードコードされていたのを除き、述語の表示名を `vocabulary.yml` の description から出すよう修正。日本語表示でブランド名が「学習 学習カード」と重なっていたのを「知識 学習カード」に修正
 - `kb serve` のノード ID をファイル名だけでなく KB 相対パスから生成するよう修正。同名ファイルが別ディレクトリにあっても、グラフ画面でノードが融合しない
 
 ## 0.2.1 — 2026-09-11
