@@ -139,7 +139,8 @@ AI エージェント（Claude Code 等）から呼び出して利用する定�
 - [設定リファレンス](docs/configuration.md) — `kb-domain.yml` / `vocabulary.yml` / `references.yml` / エンティティ spec / Claim / `evals/rag-eval.yml` のスキーマ仕様
 - [CLI リファレンス](docs/cli.md) — `kb` コマンドの詳細、終了コード、JSON 出力仕様、Python API
 - [scripts リファレンス](docs/scripts.md) — 提供スクリプトの一覧とオプション
-- [設計判断](docs/design-rationale.md) — Markdown を正データとし、グラフ DB を採用しない理由と再検討の条件
+- [設計判断](docs/design-rationale.md) — Markdown を正データとし、グラフ DB を採用しない理由と再検討の条件。語彙を小さく保つ理由とビューの位置づけ
+- [考察メモ](docs/notes/) — 設計判断の背景にある議論の記録
 
 ## 動作要件
 
