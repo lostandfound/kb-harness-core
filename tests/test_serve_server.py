@@ -82,26 +82,27 @@ class ServerTest(unittest.TestCase):
         self.assertTrue(ctype.startswith("application/json"))
         self.assertEqual(json.loads(body), GRAPH)
 
-    def test_同梱ライブラリとランタイムが配られる(self):
-        for path in ("/support.js", "/vendor/react.production.min.js"):
-            status, ctype, body = self._get(path)
-            self.assertEqual(status, 200, path)
-            self.assertTrue(ctype.startswith("text/javascript"), path)
-            self.assertTrue(body, path)
-
     def test_列挙外のパスは配らない(self):
         for path in (
+            "/support.js",
+            "/vendor/unknown.js",
             "/vendor/../../serve.py",
             "/vendor/%2e%2e/%2e%2e/setup.py",
             "/vendor/..%2f..%2fsetup.py",
             "/vendor/./react.production.min.js",
             "/VENDOR/react.production.min.js",
-            "/vendor/unknown.js",
             "/etc/passwd",
             "/app.js",
         ):
             status, _, _ = self._get(path)
             self.assertEqual(status, 404, path)
+
+    def test_グラフライブラリが配られる(self):
+        for path in ("/vendor/graphology.umd.min.js", "/vendor/sigma.min.js"):
+            status, ctype, body = self._get(path)
+            self.assertEqual(status, 200, path)
+            self.assertTrue(ctype.startswith("text/javascript"), path)
+            self.assertTrue(body, path)
 
     def test_graph_jsonがなければ案内つきで404を返す(self):
         (self.root / "graph.json").unlink()

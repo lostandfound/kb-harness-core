@@ -21,8 +21,8 @@ from .viewer import build_viewer_config
 MARKER = re.compile(r"__KB_(GRAPH|DESC|VIEWER|TITLE)__")
 STATIC = Path(__file__).resolve().parent / "static"
 VENDOR = {
-    "react.production.min.js",
-    "react-dom.production.min.js",
+    "graphology.umd.min.js",
+    "sigma.min.js",
 }
 
 
@@ -105,13 +105,6 @@ def make_handler(project: Project, view: str = "graph") -> type[BaseHTTPRequestH
                 name = path.removeprefix("/")
                 content_type = "text/css; charset=utf-8" if name.endswith(".css") else "text/javascript; charset=utf-8"
                 self._send((STATIC / name).read_bytes(), content_type)
-                return
-
-            if path == "/support.js":
-                self._send(
-                    (STATIC / "support.js").read_bytes(),
-                    "text/javascript; charset=utf-8",
-                )
                 return
 
             if path.startswith("/vendor/"):
