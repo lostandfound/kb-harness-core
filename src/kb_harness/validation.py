@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import re
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -540,6 +542,28 @@ def run_extra_checks(commands, cwd: Path) -> list[dict]:
     return results
 
 
+def _doi_from_url(url: str) -> str | None:
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.netloc.lower() not in {"doi.org", "www.doi.org", "dx.doi.org"}:
+        return None
+    return urllib.parse.unquote(parsed.path.lstrip("/")) or None
+
+
+def _doi_registered(doi: str) -> bool:
+    """Check a DOI in the Handle registry without following it to a publisher."""
+    handle_url = f"https://doi.org/api/handles/{urllib.parse.quote(doi, safe='/')}"
+    req = urllib.request.Request(handle_url, headers={**_UA, "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            record = json.load(resp)
+            return (
+                record.get("responseCode") == 1
+                and record.get("handle", "").casefold() == doi.casefold()
+            )
+    except Exception:
+        return False
+
+
 def check_urls(root: Path) -> list[str]:
     errors: list[str] = []
     for path in _iter_entity_files(root):
@@ -552,7 +576,11 @@ def check_urls(root: Path) -> list[str]:
         for source in fm.get("sources") or []:
             if not isinstance(source, str) or not source.startswith(("http://", "https://")):
                 continue
-            if not _url_reachable(source):
+            doi = _doi_from_url(source)
+            if doi:
+                if not _doi_registered(doi):
+                    errors.append(f"ERROR {rel}: DOI unregistered or registry unreachable {doi}")
+            elif not _url_reachable(source):
                 errors.append(f"ERROR {rel}: unreachable URL {source}")
 
     references, _ref_errors = _load_references(root)
@@ -562,11 +590,14 @@ def check_urls(root: Path) -> list[str]:
         url = entry.get("url")
         doi = entry.get("doi")
         if doi:
-            doi_url = f"https://doi.org/{doi}"
-            if not _url_reachable(doi_url):
-                errors.append(f"ERROR /references.yml: unreachable DOI {doi_url} ({ref_id})")
+            if not _doi_registered(doi):
+                errors.append(f"ERROR /references.yml: DOI unregistered or registry unreachable {doi} ({ref_id})")
         elif url:
-            if not _url_reachable(url):
+            doi = _doi_from_url(url)
+            if doi:
+                if not _doi_registered(doi):
+                    errors.append(f"ERROR /references.yml: DOI unregistered or registry unreachable {doi} ({ref_id})")
+            elif not _url_reachable(url):
                 errors.append(f"ERROR /references.yml: unreachable URL {url} ({ref_id})")
     return errors
 
