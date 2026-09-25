@@ -7,17 +7,15 @@ import argparse
 import sys
 from pathlib import Path
 
-try:
-    from kb_harness.graph import export_graph as _export_graph, render_graph
-    from kb_harness.project import Project
-    from kb_harness.sync import apply_changes_atomically, plan_graph
-    from kb_harness.validation import validate
-except ModuleNotFoundError:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-    from kb_harness.graph import export_graph as _export_graph, render_graph
-    from kb_harness.project import Project
-    from kb_harness.sync import apply_changes_atomically, plan_graph
-    from kb_harness.validation import validate
+# 同じチェックアウトの src を pip で入った kb_harness より優先する。導入先で古い版が
+# 入っていると、try/except の import は成功してしまい submodule の修正が効かない
+_SRC = Path(__file__).resolve().parents[1] / "src"
+if _SRC.is_dir():
+    sys.path.insert(0, str(_SRC))
+from kb_harness.graph import export_graph as _export_graph, render_graph
+from kb_harness.project import Project
+from kb_harness.sync import apply_changes_atomically, plan_graph
+from kb_harness.validation import validate
 
 def export_graph(root: Path, warnings: list[str] | None = None) -> dict:
     """Compatibility API that retains the legacy warning display behavior."""

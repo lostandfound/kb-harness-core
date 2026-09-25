@@ -27,6 +27,7 @@ from .graph import plan_graph
 from .index import plan_index
 from .okf import OkfExportError, audit_okf_bundle, plan_okf_export
 from .project import Project, ProjectError
+from .serve import serve
 from .sync import (
     apply_changes_atomically,
     execute_write_plan,
@@ -34,7 +35,14 @@ from .sync import (
     plan_write,
 )
 from .validation import check_urls, run_extra_checks, validate
-from .views import ViewError, load_entities as _load_view_entities, load_views, resolve_view, validate_views
+from .views import (
+    ViewError,
+    load_entities as _load_view_entities,
+    load_views,
+    query_excluded_types,
+    resolve_view,
+    validate_views,
+)
 
 Result = dict[str, Any]
 
@@ -110,6 +118,15 @@ def _parser() -> argparse.ArgumentParser:
 
     doctor_parser = subcommands.add_parser("doctor", help="check project health")
     _add_common_options(doctor_parser)
+    serve_parser = subcommands.add_parser("serve", help="view knowledge graph")
+    serve_parser.add_argument("--port", type=int, default=8000)
+    serve_parser.add_argument("--open", action="store_true", dest="open_browser")
+    _add_common_options(serve_parser)
+
+    flashcards_parser = subcommands.add_parser("flashcards", help="study the KB with flashcards")
+    flashcards_parser.add_argument("--port", type=int, default=8000)
+    flashcards_parser.add_argument("--open", action="store_true", dest="open_browser")
+    _add_common_options(flashcards_parser)
     reference = subcommands.add_parser("reference", help="manage references")
     reference_commands = reference.add_subparsers(dest="reference_command", required=True)
     _add_common_options(reference_commands.add_parser("health"))
@@ -250,6 +267,14 @@ def _run_derived(
             output_format=output_format,
             dry_run=dry_run,
         )
+    except ViewError as error:
+        # ビュー定義の不備は利用者が直すものなので、内部エラーではなくビューの診断として返す
+        _emit(
+            {"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]},
+            output_format,
+            error=output_format != "json",
+        )
+        return 1
     except Exception as error:
         return _internal_error(error, output_format)
 
@@ -287,6 +312,7 @@ def _view_action(project: Project, args: Any) -> int:
             _emit({"ok": not diagnostics, "changed": [], "diagnostics": diagnostics}, args.format)
             return 1 if diagnostics else 0
         entities = _load_view_entities(project.content_root)
+        excluded = query_excluded_types(project.content_root)
         views = load_views(project.views_root)
         if args.view_command == "list":
             items = [
@@ -295,7 +321,7 @@ def _view_action(project: Project, args: Any) -> int:
                     "name": view.name,
                     "kind": view.kind,
                     "basis": view.basis,
-                    "members": len(resolve_view(view, entities)),
+                    "members": len(resolve_view(view, entities, excluded)),
                 }
                 for view in views
             ]
@@ -321,7 +347,7 @@ def _view_action(project: Project, args: Any) -> int:
         view = matches[0]
         members = [
             {"path": member.path, "note": member.note, "title": (entities.get(member.path) or {}).get("title")}
-            for member in resolve_view(view, entities)
+            for member in resolve_view(view, entities, excluded)
         ]
         if args.format == "json":
             print(
@@ -783,6 +809,14 @@ def _main(argv: Sequence[str] | None = None) -> int:
             stale_code=lambda path: _sync_stale_code(project, path),
             stale_message=lambda path: f"generated file is stale: {path}",
         )
+
+    if args.command == "serve":
+        serve(project, port=args.port, open_browser=args.open_browser)
+        return 0
+
+    if args.command == "flashcards":
+        serve(project, port=args.port, open_browser=args.open_browser, view="flashcards")
+        return 0
 
     return 2
 

@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__KB_TITLE__</title>
+<link rel="stylesheet" href="/ds/styles.css">
+<style>
+/* Noto Sans JP は同梱しないので、各 OS の日本語書体へ落とす */
+:root {
+  color-scheme: dark;
+  --font-sans: 'Noto Sans JP', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', Meiryo, 'Helvetica Neue', sans-serif;
+  --rail-w: clamp(var(--rail-w-min), 26vw, var(--rail-w-max));
+  --panel-w: clamp(var(--panel-w-min), 30vw, var(--panel-w-max));
+}
+html, body { width: 100%; height: 100%; overflow: hidden; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+/* GraphBackdrop */
+.app { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--surface-app); }
+.app::before, .app::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.app::before {
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+}
+.app::after { background: var(--vignette); }
+#graph { position: absolute; inset: 0; z-index: 1; }
+
+/* 左レール: Wordmark / SearchField / FilterChip / StatLine */
+.rail { position: absolute; z-index: 5; left: 24px; top: 22px; width: var(--rail-w); display: flex; flex-direction: column; gap: 12px; }
+.wordmark { display: flex; align-items: baseline; gap: 10px; padding-left: 2px; font-family: var(--font-mono); }
+.wordmark .name { font-size: var(--fs-12); letter-spacing: var(--ls-brand); color: var(--text-brand); text-transform: uppercase; overflow-wrap: anywhere; }
+.wordmark .sub { font-size: var(--fs-10-5); color: var(--fg-775); white-space: nowrap; }
+.search {
+  display: flex; align-items: center; gap: 10px; height: var(--search-h); padding: 0 14px;
+  border-radius: var(--radius-lg); background: var(--surface-glass); border: 1px solid var(--border-default);
+  backdrop-filter: var(--blur-glass); box-shadow: var(--shadow-sm);
+}
+.search:focus-within { border-color: var(--border-active); }
+.search .ring { flex: none; width: 13px; height: 13px; border-radius: var(--radius-pill); border: 1.5px solid var(--fg-700); }
+.search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--text-input); font-family: var(--font-sans); font-size: var(--fs-13); }
+.search input::placeholder { color: var(--text-meta); }
+.kbd { font-family: var(--font-mono); font-size: var(--fs-10); color: var(--fg-800); border: 1px solid var(--border-kbd); border-radius: var(--radius-xs); padding: 2px 5px; line-height: 1.2; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  --c: var(--type-all);
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 9px;
+  border-radius: var(--radius-pill); border: 1px solid var(--border-default); background: var(--surface-chip-off);
+  transition: all var(--dur-chip) var(--ease-std); user-select: none;
+}
+.chip .dot { width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--fg-900); box-shadow: var(--glow-dot) var(--fg-900); }
+.chip .label { font-size: var(--type-chip-size); color: var(--text-off); }
+.chip .count { font-family: var(--font-mono); font-size: var(--fs-10); color: var(--fg-850); }
+.chip.active { background: color-mix(in srgb, var(--c) 12%, transparent); border-color: color-mix(in srgb, var(--c) 40%, transparent); }
+.chip.active .dot { background: var(--c); box-shadow: var(--glow-dot) var(--c); }
+.chip.active .label { color: var(--text-strong); }
+.chip.active .count { color: color-mix(in srgb, var(--c) 80%, transparent); }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 14px; padding-left: 3px; font-family: var(--font-mono); font-size: var(--type-meta-size); color: var(--text-stat); }
+
+/* ZoomControls */
+.zoom { position: absolute; z-index: 5; left: 24px; bottom: 22px; display: flex; align-items: center; gap: 8px; }
+.icon-btn, .ctl-btn {
+  height: var(--control-h); border-radius: var(--radius-md); background: var(--surface-glass-strong);
+  border: 1px solid var(--border-default); font-family: var(--font-mono);
+  transition: border-color var(--dur-fast) var(--ease-std), color var(--dur-fast) var(--ease-std);
+}
+.icon-btn { width: var(--control-h); display: grid; place-items: center; font-size: var(--fs-14); color: var(--text-control); }
+.ctl-btn { padding: 0 11px; font-size: var(--fs-10-5); letter-spacing: var(--ls-button); text-transform: uppercase; color: var(--text-muted); }
+.icon-btn:hover, .ctl-btn:hover { border-color: var(--border-active); color: var(--fg-150); }
+.zoom .level { margin-left: 4px; font-family: var(--font-mono); font-size: var(--fs-10-5); color: var(--text-stat); }
+
+/* DetailPanel */
+.panel {
+  --c: var(--type-all);
+  position: absolute; z-index: 5; right: 22px; top: 22px; bottom: 22px; width: var(--panel-w);
+  display: flex; flex-direction: column; overflow: hidden;
+  border-radius: var(--radius-xl); background: var(--surface-panel); border: 1px solid var(--border-default);
+  backdrop-filter: var(--blur-panel); box-shadow: var(--shadow-lg);
+}
+.panel[hidden] { display: none; }
+.panel .bar { flex: none; height: 3px; background: var(--c); box-shadow: var(--glow-bar) var(--c); }
+.panel .head { flex: none; display: flex; flex-direction: column; gap: 10px; padding: 20px 22px 16px; border-bottom: 1px solid var(--border-divider); }
+.panel .eyebrow { display: flex; align-items: center; gap: 9px; }
+.panel .eyebrow .dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--c); box-shadow: var(--glow-dot-md) var(--c); }
+.panel .eyebrow .type { font-family: var(--font-mono); font-size: var(--fs-10-5); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--c); }
+.panel .eyebrow .deg { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-10); color: var(--text-faint); }
+.panel h2 { margin: 0; font-size: var(--type-title-size); font-weight: var(--fw-bold); line-height: var(--lh-title); color: var(--text-title); overflow-wrap: anywhere; }
+.panel .id { font-family: var(--font-mono); font-size: var(--fs-10-5); color: var(--fg-675); word-break: break-all; }
+.panel .body { flex: 1; overflow: auto; padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 22px; }
+.section { display: flex; flex-direction: column; gap: 9px; }
+.section-label { display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono); font-size: var(--type-eyebrow-size); color: var(--text-label); }
+.section-label .count { color: var(--fg-875); }
+.description { font-size: var(--type-body-size); line-height: var(--lh-body); color: var(--text-desc); text-wrap: pretty; overflow-wrap: anywhere; }
+.empty { font-size: var(--type-row-size); color: var(--text-muted); }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-family: var(--font-mono); font-size: var(--fs-10-5); color: var(--text-control); padding: 4px 9px; border-radius: var(--radius-sm); background: var(--surface-tag); border: 1px solid var(--border-tag); }
+.pred { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 9px; border-radius: var(--radius-sm); background: var(--surface-pred); border: 1px solid var(--border-pred); }
+.pred .label { font-size: var(--type-label-size); color: var(--fg-300); }
+.pred .count { font-family: var(--font-mono); font-size: var(--fs-10); color: var(--text-meta); }
+.relations { display: flex; flex-direction: column; gap: 2px; }
+.relation {
+  --c: var(--type-all);
+  display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 10px; border: 0; border-radius: var(--radius-md);
+  background: var(--surface-row); text-align: left; transition: background var(--dur-fast) var(--ease-std);
+}
+.relation:hover, .relation:focus-visible { background: var(--surface-row-hover); outline: none; }
+.relation .dot { flex: none; width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--c); box-shadow: var(--glow-dot) var(--c); }
+.relation .text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.relation .name { font-size: var(--type-row-size); color: var(--fg-150); overflow-wrap: anywhere; }
+.relation .via { font-family: var(--font-mono); font-size: var(--fs-10); color: var(--text-meta); overflow-wrap: anywhere; }
+
+/* NodeTooltip */
+.tooltip {
+  --c: var(--type-all);
+  position: absolute; z-index: 8; max-width: 320px; padding: 11px 13px; pointer-events: none;
+  border-radius: var(--radius-lg); background: var(--surface-tooltip); border: 1px solid var(--border-tooltip); box-shadow: var(--shadow-md);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.tooltip[hidden] { display: none; }
+.tooltip .title { display: flex; align-items: center; gap: 7px; font-size: var(--type-row-size); font-weight: var(--fw-bold); color: var(--text-title); }
+.tooltip .dot { flex: none; width: 6px; height: 6px; border-radius: var(--radius-pill); background: var(--c); box-shadow: var(--glow-dot) var(--c); }
+.tooltip .text { font-size: var(--type-label-size); line-height: var(--lh-tip); color: var(--text-secondary); }
+
+@media (max-width: 700px) {
+  .rail { left: 14px; right: 14px; width: auto; }
+  .panel { top: auto; left: 12px; right: 12px; bottom: 64px; width: auto; max-height: 40%; }
+  .zoom { left: 14px; bottom: 16px; }
+}
+</style>
+</head>
+<body>
+<main class="app">
+  <div id="graph" role="img" aria-label="知識グラフ"></div>
+  <section class="rail">
+    <div class="wordmark"><div class="name">__KB_TITLE__</div><div class="sub">knowledge base</div></div>
+    <label class="search"><span class="ring"></span><input id="search" placeholder="ノードを検索 / search entities" aria-label="ノードを検索"><span class="kbd" id="shortcut"></span></label>
+    <div class="chips" id="chips"></div>
+    <div class="stats" id="stats"></div>
+  </section>
+  <div class="zoom">
+    <button class="icon-btn" id="out" title="zoom out" aria-label="縮小">−</button>
+    <button class="icon-btn" id="in" title="zoom in" aria-label="拡大">+</button>
+    <button class="ctl-btn" id="reset">reset</button>
+    <span class="level" id="level"></span>
+  </div>
+  <aside class="panel" id="panel" aria-live="polite" hidden></aside>
+  <div class="tooltip" id="tooltip" hidden></div>
+</main>
+<script src="/vendor/graphology.umd.min.js"></script>
+<script src="/vendor/sigma.min.js"></script>
+<script src="/vendor/graphology-library.min.js"></script>
+<script>
+const RAW = __KB_GRAPH__, DESC = __KB_DESC__, VIEWER = __KB_VIEWER__;
+const css = getComputedStyle(document.documentElement);
+const token = name => css.getPropertyValue(name).trim();
+const FONT = token('--font-sans');
+const FALLBACK = token('--type-all') || '#93a6c6';
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---- データ ----
+const colors = new Map(VIEWER.types.map(t => [String(t.name).toLowerCase(), t.color]));
+const colorOf = type => colors.get(String(type).toLowerCase()) || FALLBACK;
+const predicateLabel = new Map(VIEWER.predicates.map(p => [p.name, p.label]));
+const nodes = RAW.nodes.map(r => ({
+  id: r[0], type: r[1], title: r[2],
+  tags: (r[3] || '').split('|').filter(Boolean),
+  desc: DESC[r[0]] || '',
+  color: colorOf(r[1]),
+}));
+const byId = new Map(nodes.map(n => [n.id, n]));
+const edges = RAW.edges
+  .map(e => Array.isArray(e) ? { source: e[0], predicate: e[1], target: e[2] } : e)
+  .filter(e => byId.has(e.source) && byId.has(e.target));
+const degree = new Map(nodes.map(n => [n.id, 0]));
+edges.forEach(e => { degree.set(e.source, degree.get(e.source) + 1); degree.set(e.target, degree.get(e.target) + 1); });
+const types = [...new Set(nodes.map(n => n.type))];
+
+const state = { query: '', off: new Set(), selected: nodes[0]?.id || '', hovered: '' };
+const visible = n => !state.off.has(n.type) &&
+  (!state.query || `${n.title} ${n.id} ${n.tags.join(' ')}`.toLowerCase().includes(state.query));
+// DS の Viewer と同じく、フォーカスは hover を選択より優先する
+const focusId = () => state.hovered || state.selected;
+// reducer はノードごとに呼ばれるので、近傍はフォーカスが変わったときだけ数え直す
+const near = { id: null, set: new Set() };
+function neighbours(id) {
+  if (near.id !== id) {
+    near.id = id; near.set = new Set();
+    edges.forEach(e => { if (e.source === id) near.set.add(e.target); if (e.target === id) near.set.add(e.source); });
+  }
+  return near.set;
+}
+
+function channels(color) {
+  const m = color.match(/rgba?\(([^)]*)\)/);
+  if (m) { const [r, g, b, a = 1] = m[1].split(',').map(Number); return [r, g, b, a]; }
+  const h = color.replace('#', '');
+  const v = h.length === 3 ? h.split('').map(c => parseInt(c + c, 16)) : [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+  return [...v, 1];
+}
+function rgba(color, alpha) {
+  const [r, g, b] = channels(color);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+// Sigma の WebGL は色の α を透過として扱わないので、地の色と先に混ぜて不透明色で渡す。
+// 地は vignette で場所ごとに違うが、中間の紺で近似する。
+const GROUND = channels('#0b1328');
+function solid(color, alpha = 1) {
+  const [r, g, b, a] = channels(color), k = alpha * a;
+  return `rgb(${[r, g, b].map((c, i) => Math.round(c * k + GROUND[i] * (1 - k))).join(',')})`;
+}
+
+// ---- グラフ ----
+// 初期位置は黄金角の螺旋（次数の大きい順に中心へ）。乱数を使わないので、
+// 同じ graph.json からは毎回同じ配置になる。
+const graph = new graphology.Graph();
+[...nodes].sort((a, b) => degree.get(b.id) - degree.get(a.id)).forEach((n, i) => {
+  const a = i * 2.39996, r = 2.2 + Math.sqrt((i + 1) / Math.max(1, nodes.length)) * 8;
+  graph.addNode(n.id, {
+    x: Math.cos(a) * r, y: Math.sin(a) * r * .7,
+    size: Math.max(4, Math.min(12, 4 + Math.sqrt(degree.get(n.id)) * 2)),
+    color: n.color, label: n.title,
+  });
+});
+edges.forEach((e, i) => graph.addEdgeWithKey(`edge-${i}`, e.source, e.target, { size: .9, color: solid(token('--edge-rest')) }));
+
+// 力学配置: ForceAtlas2 で関係の近いものを寄せ、noverlap でノードの重なりを解く。
+// 描画前に同期で回す。反復回数はノード数に反比例させ、大きな KB でも待ち時間を 1 秒前後に抑える。
+if (graph.order > 1) {
+  const { layoutForceAtlas2, layoutNoverlap } = graphologyLibrary;
+  const settings = { ...layoutForceAtlas2.inferSettings(graph), barnesHutOptimize: graph.order > 400 };
+  const iterations = Math.max(60, Math.min(400, Math.round(120000 / graph.order)));
+  layoutForceAtlas2.assign(graph, { iterations, settings });
+  layoutNoverlap.assign(graph, { maxIterations: 80, settings: { margin: 6, ratio: 1.4 } });
+}
+
+// NodeLabel: 半透明の板に載せ、ノードの下へ中央揃えで置く
+function drawLabel(ctx, data, settings) {
+  if (!data.label) return;
+  const size = settings.labelSize, strong = data.labelStrong;
+  ctx.font = `${strong ? 700 : 500} ${size}px ${FONT}`;
+  const w = ctx.measureText(data.label).width, padX = 6, padY = 3;
+  const x = data.x - w / 2, y = data.y + data.size + 6;
+  ctx.globalAlpha = data.labelAlpha ?? 1;
+  ctx.fillStyle = token('--surface-label');
+  ctx.beginPath();
+  ctx.roundRect(x - padX, y, w + padX * 2, size + padY * 2, 4);
+  ctx.fill();
+  ctx.fillStyle = strong ? token('--text-title') : token('--text-body');
+  ctx.textBaseline = 'top';
+  ctx.fillText(data.label, x, y + padY + 1);
+  ctx.globalAlpha = 1;
+}
+
+const renderer = new Sigma(graph, document.getElementById('graph'), {
+  labelFont: FONT, labelSize: 11.5, labelWeight: '500',
+  labelRenderedSizeThreshold: 7, labelDensity: .5, labelGridCellSize: 110,
+  defaultDrawNodeLabel: drawLabel,
+  // 既定の白い吹き出しを出さない。hover は DOM のツールチップで示す
+  defaultDrawNodeHover: (ctx, data, settings) => drawLabel(ctx, { ...data, labelStrong: true }, settings),
+  zIndex: true,
+  nodeReducer: (id, data) => {
+    const n = byId.get(id), f = focusId(), close = !f || id === f || neighbours(f).has(id);
+    const out = { ...data };
+    const alpha = !visible(n) ? .07 : close ? 1 : .22;
+    out.color = solid(n.color, alpha);
+    out.labelAlpha = !visible(n) ? 0 : close ? 1 : .62;
+    if (!visible(n)) out.label = '';
+    if (id === state.selected && visible(n)) { out.size = data.size * 1.2; out.forceLabel = true; out.labelStrong = true; out.zIndex = 3; }
+    // 近傍のラベルまで強制すると密なところで重なるので、強制はフォーカス中の 1 点に留める
+    else if (id === f && visible(n)) { out.forceLabel = true; out.zIndex = 2; }
+    else if (f && close && visible(n)) out.zIndex = 1;
+    return out;
+  },
+  edgeReducer: (key, data) => {
+    const e = edges[Number(key.slice(5))], f = focusId(), out = { ...data };
+    const shown = visible(byId.get(e.source)) && visible(byId.get(e.target));
+    if (!shown) { out.color = solid(token('--edge-hidden')); return out; }
+    if (f && (e.source === f || e.target === f)) {
+      out.color = solid(byId.get(e.source === f ? e.target : e.source).color, .7);
+      out.size = 1.6; out.zIndex = 1;
+    }
+    return out;
+  },
+});
+
+// ---- 発光 ----
+// Sigma の WebGL は平塗りの円しか描かないので、DS の halo・球面の艶・選択輪・辺の流れを
+// 別の 2D キャンバスで重ねる。放射グラデーションは毎フレーム作ると重いので色ごとに焼いておく。
+function layer(name, options) {
+  const canvas = renderer.createCanvas(name, options);
+  canvas.style.pointerEvents = 'none';
+  return canvas.getContext('2d');
+}
+const under = layer('ng-halo', { beforeLayer: 'edges' });
+const flow = layer('ng-flow', { afterLayer: 'edges' });
+const over = layer('ng-sheen', { afterLayer: 'nodes' });
+
+const sprites = new Map();
+function sprite(color, stops) {
+  const key = color + stops;
+  if (!sprites.has(key)) {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d'), grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    stops.split(';').forEach(s => { const [at, a] = s.split(':').map(Number); grad.addColorStop(at, rgba(color, a)); });
+    g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+    sprites.set(key, c);
+  }
+  return sprites.get(key);
+}
+const HALO = '0:.3;.7:0;1:0', SHEEN = '0:.85;.62:0;1:0';
+const phase = new Map(nodes.map((n, i) => [n.id, { period: 5 + (i % 4), offset: (i * 0.37) % 1 }]));
+
+function fit(ctx) {
+  const { width, height } = renderer.getDimensions(), ratio = devicePixelRatio || 1;
+  if (ctx.canvas.width !== Math.round(width * ratio) || ctx.canvas.height !== Math.round(height * ratio)) {
+    ctx.canvas.width = Math.round(width * ratio); ctx.canvas.height = Math.round(height * ratio);
+    ctx.canvas.style.width = `${width}px`; ctx.canvas.style.height = `${height}px`;
+  }
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+}
+function viewport(id) {
+  const d = renderer.getNodeDisplayData(id);
+  if (!d) return null;
+  const p = renderer.framedGraphToViewport(d);
+  return { x: p.x, y: p.y, r: renderer.scaleSize(d.size), node: byId.get(id) };
+}
+function pulse(t, period, offset) {
+  if (REDUCED) return .5;
+  return .5 - .5 * Math.cos(((t / 1000) / period + offset) * Math.PI * 2);
+}
+
+function decorate(t) {
+  fit(under); fit(flow); fit(over);
+  const f = focusId(), around = f ? neighbours(f) : null;
+  nodes.forEach(n => {
+    if (!visible(n)) return;
+    const v = viewport(n.id);
+    if (!v) return;
+    const selected = n.id === state.selected, dim = f && n.id !== f && !around.has(n.id) ? .22 : 1;
+    const { period, offset } = selected ? { period: 2.4, offset: 0 } : phase.get(n.id);
+    const k = pulse(t, period, offset);
+    const halo = (v.r + (selected ? 20 : 11)) * (1 + .12 * k);
+    under.globalAlpha = (.55 + .4 * k) * dim;
+    under.drawImage(sprite(n.color, HALO), v.x - halo, v.y - halo, halo * 2, halo * 2);
+    // 球面の艶: 左上 34% / 30% に白い芯を置く
+    const s = v.r * 1.1;
+    over.globalAlpha = .9 * dim;
+    over.drawImage(sprite('#ffffff', SHEEN), v.x - v.r * .32 - s / 2, v.y - v.r * .4 - s / 2, s, s);
+    if (selected) {
+      over.globalAlpha = 1; over.strokeStyle = token('--fg-000'); over.lineWidth = 2;
+      over.beginPath(); over.arc(v.x, v.y, v.r + 1, 0, Math.PI * 2); over.stroke();
+    }
+  });
+  under.globalAlpha = over.globalAlpha = 1;
+  // GraphEdge の live: フォーカス中の辺に短い光を流す
+  if (f && !REDUCED && visible(byId.get(f))) {
+    const offset = -((t / 1000) / 2.6 % 1) * 600;
+    flow.lineWidth = 2.2; flow.lineCap = 'round'; flow.setLineDash([10, 150]); flow.lineDashOffset = offset;
+    edges.forEach(e => {
+      if (e.source !== f && e.target !== f) return;
+      const other = byId.get(e.source === f ? e.target : e.source);
+      if (!visible(other)) return;
+      const a = viewport(e.source), b = viewport(e.target);
+      if (!a || !b) return;
+      flow.strokeStyle = rgba(other.color, .7);
+      flow.beginPath(); flow.moveTo(a.x, a.y); flow.lineTo(b.x, b.y); flow.stroke();
+    });
+  }
+}
+let frame = 0;
+function loop(t) { decorate(t); frame = REDUCED ? 0 : requestAnimationFrame(loop); }
+renderer.on('afterRender', () => { if (REDUCED) decorate(0); });
+if (!REDUCED) frame = requestAnimationFrame(loop);
+
+// ---- HUD ----
+const el = id => document.getElementById(id);
+function h(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function renderChips() {
+  const root = el('chips');
+  root.replaceChildren();
+  const chip = (label, count, color, active, onClick) => {
+    const b = h('button', `chip${active ? ' active' : ''}`);
+    b.style.setProperty('--c', color);
+    b.setAttribute('aria-pressed', String(active));
+    b.append(h('span', 'dot'), h('span', 'label', label), h('span', 'count', String(count)));
+    b.onclick = onClick;
+    root.append(b);
+  };
+  chip('すべて', nodes.length, FALLBACK, state.off.size === 0, () => { state.off.clear(); refresh(); });
+  types.forEach(type => {
+    const count = nodes.filter(n => n.type === type).length;
+    chip(type, count, colorOf(type), !state.off.has(type), event => {
+      // クリックはその型だけに絞る。⇧/⌘/Ctrl つきは足し引き。絞り込み済みの型をもう一度押すと戻す
+      if (event.shiftKey || event.metaKey || event.ctrlKey) {
+        state.off.has(type) ? state.off.delete(type) : state.off.add(type);
+      } else {
+        const isolated = !state.off.has(type) && types.every(t => t === type || state.off.has(t));
+        state.off = new Set(isolated ? [] : types.filter(t => t !== type));
+      }
+      refresh();
+    });
+  });
+}
+
+function renderStats() {
+  const shown = nodes.filter(visible).length;
+  const shownEdges = edges.filter(e => visible(byId.get(e.source)) && visible(byId.get(e.target))).length;
+  el('stats').replaceChildren(h('div', '', `nodes ${shown}/${nodes.length}`), h('div', '', `edges ${shownEdges}/${edges.length}`));
+}
+
+function section(label, content, count) {
+  const s = h('section', 'section'), head = h('div', 'section-label');
+  head.append(h('span', '', label));
+  if (count !== undefined) head.append(h('span', 'count', String(count)));
+  s.append(head, content);
+  return s;
+}
+
+function renderPanel() {
+  const panel = el('panel'), n = byId.get(state.selected);
+  if (!n || !visible(n)) { panel.hidden = true; return; }
+  panel.hidden = false;
+  panel.style.setProperty('--c', n.color);
+  const head = h('div', 'head'), eyebrow = h('div', 'eyebrow');
+  eyebrow.append(h('span', 'dot'), h('span', 'type', n.type), h('span', 'deg', `deg ${degree.get(n.id)}`));
+  head.append(eyebrow, h('h2', '', n.title), h('div', 'id', n.id));
+
+  const body = h('div', 'body');
+  body.append(section('説明 / description', n.desc ? h('div', 'description', n.desc) : h('div', 'empty', '説明はない。')));
+  if (n.tags.length) {
+    const tags = h('div', 'badges');
+    n.tags.forEach(t => tags.append(h('span', 'tag', t)));
+    body.append(section('タグ / tags', tags));
+  }
+  const related = edges.filter(e => e.source === n.id || e.target === n.id);
+  if (related.length) {
+    const counts = new Map();
+    related.forEach(e => counts.set(e.predicate, (counts.get(e.predicate) || 0) + 1));
+    const preds = h('div', 'badges');
+    counts.forEach((count, name) => {
+      const badge = h('span', 'pred');
+      badge.title = predicateLabel.get(name) || name;
+      badge.append(h('span', 'label', name), h('span', 'count', String(count)));
+      preds.append(badge);
+    });
+    body.append(section('述語の内訳 / predicates', preds));
+  }
+  const rows = h('div', 'relations');
+  related
+    .map(e => ({ e, out: e.source === n.id, other: byId.get(e.source === n.id ? e.target : e.source) }))
+    .sort((a, b) => Number(b.out) - Number(a.out) || a.e.predicate.localeCompare(b.e.predicate))
+    .forEach(({ e, out, other }) => {
+      const row = h('button', 'relation'), text = h('span', 'text');
+      row.style.setProperty('--c', other.color);
+      const label = predicateLabel.get(e.predicate);
+      text.append(
+        h('span', 'name', other.title),
+        h('span', 'via', `${out ? '→' : '←'} ${e.predicate}${label && label !== e.predicate ? ` · ${label}` : ''}`),
+      );
+      row.append(h('span', 'dot'), text);
+      row.onclick = () => select(other.id);
+      row.onmouseenter = () => { state.hovered = other.id; renderer.refresh(); };
+      row.onmouseleave = () => { state.hovered = ''; renderer.refresh(); };
+      rows.append(row);
+    });
+  body.append(section('関係 / relations', related.length ? rows : h('div', 'empty', '関係はない。'), related.length));
+  panel.replaceChildren(h('div', 'bar'), head, body);
+}
+
+function showTooltip(id) {
+  const tip = el('tooltip'), n = byId.get(id), v = viewport(id);
+  if (!n || !v || !visible(n)) { tip.hidden = true; return; }
+  tip.style.setProperty('--c', n.color);
+  const title = h('div', 'title');
+  title.append(h('span', 'dot'), h('span', '', n.title));
+  // 説明は最初の一文だけ見せる
+  const first = n.desc ? n.desc.split(/(?<=。)/)[0] : '';
+  tip.replaceChildren(title, ...(first ? [h('div', 'text', first)] : []));
+  tip.hidden = false;
+  const { width, height } = renderer.getDimensions(), box = tip.getBoundingClientRect();
+  const left = Math.max(12, Math.min(width - box.width - 12, v.x + 16));
+  const top = v.y + 18 + box.height > height - 12 ? Math.max(12, v.y - 18 - box.height) : v.y + 18;
+  tip.style.left = `${left}px`; tip.style.top = `${top}px`;
+}
+
+function select(id) {
+  state.selected = id;
+  refresh();
+}
+
+function refresh() {
+  if (state.selected && !visible(byId.get(state.selected))) state.selected = '';
+  renderer.refresh();
+  renderChips();
+  renderStats();
+  renderPanel();
+}
+
+renderer.on('clickNode', ({ node }) => { if (visible(byId.get(node))) select(node); });
+renderer.on('clickStage', () => select(''));
+renderer.on('enterNode', ({ node }) => {
+  if (!visible(byId.get(node))) return;
+  state.hovered = node; renderer.refresh(); showTooltip(node);
+  el('graph').style.cursor = 'pointer';
+});
+renderer.on('leaveNode', () => {
+  state.hovered = ''; renderer.refresh(); el('tooltip').hidden = true;
+  el('graph').style.cursor = '';
+});
+
+const search = el('search');
+search.addEventListener('input', () => { state.query = search.value.trim().toLowerCase(); refresh(); });
+const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+el('shortcut').textContent = mac ? '⌘K' : 'Ctrl K';
+addEventListener('keydown', event => {
+  if ((mac ? event.metaKey : event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); search.focus(); search.select(); }
+  else if (event.key === 'Escape' && document.activeElement === search) search.blur();
+});
+
+const camera = renderer.getCamera();
+// 右の詳細パネルに隠れない幅の中へ、ノードの外接矩形が余白つきで収まる視点を作る。
+// Sigma の既定はパネルを知らずに画面全体へ合わせる。狭い画面ではパネルが下に回るので横は削らない。
+function home() {
+  const { width, height } = renderer.getDimensions(), margin = 48;
+  const covered = width > 700 ? Math.max(240, Math.min(350, width * .3)) + 22 : 0;
+  const base = { x: .5, y: .5, angle: 0, ratio: 1 };
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  graph.forEachNode((id, attrs) => {
+    const p = renderer.graphToViewport(attrs, { cameraState: base });
+    x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
+  });
+  if (!Number.isFinite(x0)) return base;
+  const avail = width - covered;
+  const ratio = Math.max((x1 - x0) / Math.max(1, avail - margin * 2), (y1 - y0) / Math.max(1, height - margin * 2), .1);
+  // 外接矩形の中心が、パネルを除いた幅の中央に来るようカメラを右へずらす
+  const center = renderer.viewportToFramedGraph(
+    { x: (x0 + x1) / 2 + (width - avail) / 2 * ratio, y: (y0 + y1) / 2 },
+    { cameraState: base },
+  );
+  return { x: center.x, y: center.y, angle: 0, ratio };
+}
+camera.setState(home());
+el('in').onclick = () => camera.animatedZoom({ duration: 250 });
+el('out').onclick = () => camera.animatedUnzoom({ duration: 250 });
+el('reset').onclick = () => camera.animate(home(), { duration: 250 });
+const level = () => { el('level').textContent = `${Math.round(100 / camera.getState().ratio)}%`; };
+camera.on('updated', () => { level(); el('tooltip').hidden = true; });
+level();
+refresh();
+</script>
+</body>
+</html>

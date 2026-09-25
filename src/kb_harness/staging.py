@@ -56,8 +56,10 @@ def stage_and_validate(
         if views_root is not None and views_index is not None:
             staged_views_root = stage_root / views_root.resolve().relative_to(repo_root)
             staged_views_index = stage_root / views_index.resolve().relative_to(repo_root)
-            if views_root.is_dir() and not staged_views_root.exists():
-                copytree(views_root, staged_views_root, symlinks=True)
+            # views_root が content_root を含む配置（content_root: kb/entities, views.root: kb）では
+            # 写し先が content のコピーで既にできている。存在で飛ばすとビュー定義が写らない
+            if views_root.is_dir():
+                copytree(views_root, staged_views_root, symlinks=True, dirs_exist_ok=True)
             if views_index.is_file():
                 staged_views_index.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(views_index, staged_views_index)
@@ -65,6 +67,12 @@ def stage_and_validate(
         staged_path = stage_content / relative
         staged_path.parent.mkdir(parents=True, exist_ok=True)
         staged_path.write_text(proposed_text, encoding="utf-8")
+        # ビュー定義の不備は派生物の生成（export_views）で ViewError になって先に落ちるので、
+        # 生成の前に検査して他の検証エラーと同じ形で返す
+        if staged_views_root is not None:
+            view_errors = validate_views(stage_content, staged_views_root)
+            if view_errors:
+                raise validation_error("; ".join(view_errors))
         # index.by_tag などの設定を引き継がないと、作成直後の sync --check が陳腐化を報告する
         staged_project = dataclasses.replace(
             project,
@@ -84,8 +92,6 @@ def stage_and_validate(
         }
         execute_write_plan(plan_write(derived))
         errors = validate(stage_content)
-        if staged_views_root is not None:
-            errors.extend(validate_views(stage_content, staged_views_root))
         if errors:
             raise validation_error("; ".join(errors))
         if plan_sync(staged_project):

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Collection, Mapping
 
 import yaml
 
@@ -201,8 +201,25 @@ def load_views(views_root: Path) -> list[View]:
     return views
 
 
-def resolve_view(view: View, entities: Mapping[str, dict]) -> list[ViewMember]:
-    """ビューのメンバーを確定する。query は entities を AND 条件で絞る。"""
+def query_excluded_types(content_root: Path) -> frozenset[str]:
+    """query の対象から外す型。export_graph がノードにしない型（Claim / Index / graph: false）と揃える。"""
+    types = _load_types(content_root)
+    return frozenset(
+        {"Claim", "Index"}
+        | {name for name, definition in types.items() if not definition.get("graph", True)}
+    )
+
+
+def resolve_view(
+    view: View,
+    entities: Mapping[str, dict],
+    excluded: Collection[str] = ("Claim", "Index"),
+) -> list[ViewMember]:
+    """ビューのメンバーを確定する。query は entities を AND 条件で絞る。
+
+    excluded は語彙を読まずに済む既定値。graph: false の型も外すには
+    query_excluded_types(content_root) を渡す。
+    """
     if view.kind == "list":
         return list(view.members)
     wanted_type = view.where.get("type")
@@ -211,7 +228,8 @@ def resolve_view(view: View, entities: Mapping[str, dict]) -> list[ViewMember]:
     hits: list[ViewMember] = []
     for path in sorted(entities):
         frontmatter = entities[path]
-        if frontmatter.get("type") == "Claim":
+        # graph.json の nodes に出ないものを拾うと、views[].members が nodes に無いパスを指す
+        if frontmatter.get("type") in excluded:
             continue
         if wanted_type is not None and frontmatter.get("type") != wanted_type:
             continue
@@ -288,6 +306,7 @@ def export_views(content_root: Path, views_root: Path) -> list[dict[str, Any]]:
     """graph.json の `views` 要素。メンバーは解決済みのパス一覧。"""
     entities = load_entities(content_root)
     exported: list[dict[str, Any]] = []
+    excluded = query_excluded_types(content_root)
     for view in load_views(views_root):
         item: dict[str, Any] = {
             "id": view.id,
@@ -299,7 +318,7 @@ def export_views(content_root: Path, views_root: Path) -> list[dict[str, Any]]:
             item["basis"] = view.basis
         if view.kind == "query":
             item["where"] = dict(view.where)
-        item["members"] = [member.path for member in resolve_view(view, entities)]
+        item["members"] = [member.path for member in resolve_view(view, entities, excluded)]
         exported.append(item)
     return exported
 
@@ -313,9 +332,10 @@ INDEX_NOTE = (
 
 def render_views_index(content_root: Path, views_root: Path) -> str:
     entities = load_entities(content_root)
+    excluded = query_excluded_types(content_root)
     lines = [INDEX_HEADING, "", INDEX_NOTE, ""]
     for view in load_views(views_root):
-        members = resolve_view(view, entities)
+        members = resolve_view(view, entities, excluded)
         lines.append(f"## {view.name}")
         lines.append("")
         lines.append(view.description)

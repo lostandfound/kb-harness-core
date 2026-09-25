@@ -1,0 +1,4 @@
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--surface-page);color:var(--text-body);font-family:var(--font-sans)}
+a{color:var(--link);text-decoration:none}a:hover{color:var(--link-hover)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border-radius:8px}
