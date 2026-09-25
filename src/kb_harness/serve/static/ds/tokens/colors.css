@@ -1,0 +1,28 @@
+:root{
+/* canvas */
+--ink-000:#05070f;--ink-050:#070b16;--ink-100:#080d19;--ink-150:#0a0f1c;--ink-200:#0c1221;--ink-250:#10182a;
+/* lines */
+--line-100:#16203a;--line-200:#1b2743;--line-250:#1c2947;--line-300:#1f2b47;--line-350:#22304e;--line-400:#23324f;--line-500:#3a4c70;
+/* text ramp (brightest → faintest) */
+--fg-000:#ffffff;--fg-050:#f0f5ff;--fg-075:#eef4ff;--fg-100:#e6edfb;--fg-150:#dce6f8;--fg-200:#dbe4f5;--fg-250:#c3d1e8;--fg-300:#b8c6e0;--fg-350:#b2c1dc;
+--fg-400:#93a6c6;--fg-450:#8ea3c6;--fg-500:#7f93b8;--fg-550:#6d80a6;--fg-600:#5d6c8c;--fg-650:#4f6187;--fg-675:#4d5f83;--fg-700:#4a5f85;--fg-725:#46577a;--fg-750:#44557a;--fg-775:#43536f;--fg-800:#3f4f6d;--fg-850:#3b4864;--fg-875:#35435f;--fg-900:#33415c;
+/* neon entity hues */
+--neon-amber:#f5a524;--neon-cyan:#22d3ee;--neon-cyan-hi:#67e8f9;--neon-violet:#a78bfa;--neon-mint:#34d399;
+/* semantic: entity types */
+--type-course:var(--neon-amber);--type-concept:var(--neon-cyan);--type-technique:var(--neon-violet);--type-tool:var(--neon-mint);--type-all:var(--fg-400);
+/* semantic: surfaces */
+--surface-page:var(--ink-000);--surface-app:var(--ink-050);
+--surface-glass:rgba(12,18,33,.82);--surface-glass-strong:rgba(12,18,33,.85);--surface-chip-off:rgba(12,18,33,.75);
+--surface-panel:rgba(10,15,28,.9);--surface-tooltip:rgba(8,13,25,.95);--surface-label:rgba(5,8,17,.62);
+--surface-tag:rgba(38,52,80,.45);--surface-pred:rgba(16,24,42,.8);--surface-row:rgba(255,255,255,.015);--surface-row-hover:rgba(45,62,96,.55);
+/* semantic: borders */
+--border-default:var(--line-200);--border-divider:var(--line-100);--border-tooltip:var(--line-350);--border-kbd:var(--line-400);--border-tag:var(--line-300);--border-pred:var(--line-250);--border-active:var(--line-500);
+/* semantic: text */
+--text-title:var(--fg-050);--text-strong:var(--fg-075);--text-input:var(--fg-100);--text-body:var(--fg-200);--text-desc:var(--fg-250);--text-secondary:var(--fg-350);
+--text-control:var(--fg-450);--text-brand:var(--fg-500);--text-muted:var(--fg-550);--text-off:var(--fg-600);--text-meta:var(--fg-650);--text-label:var(--fg-725);--text-stat:var(--fg-750);--text-faint:var(--fg-800);
+--link:var(--neon-cyan);--link-hover:var(--neon-cyan-hi);
+/* graph */
+--grid-line:rgba(120,160,220,.16);--edge-rest:rgba(130,162,214,.26);--edge-hidden:rgba(90,115,160,.05);
+--vignette:radial-gradient(ellipse 70% 60% at 48% 45%,rgba(30,60,110,.45),rgba(5,7,15,.9) 70%);/* @kind color */
+--scrollbar-thumb:#1d2740;
+}

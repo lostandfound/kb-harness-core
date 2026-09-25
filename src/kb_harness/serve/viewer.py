@@ -14,6 +14,8 @@ import yaml
 from ..project import Project, ProjectError
 
 # 深い紺黒の地で発光して見える 8 色。型の定義順に割り当てる。
+# 先頭 4 色は neon-graph-design-system の neon 4 色と同じ並び。型が 8 を超えて
+# 色が重なるようになったら、循環させず末尾に色を足す。
 PALETTE = (
     "#f5a524",
     "#22d3ee",

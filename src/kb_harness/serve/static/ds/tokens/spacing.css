@@ -1,0 +1,6 @@
+:root{
+--space-2:2px;--space-3:3px;--space-4:4px;--space-5:5px;--space-6:6px;--space-7:7px;--space-8:8px;--space-9:9px;--space-10:10px;--space-11:11px;--space-12:12px;--space-13:13px;--space-14:14px;--space-16:16px;--space-18:18px;--space-20:20px;--space-22:22px;--space-24:24px;
+--radius-xs:4px;--radius-sm:5px;--radius-md:8px;--radius-lg:10px;--radius-xl:14px;--radius-pill:999px;
+--control-h:30px;--search-h:42px;--grid-size:48px;/* @kind spacing */
+--inset-hud:22px 24px;/* @kind spacing */--panel-w-min:240px;--panel-w-max:350px;--rail-w-min:200px;--rail-w-max:300px;
+}

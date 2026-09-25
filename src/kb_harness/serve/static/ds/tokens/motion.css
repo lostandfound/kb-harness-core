@@ -1,0 +1,6 @@
+:root{
+--dur-fast:.16s;/* @kind other */--dur-chip:.18s;/* @kind other */--dur-label:.2s;/* @kind other */--dur-fade:.25s;/* @kind other */--dur-flow:2.6s;/* @kind other */--dur-pulse-sel:2.4s;/* @kind other */--dur-pulse:5s;/* @kind other */
+--ease-std:ease;/* @kind other */--ease-pulse:ease-in-out;/* @kind other */
+}
+@keyframes dashflow{to{stroke-dashoffset:-600}}
+@keyframes haloPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:.95;transform:scale(1.12)}}

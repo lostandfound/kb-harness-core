@@ -1,0 +1,10 @@
+:root{
+--font-sans:'Noto Sans JP','Helvetica Neue',sans-serif;
+--font-mono:'JetBrains Mono',monospace;
+--fs-10:10px;--fs-10-5:10.5px;--fs-11-5:11.5px;--fs-12:12px;--fs-12-5:12.5px;--fs-13:13px;--fs-13-5:13.5px;--fs-14:14px;--fs-20:20px;
+--fw-regular:400;/* @kind font */--fw-medium:500;/* @kind font */--fw-bold:700;/* @kind font */
+--lh-title:1.4;/* @kind font */--lh-tip:1.75;/* @kind font */--lh-body:1.9;/* @kind font */
+--ls-eyebrow:.18em;/* @kind font */--ls-brand:.2em;/* @kind font */--ls-button:.1em;/* @kind font */--ls-label:.01em;/* @kind font */
+/* semantic roles */
+--type-title-size:var(--fs-20);--type-body-size:var(--fs-13-5);--type-input-size:var(--fs-13);--type-row-size:var(--fs-12-5);--type-chip-size:var(--fs-12);--type-label-size:var(--fs-11-5);--type-eyebrow-size:var(--fs-10);--type-meta-size:var(--fs-10-5);
+}

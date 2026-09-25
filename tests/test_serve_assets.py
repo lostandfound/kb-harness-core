@@ -18,6 +18,17 @@ class AssetTest(unittest.TestCase):
             "vendor/sigma.min.js",
             "vendor/GRAPHOLOGY-LICENSE.txt",
             "vendor/SIGMA-LICENSE.txt",
+            "ds/styles.css",
+            "ds/tokens/fonts.css",
+            "ds/tokens/colors.css",
+            "ds/tokens/typography.css",
+            "ds/tokens/spacing.css",
+            "ds/tokens/effects.css",
+            "ds/tokens/motion.css",
+            "ds/tokens/base.css",
+            "ds/assets/fonts/JetBrainsMono-latin.woff2",
+            "ds/assets/fonts/JetBrainsMono-latin-ext.woff2",
+            "ds/assets/fonts/OFL.txt",
         ):
             self.assertTrue((STATIC / name).is_file(), name)
 
@@ -37,6 +48,16 @@ class AssetTest(unittest.TestCase):
         text = (STATIC / "graph.html").read_text(encoding="utf-8")
         for marker in ("unpkg.com", "cdn.jsdelivr.net", "cdnjs.cloudflare.com", "fonts.googleapis.com"):
             self.assertNotIn(marker, text, marker)
+
+    def test_デザインシステムの資産が外部資産を参照しない(self):
+        for path in sorted((STATIC / "ds").rglob("*.css")):
+            text = path.read_text(encoding="utf-8")
+            for marker in ("http://", "https://", "//fonts."):
+                self.assertNotIn(marker, text, f"{path.name}: {marker}")
+
+    def test_グラフ画面がデザインシステムを読み込む(self):
+        text = (STATIC / "graph.html").read_text(encoding="utf-8")
+        self.assertIn('href="/ds/styles.css"', text)
 
 
 if __name__ == "__main__":

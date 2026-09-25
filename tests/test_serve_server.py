@@ -93,6 +93,11 @@ class ServerTest(unittest.TestCase):
             "/VENDOR/react.production.min.js",
             "/etc/passwd",
             "/app.js",
+            "/ds/unknown.css",
+            "/ds/../server.py",
+            "/ds/tokens/../../server.py",
+            "/ds/assets/fonts/OFL.txt/..",
+            "/ds/components/controls/FilterChip.jsx",
         ):
             status, _, _ = self._get(path)
             self.assertEqual(status, 404, path)
@@ -102,6 +107,19 @@ class ServerTest(unittest.TestCase):
             status, ctype, body = self._get(path)
             self.assertEqual(status, 200, path)
             self.assertTrue(ctype.startswith("text/javascript"), path)
+            self.assertTrue(body, path)
+
+    def test_デザインシステムの資産が配られる(self):
+        for path, kind in (
+            ("/ds/styles.css", "text/css"),
+            ("/ds/tokens/colors.css", "text/css"),
+            ("/ds/tokens/fonts.css", "text/css"),
+            ("/ds/assets/fonts/JetBrainsMono-latin.woff2", "font/woff2"),
+            ("/ds/assets/fonts/JetBrainsMono-latin-ext.woff2", "font/woff2"),
+        ):
+            status, ctype, body = self._get(path)
+            self.assertEqual(status, 200, path)
+            self.assertTrue(ctype.startswith(kind), path)
             self.assertTrue(body, path)
 
     def test_graph_jsonがなければ案内つきで404を返す(self):

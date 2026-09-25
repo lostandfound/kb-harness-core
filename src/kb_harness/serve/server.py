@@ -24,6 +24,20 @@ VENDOR = {
     "graphology.umd.min.js",
     "sigma.min.js",
 }
+# neon-graph-design-system から写したトークンと書体。CSS 内の相対参照
+# （styles.css → tokens/ → ../assets/fonts/）が解決できるよう、上流の配置を保つ。
+DS = {
+    "styles.css": "text/css; charset=utf-8",
+    "tokens/fonts.css": "text/css; charset=utf-8",
+    "tokens/colors.css": "text/css; charset=utf-8",
+    "tokens/typography.css": "text/css; charset=utf-8",
+    "tokens/spacing.css": "text/css; charset=utf-8",
+    "tokens/effects.css": "text/css; charset=utf-8",
+    "tokens/motion.css": "text/css; charset=utf-8",
+    "tokens/base.css": "text/css; charset=utf-8",
+    "assets/fonts/JetBrainsMono-latin.woff2": "font/woff2",
+    "assets/fonts/JetBrainsMono-latin-ext.woff2": "font/woff2",
+}
 
 
 def _node_id(path: str) -> str:
@@ -114,6 +128,12 @@ def make_handler(project: Project, view: str = "graph") -> type[BaseHTTPRequestH
                         (STATIC / "vendor" / name).read_bytes(),
                         "text/javascript; charset=utf-8",
                     )
+                    return
+
+            if path.startswith("/ds/"):
+                name = path.removeprefix("/ds/")
+                if name in DS:
+                    self._send((STATIC / "ds" / name).read_bytes(), DS[name])
                     return
 
             self.send_error(404)

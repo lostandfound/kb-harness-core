@@ -33,7 +33,13 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-"kb_harness.serve" = ["static/*", "static/vendor/*"]
+"kb_harness.serve" = [
+    "static/*",
+    "static/vendor/*",
+    "static/ds/*",
+    "static/ds/tokens/*",
+    "static/ds/assets/fonts/*",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
