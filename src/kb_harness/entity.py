@@ -14,6 +14,7 @@ from typing import Any
 import yaml
 
 from .markdown import field_text
+from .types import load_types, validate_type_fields
 
 # 型が sections を宣言しないときの章立て。ハーネスは型ごとの既定を持たない
 DEFAULT_SECTIONS = ["概要", "詳細", "関連項目"]
@@ -37,24 +38,8 @@ class EntityPlan:
 
 
 def _load_types(root: Path) -> dict[str, dict[str, object]]:
-    vocabulary_path = root / "vocabulary.yml"
-    data = yaml.safe_load(vocabulary_path.read_text(encoding="utf-8")) or {}
-    raw_types = data.get("types") if isinstance(data, dict) else None
-    if not isinstance(raw_types, dict):
-        return {}
-    types: dict[str, dict[str, object]] = {}
-    for name, definition in raw_types.items():
-        if not isinstance(name, str) or not isinstance(definition, dict):
-            continue
-        types[name] = {
-            "directory": definition.get("directory"),
-            "extra_fields": definition.get("extra_fields") or [],
-            "optional_fields": definition.get("optional_fields") or [],
-            "sections": definition.get("sections") or [],
-            "graph": definition.get("graph", True),
-            "sources_required": definition.get("sources_required", True),
-        }
-    return types
+    """kb_harness.types.load_types の寛容版。types: が無ければ空の辞書。"""
+    return load_types(root)
 
 
 def _nonempty_string(value: object, name: str) -> str:
@@ -193,13 +178,11 @@ def _frontmatter_and_body(root: Path, spec: Mapping[str, Any], *, timestamp: str
             detail.append(f"unknown sections: {', '.join(extra)}")
         raise EntitySpecError("section layout mismatch (" + "; ".join(detail) + ")")
 
-    extra_fields = definition.get("extra_fields") or []
-    optional_fields = definition.get("optional_fields") or []
-    for key, declared in (("extra_fields", extra_fields), ("optional_fields", optional_fields)):
-        if not isinstance(declared, list) or not all(isinstance(item, str) for item in declared):
-            raise EntitySpecError(f"type '{entity_type}' has invalid {key} configuration", argument=True)
-    if set(extra_fields) & set(optional_fields):
-        raise EntitySpecError(f"type '{entity_type}' declares the same field in extra_fields and optional_fields", argument=True)
+    problems = validate_type_fields({entity_type: definition})
+    if problems:
+        raise EntitySpecError(f"vocabulary.yml: {problems[0]}", argument=True)
+    extra_fields = definition["extra_fields"]
+    optional_fields = definition["optional_fields"]
     fields = spec.get("fields") or {}
     if not isinstance(fields, Mapping):
         raise EntitySpecError("fields must be a mapping")
@@ -208,10 +191,11 @@ def _frontmatter_and_body(root: Path, spec: Mapping[str, Any], *, timestamp: str
         raise EntitySpecError(f"unknown field(s): {', '.join(unknown_fields)}")
     field_values: dict[str, str] = {}
     for field in extra_fields:
-        if field not in fields:
+        if fields.get(field) is None:
             raise EntitySpecError(f"missing required field '{field}'")
     for field in [*extra_fields, *optional_fields]:
-        if field not in fields:
+        if fields.get(field) is None:
+            # 任意フィールドは、キーが無いか値が空（null）なら書き出さない
             continue
         value = field_text(fields[field])
         if value is None:

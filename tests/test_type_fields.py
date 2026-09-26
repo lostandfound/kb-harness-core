@@ -85,6 +85,10 @@ class ValidateFieldsTest(unittest.TestCase):
         self.assertEqual(self.errors(person_fields="born: 1940\nyear: 2021\n"), [])
         self.assertEqual(self.errors(person_fields="born: '1940'\nyear: 2021-05-01\n"), [])
 
+    def test_empty_value_counts_as_omitted(self):
+        self.assertEqual(self.errors(person_fields="born: '1940'\ndied:\n"), [])
+        self.assertEqual(self.errors(person_fields="born:\n"), ["ERROR /people/x.md: missing required field 'born'"])
+
     def test_non_scalar_value_gets_accurate_message(self):
         self.assertEqual(self.errors(person_fields="born: [1940]\n"),
                          ["ERROR /people/x.md: 'born' は非空の文字列でなければならない（値: [1940]）"])
@@ -94,6 +98,8 @@ class ValidateFieldsTest(unittest.TestCase):
         self.assertIn("ERROR vocabulary.yml: types.Person で extra_fields と optional_fields に同じフィールドがある: born", self.errors(bad))
         bad = VOCAB.replace("optional_fields: [died, year]", "optional_fields: died")
         self.assertIn("ERROR vocabulary.yml: types.Person.optional_fields はフィールド名のリストでなければならない", self.errors(bad))
+        bad = VOCAB.replace("extra_fields: [born]", "extra_fields: ['']")
+        self.assertIn("ERROR vocabulary.yml: types.Person.extra_fields はフィールド名のリストでなければならない", self.errors(bad))
 
 
 class EntityCreateFieldsTest(unittest.TestCase):
@@ -134,6 +140,19 @@ class EntityCreateFieldsTest(unittest.TestCase):
         (self.root / "knowledge" / "vocabulary.yml").write_text(vocab, encoding="utf-8")
         with self.assertRaisesRegex(EntitySpecError, "missing sections: 詳細, 関連項目"):
             self.created("fields:\n  born: '1940'\n")
+
+    def test_entity_create_rejects_the_same_declarations_as_validate(self):
+        for broken in ("extra_fields: ['']", "extra_fields: [born, died]"):
+            vocab = VOCAB.replace("extra_fields: [born]", broken)
+            (self.root / "knowledge" / "vocabulary.yml").write_text(vocab, encoding="utf-8")
+            with self.assertRaisesRegex(EntitySpecError, "vocabulary.yml: types.Person"):
+                self.created("fields:\n  born: '1940'\n  died: '2000'\n")
+
+    def test_null_field_value_counts_as_omitted(self):
+        text = self.created("fields:\n  born: '1940'\n  died: null\n")
+        self.assertNotIn("died", text)
+        with self.assertRaisesRegex(EntitySpecError, "missing required field 'born'"):
+            self.created("fields:\n  born:\n")
 
     def test_required_and_unknown_fields(self):
         with self.assertRaisesRegex(EntitySpecError, "missing required field 'born'"):

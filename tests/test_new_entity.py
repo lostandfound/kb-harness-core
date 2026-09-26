@@ -21,6 +21,8 @@ class NewEntityTest(unittest.TestCase):
   Product:
     directory: products
     sections: [概要, 主な機能, 関連項目]
+  Person:
+    directory: people
 predicates: {}
 tags: []
 """,
@@ -45,11 +47,18 @@ tags: []
         text = path.read_text(encoding="utf-8")
         self.assertIn("## 主な機能", text)
 
+    def test_person_without_sections_gets_default_sections_not_a_builtin_layout(self):
+        path = new_entity(self.root, "person", "example")
+
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("## 詳細", text)
+        self.assertNotIn("## 生涯", text)
+
     def test_rejects_unknown_type_without_creating_a_file(self):
         with self.assertRaisesRegex(ValueError, "unknown type"):
-            new_entity(self.root, "person", "example")
+            new_entity(self.root, "style", "example")
 
-        self.assertFalse((self.root / "people" / "example.md").exists())
+        self.assertFalse((self.root / "styles" / "example.md").exists())
 
 
 if __name__ == "__main__":

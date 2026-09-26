@@ -61,6 +61,7 @@ validate:
 types:
   <型名>:
     directory: <対応ディレクトリ名>     # 必須。frontmatter の type とディレクトリの対応検査に使う
+    description: <説明>                  # 任意。型の意味。ハーネスは検査にも表示にも使わない
     extra_fields: [born]                 # 任意。この型で追加必須になる frontmatter フィールド
     optional_fields: [died, same_as]     # 任意。書いてもよい frontmatter フィールド。無くても検査は通る
     sections: [概要, 生涯, 功績]         # 任意。本文の章立て。kb entity create が過不足を検査する。省略時は 概要 / 詳細 / 関連項目
@@ -99,14 +100,15 @@ tags:
 | `Organization` | 集団・組織 | `schema:Organization` | E74 Group | Q43229 |
 | `Place` | 場所 | `schema:Place` | E53 Place | Q17334923 |
 | `Event` | 出来事 | `schema:Event` | E5 Event | Q1190554 |
-| `Work` | 作品・著作物・人工物 | `schema:CreativeWork` | E71 Human-Made Thing | Q386724 |
+| `Work` | 作品・著作物 | `schema:CreativeWork` | E73 Information Object | Q386724 |
 | `Concept` | 概念。上の 5 つに入らないもの | `schema:Intangible` | E28 Conceptual Object | Q151885 |
 
+- 対応の列は、その語彙で最も近い上位クラスであって同値ではない（`schema:Person` は E21 と一致するが、`schema:CreativeWork` と E73 は物理的な作品の扱いが違う）。型に `maps_to` を置くときは導入先が絞る。
 - 標準述語の束縛の目安: `created-by` の range は `Person` / `Organization`、`located-in` の range は `Place`、`part-of` / `derived-from` / `follows` は同じ型どうしが基本。導入先はこれを自分の型に写して `vocabulary.yml` に書く。
-- 上の 6 つより細かい型（`Dish` / `Kata` / `Script` など）は導入先が任意で足す。述語の層 2 に相当するが、型には `broader` を置かない。型の継承は `domain` / `range` の継承を連れてきて検証が重くなる。細かい型を足すときは、どの推奨型の細分かを `description` に一言書く。
+- 上の 6 つより細かい型（`Dish` / `Kata` / `Script` など）は導入先が任意で足す。述語の層 2 に相当するが、型には `broader` を置かない。型の継承は `domain` / `range` の継承を連れてきて検証が重くなる。推奨型の細分なら（`Kata` は `Work` の細分など）、そのことを型の `description` に一言書く。どの推奨型にも入らない型（`Dish` など）があってもよい。
 - 型名は検査しない。`kb doctor` も非標準の型名を警告しない。型は述語より導入先固有になりやすく、`Dish` を `Work` に押し込む方が害が大きい。
 - 標準語彙への対応（`maps_to`）は型にはまだ置かない。読む側（RDF 出力、KB の突合）ができた時点で、述語と同じ形で足す。
-- ハーネスは型ごとの既定の章立てや必須フィールドを持たない。`Person` にどの章があるかは導入先の `sections` で決まる。
+- ハーネスは型ごとの既定の章立てや必須フィールドを持たない。`Person` にどの章があるかは導入先の `sections` で決まる。`sections` を書かない型は 概要 / 詳細 / 関連項目 になる。既存のエンティティが別の章立てなら、`sections` に書いておかないと `kb entity create` と `scripts/new_entity.py` が既存と食い違う章立てを作る。
 
 背景は [docs/notes/hyojun-kata-memo.md](notes/hyojun-kata-memo.md) にある。
 
@@ -230,7 +232,7 @@ aliases: []                     # 任意
 relations:                      # 任意
   - predicate: taught
     target: /people/other.md
-fields:                         # 任意。型の extra_fields に対応
+fields:                         # 任意。型の extra_fields（必須）と optional_fields（任意）に対応
   born: "1900"
 timestamp: 2026-01-01T00:00:00Z # 任意。省略時は SOURCE_DATE_EPOCH → clock
 ```

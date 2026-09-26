@@ -33,13 +33,13 @@
 | `Work` | CreativeWork | E71 Human-Made Thing | Q386724 work |
 | `Concept` | Intangible | E28 Conceptual Object | Q151885 concept |
 
-- `Dish` / `Kata` / `Script` のような細かい型は述語の層 2 に相当し、導入先が任意で足す。ただし型には `broader` を置かない。型の継承は `domain` / `range` の継承を連れてきて検証器が重くなる。`Dish` が `Work` の細分であることは `description` に一言書けば足りる。
+- `Dish` / `Kata` / `Script` のような細かい型は述語の層 2 に相当し、導入先が任意で足す。ただし型には `broader` を置かない。型の継承は `domain` / `range` の継承を連れてきて検証器が重くなる。推奨型の細分なら（`Kata` は `Work` の細分）`description` に一言書けば足り、どの推奨型にも入らない型（`Dish`）があってもよい。
 - 非標準の型名を `kb doctor` が警告することもしない。型は述語より導入先固有になりやすく、`Dish` を `Work` に押し込む方が害が大きい。
 - `maps_to` は型にはまだ置かない。読む側（RDF 出力、KB の突合）ができた時点で述語と同じ形で足す。`graph.json` に `predicates` を出しているのと対になる `types` を出せばよい。
 
 ## 併せて直したこと
 
-`SECTIONS_BY_TYPE` を消し、`sections` を宣言しない型はすべて 概要 / 詳細 / 関連項目 にした。影響は `kb entity create` と `kb entity template` だけで、`kb validate` は章立てを見ない。沖縄空手 KB がこの既定に依存していれば、`vocabulary.yml` の `sections` に章立てを書く移行が要る。
+`SECTIONS_BY_TYPE` を消し、`sections` を宣言しない型はすべて 概要 / 詳細 / 関連項目 にした。影響は `kb entity create` と `scripts/new_entity.py` だけで、`kb validate` は章立てを見ない。既定に依存していた導入先は `vocabulary.yml` の `sections` に既存エンティティと同じ章立てを書く。omnibus-kb がまさにそれで、`Person`（概要・生涯・系譜（師と弟子）・功績）と `Note`（概要・本文・関連項目）は既定に乗っていたので、語彙に `sections` を足した。沖縄空手 KB は `Person` / `Style` / `Kata` について同じ移行が要る。
 
 `born` / `died` の名前による特別扱いは残した。フィールドのメモに書いたとおり、次に validation を触るときに外す。
 
