@@ -88,6 +88,20 @@ tags:
 - `predicates.<述語>.domain` / `range` は、frontmatter の `relations` に書かれた `predicate` と `target` エンティティの型が一致するかを検査する型制約である。
 - `tags` は frontmatter の `tags` に使える語の全量である。一覧にない語は validate エラーになる。
 
+### 名前の文字種
+
+語彙の名前は次の文字種に揃える。`kb validate` が検査し、外れていれば ERROR にする。いずれも ASCII で、表示名は `description` / `tag_labels` / `title` に置く。
+
+| 対象 | 文字種 | 例 |
+|---|---|---|
+| 型名 | PascalCase | `Person`、`HistoricalEvent` |
+| 述語名・プロパティ名（値 Claim の `property`） | kebab-case | `part-of`、`created-by`、`established-year` |
+| フィールド名（`extra_fields` / `optional_fields`） | snake_case | `born`、`same_as` |
+| タグ | kebab-case | `cs`、`machine-learning` |
+| slug・ファイル名・ref ID | kebab-case | `alan-kay`、`wikipedia-alan-kay` |
+
+型は schema.org のクラス、述語と slug は URL の断片、フィールドと設定キーは YAML のキーという、それぞれの隣に並ぶものの慣習に合わせている。プロパティは Claim の frontmatter で `predicate` と同じ位置に立つので述語に揃える。外部語彙の名前は借りず（`sameAs` ではなく `same_as`）、対応は `maps_to` に書く。
+
 `predicates.<述語>` の `domain` / `range` は省略できる。省略した側は無制約になる。ハーネスが読む述語のキーは `description` / `domain` / `range` と、下記の `broader` / `maps_to` である。
 
 ### 標準型
