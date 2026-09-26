@@ -146,7 +146,7 @@ AI エージェント（Claude Code 等）から呼び出して利用する定�
 ## 動作要件
 
 - **Python**: 3.10 以上（CI は 3.12 で実行）
-- **主要な依存パッケージ**: PyYAML、[`kb-ontology-core`](https://github.com/lostandfound/kb-ontology-core) v0.2.0（詳細は `pyproject.toml` / `requirements.txt` を参照）
+- **主要な依存パッケージ**: PyYAML、[`kb-ontology-core`](https://github.com/lostandfound/kb-ontology-core) v0.2.0（詳細は `pyproject.toml` / `requirements.txt` を参照）。`kb-ontology-core` は Claim 型を使う導入先だけが要る。無くても Claim 以外の全機能は動き、`kb doctor` が WARNING で知らせる
 - **ツール**: [`apm`](https://github.com/microsoft/apm) CLI 0.32 以上
 - **その他**: 一部の補助スクリプトは追加の環境（外部 API キー、Chromium 等）を必要とする（詳細は [scripts リファレンス](docs/scripts.md) を参照）
 
@@ -157,7 +157,7 @@ pip install -r requirements.txt pytest
 python3 -m pytest
 ```
 
-※ `tests/test_distribution_alignment.py` を実行する場合は、兄弟ディレクトリに `../kb-ontology-core`（v0.2.0）が存在することを前提とする。
+※ `tests/test_distribution_alignment.py` は兄弟ディレクトリ `../kb-ontology-core`（v0.2.0）が無ければ skip される。Claim を使うテストは `kb-ontology-core` が無ければ skip され、CI はコアあり・なしの両方で回す。
 
 ### リリース
 

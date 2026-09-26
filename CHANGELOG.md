@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- `kb-ontology-core` が無い環境でもハーネスが動くようにした。コアの import を Claim の検証・出力・語彙構築を呼ぶ時点まで遅らせ、Claim を使わない KB では `kb validate` / `kb sync` / `kb graph build` / `kb doctor` などがコアなしで通る。Claim を扱おうとしたときは `ontology.core.missing` の診断（終了コード 1）で止まり、内部エラーにはしない。`kb doctor` はコアが無いことを `doctor.ontology.not_installed`（WARNING）で報告する。CI にコアなしのジョブを足し、Claim を使うテストと `test_distribution_alignment.py` はそれぞれコア・兄弟ディレクトリが無ければ skip する
 - 標準型を文書で定めた。`Person` / `Organization` / `Place` / `Event` / `Work` / `Concept` の 6 つで、名前と意味と schema.org / CIDOC-CRM / Wikidata への対応だけを定め、フィールド・章立て・ディレクトリ名は導入先が決める。検査はしない。標準述語の `domain` / `range` を束縛する目安もこの型名で書いた。考察は `docs/notes/hyojun-kata-memo.md`
 
 ### Changed

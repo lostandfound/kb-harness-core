@@ -14,7 +14,7 @@ import yaml
 
 from .diagnostics import HarnessError
 from .markdown import field_text, parse_document
-from .ontology import Ontology, validate_claim
+from .ontology import build_ontology, validate_claim
 from .predicates import (
     Predicate,
     as_mapping,
@@ -255,7 +255,6 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
         warnings = []
     predicates, vocab_tags, predicate_defs = _read_vocabulary(root)
     properties = _load_properties(root)
-    ontology = Ontology.from_mapping({"predicates": predicates, "properties": properties})
     # 述語の階層（broader / maps_to）は kb-ontology-core には渡さず、ハーネス側で検査する
     errors.extend(validate_predicates(predicate_defs))
     types = _load_types(root)
@@ -483,8 +482,11 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
 
     edge_keys = {(source, predicate, target) for source, predicate, target in edges}
     entity_types = {path: data[1].get("type") for path, data in entities.items()}
-    for claim_rel, claim in claims:
-        errors.extend(validate_claim(claim_rel, claim, entity_types, ontology, edge_keys))
+    if claims:
+        # kb-ontology-core はここで初めて要る。Claim の無い KB はコアなしで検証できる
+        ontology = build_ontology({"predicates": predicates, "properties": properties})
+        for claim_rel, claim in claims:
+            errors.extend(validate_claim(claim_rel, claim, entity_types, ontology, edge_keys))
 
     seen: dict[tuple[str, str, str], str] = {}
     for source_rel, predicate, target in edges:

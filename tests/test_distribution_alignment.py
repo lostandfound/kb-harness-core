@@ -6,10 +6,19 @@ import sys
 import shutil
 from types import SimpleNamespace
 
+import pytest
+
 from kb_harness.doctor import diagnose
 from kb_harness.project import Project
 from kb_harness.index import plan_index
 from kb_harness.graph import plan_graph
+
+_SIBLING = Path(__file__).parents[2] / "kb-ontology-core"
+pytestmark = pytest.mark.skipif(
+    not (_SIBLING / "pyproject.toml").is_file(),
+    reason="兄弟ディレクトリ ../kb-ontology-core（ソース checkout）が無い",
+)
+
 
 def test_distributed_ontology_dependency_provides_transition_api():
     """The published harness pin must contain the API used by claim transition."""

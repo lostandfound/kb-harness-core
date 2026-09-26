@@ -419,7 +419,8 @@ class CliTest(unittest.TestCase):
             result = json.loads(output.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertTrue(result["ok"])
-            self.assertEqual(result["diagnostics"], [])
+            # kb-ontology-core が無い環境では警告が 1 件出るが、それは正常
+            self.assertEqual([d for d in result["diagnostics"] if d["code"] != "doctor.ontology.not_installed"], [])
             self.assertIn("kb_harness_version", result["details"])
 
     def test_index_check_returns_zero_when_indexes_are_current(self):
@@ -482,7 +483,7 @@ class CliTest(unittest.TestCase):
                 )
             result = json.loads(output.getvalue())
             self.assertEqual(exit_code, 1)
-            self.assertEqual(result["diagnostics"][0]["code"], "doctor.generated_stale")
+            self.assertIn("doctor.generated_stale", [d["code"] for d in result["diagnostics"]])
 
 
 if __name__ == "__main__":

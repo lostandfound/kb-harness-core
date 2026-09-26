@@ -13,6 +13,7 @@ from pathlib import Path
 from . import __version__
 from .predicates import STANDARD_PREDICATES, load_predicates, nonstandard_layer1
 from .project import Project
+from .ontology import core_available
 from .sync import plan_sync
 
 _CORE_APIS = (
@@ -69,6 +70,18 @@ def _diagnostic(code: str, message: str, *, field: str | None = None, context: d
 
 def _core_diagnostics() -> list[dict[str, Any]]:
     """Check the installed core distribution and its public API, read-only."""
+    # pip 導入でも兄弟ディレクトリでも解決できなければ、Claim は使えない。
+    # Claim を使わない KB には要らないので、止めずに知らせる
+    if not core_available():
+        return [
+            _diagnostic(
+                "doctor.ontology.not_installed",
+                f"{_CORE_PACKAGE} is not installed; required only for Claim support",
+                context={"package": _CORE_PACKAGE},
+            )
+            | {"severity": "warning"}
+        ]
+
     core_version = _metadata_version(_CORE_PACKAGE)
     # A source-only checkout has no distribution metadata.  Its existing
     # project checks remain useful, but cannot claim an installed dependency.

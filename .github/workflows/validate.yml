@@ -22,3 +22,15 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest==8.3.5 setuptools==75.8.0
       - run: python3 -m pytest
+
+  test-without-core:
+    # kb-ontology-core は Claim を使う導入先だけが要る。無くてもハーネスが動くことを保証する
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install PyYAML==6.0.2 pytest==8.3.5
+      - run: python3 -c "import kb_ontology_core" && exit 1 || echo "core absent as intended"
+      - run: python3 -m pytest -rs
