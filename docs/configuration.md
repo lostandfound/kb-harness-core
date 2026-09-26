@@ -84,6 +84,50 @@ tags:
 - `predicates.<述語>.domain` / `range` は、frontmatter の `relations` に書かれた `predicate` と `target` エンティティの型が一致するかを検査する型制約である。
 - `tags` は frontmatter の `tags` に使える語の全量である。一覧にない語は validate エラーになる。
 
+`predicates.<述語>` の `domain` / `range` は省略できる。省略した側は無制約になる。`description` / `domain` / `range` 以外のキーはハーネスは読まない（下記の予約キーを含む）。
+
+### 標準述語
+
+ハーネスはドメイン語彙を持たないが、述語の**名前・向き・意味**については次の 4 つを標準として定める。導入先は使う族だけを `vocabulary.yml` に写し、自分の型で `domain` / `range` を束縛する。型への束縛は導入先が決め、ハーネスは決めない。
+
+| 述語 | 族 | 向き | 主な対応標準 |
+|---|---|---|---|
+| `part-of` | 部分・所属・分類 | 部分 → 全体 | `dcterms:isPartOf`、Wikidata P361 |
+| `derived-from` | 起源・派生・系譜 | 派生物 → 起源 | `prov:wasDerivedFrom`、Wikidata P144 |
+| `created-by` | 主体・行為 | 対象 → 主体 | `prov:wasAttributedTo`、`dcterms:creator` |
+| `located-in` | 空間 | 対象 → 場所 | `schema:containedInPlace`、Wikidata P276 |
+
+- 向きは全述語で「**依存する側から、依存される側へ**」に統一する。逆向きの述語（`has-part` など）は定義しない。
+- `related-to` は標準述語の上に置く**未分類**の印であり、方向も型制約も持たない。関係の意味は本文の関連項目に一文で書く。`related-to` のエッジは、意味が定まった時点で標準述語か導入先の述語へ精緻化する候補である。
+- 時間の族（`during` など）は標準に含めない。時期はフィールド（`born` / `died` など）か Claim で表す。時代がエンティティになる導入先は自前の述語として足してよい。
+- 分類（kind-of）と部分（part-of）は標準では分けない。区別が問い合わせに効く導入先だけが、`part-of` の下に `kind-of` などを足す。
+- 標準述語より細かい述語（`borrowed-from` / `student-of` など）は導入先が任意で足す。追加の目安は「検証器に弾かせたい型制約があるか」「その述語で絞る問い合わせが実際にあるか」のいずれかを満たすこと。relation の詳細度は出典なしで断言できる深さまでとし、それより細かい主張は Claim にする。
+
+背景は [docs/notes/jutsugo-kaisou-memo.md](notes/jutsugo-kaisou-memo.md) にある。
+
+### 述語の予約キー（草案）
+
+次のキーは述語の階層と標準対応を書くために予約する。**現時点のハーネスはこれらを読まず、検査もしない。** 書いても無害であり、対応する検査・機能は導入時に本節を正本として更新する。
+
+```yaml
+predicates:
+  derived-from:
+    description: 起源・派生元。派生物から起源へ向ける
+    maps_to: [prov:wasDerivedFrom, dcterms:source, wdt:P144]
+    domain: [Concept, Script]
+    range: [Concept, Script]
+  borrowed-from:
+    description: 表記体系を借用した。改良・継承とは区別する
+    broader: derived-from
+    domain: [Script]
+    range: [Script]
+```
+
+| キー | 内容 |
+|---|---|
+| `broader` | 親述語の名前。1 つだけ。階層は単一の木に限り、確度や期間など別の軸で述語を派生させない（それらは Claim の領分）。導入予定の検査は、親の実在、循環の禁止、子の `domain` / `range` が親の部分集合であること（親が無制約なら任意）。導入予定の機能は、`query` ビューの `where.relation.predicate` に親を書くと子孫のエッジも拾う汎化。推移閉包（`part-of` の多段）はこの機構では導かない |
+| `maps_to` | 対応する標準語彙の CURIE または IRI の一覧。ハーネスは文字列のリストであることだけを検査し、解決はしない。`graph.json` / OKF への併記を予定する |
+
 ## references.yml
 
 文献レジストリ。エンティティの `sources` と本文インラインの `（出典: ref-id）` は、ここに定義された ID を参照する。

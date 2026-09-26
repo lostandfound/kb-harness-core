@@ -68,5 +68,7 @@ Markdown と YAML はエージェントがそのまま読み、そのまま書�
 
 この前提の下で、あとから見出した関係をどう書くかが問題になる。述語を増やすのではなく、共通する性質はビュー（`views.root`）かハブとなる Concept で、新種の関係は Note / Article で受ける。ビューは出典で支えられた事実（エンティティ）と書き手の見方（束ね）を物理的に分けるための層であり、エンティティへ書き戻さない。
 
-背景の考察は [docs/notes/keiryo-ontology-memo.md](notes/keiryo-ontology-memo.md) と [docs/notes/kankei-hakken-memo.md](notes/kankei-hakken-memo.md) にある。
+述語そのものは、詳細度で三層に分けて扱う。`related-to` は未分類の印（層 0）、方向と型制約を持つ標準述語（層 1、[設定リファレンス](configuration.md#標準述語)）はハーネスが名前と向きを定めて導入先が型に束縛し、意味を精緻化した述語（層 2）は導入先が任意で親の下に足す。覚える数を小さく保つべきなのは層 1 であり、層 2 は親を知っていれば必要なときに降りればよい。
+
+背景の考察は [docs/notes/keiryo-ontology-memo.md](notes/keiryo-ontology-memo.md)、[docs/notes/kankei-hakken-memo.md](notes/kankei-hakken-memo.md)、[docs/notes/jutsugo-kaisou-memo.md](notes/jutsugo-kaisou-memo.md) にある。
 
