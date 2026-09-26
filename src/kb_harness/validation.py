@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 from .diagnostics import HarnessError
+from .links import body_links, is_root_relative, resolve_link
 from .markdown import field_text, parse_document
 from .naming import validate_vocabulary_names_at
 from .ontology import build_ontology, validate_claim
@@ -41,7 +42,6 @@ def default_content_root() -> str:
     raise FileNotFoundError(str(last_error)) from last_error
 
 REQUIRED_FIELDS = ["type", "title", "description", "tags", "timestamp"]
-LINK_RE = re.compile(r"\]\((/[^)]+\.md)\)")
 TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 PERSON_DATE_RE = re.compile(r"^(\d{4}\??|\d{4}頃|不詳)$")
 FILENAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*\.md$")
@@ -281,6 +281,7 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     expected_index_links = {f"/{d}/index.md" for d in type_dir_map}
     edges: list[tuple[str, str, str, str]] = []
     claims: list[tuple[str, dict]] = []
+    root_relative_links: dict[str, int] = {}
 
     unknown_dirs = {
         rel.split("/")[1] for rel in all_paths
@@ -444,12 +445,21 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
         if entity_type == "Claim":
             claims.append((rel, fm))
 
-        for link in LINK_RE.findall(body or ""):
-            if link not in all_paths:
+        linked: set[str] = set()
+        for link in body_links(body or ""):
+            if is_root_relative(link):
+                root_relative_links[rel] = root_relative_links.get(rel, 0) + 1
+            target = resolve_link(rel, link)
+            if target is None:
+                # content_root の外（リポジトリ内の文書など）はファイルの実在だけを見る
+                if not (path.parent / link).exists():
+                    errors.append(f"ERROR {rel}: broken link '{link}'")
+                continue
+            linked.add(target)
+            if target not in all_paths:
                 errors.append(f"ERROR {rel}: broken link '{link}'")
 
         if is_index and path.parent != root:
-            linked = set(LINK_RE.findall(body or ""))
             siblings = {
                 "/" + str(p.relative_to(root))
                 for p in (path.parent).glob("*.md")
@@ -461,9 +471,18 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                 errors.append(f"ERROR {rel}: index links non-existent entity '{extra}'")
 
         if is_index and path.parent == root:
-            linked = set(LINK_RE.findall(body or ""))
             for missing in expected_index_links - linked:
                 errors.append(f"ERROR {rel}: ルート index に必須カテゴリリンク欠落 '{missing}'")
+
+    if root_relative_links:
+        # 旧形式は GitHub で遷移できないだけで解決はできるので、ERROR にせず件数で促す
+        warnings.append(
+            ValidationWarning(
+                f"ルート相対の本文リンク {sum(root_relative_links.values())} 件"
+                f"（{len(root_relative_links)} ファイル）。`kb link migrate` で相対リンクに書き換えられる",
+                code="validation.link.root_relative",
+            )
+        )
 
     all_titles = {fm.get("title"): rel for rel, (_p, fm, _b) in entities.items() if fm.get("title")}
     alias_owners: dict[str, list[str]] = {}

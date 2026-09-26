@@ -11,6 +11,7 @@ import yaml
 
 from .markdown import parse_document
 from .diagnostics import HarnessError
+from .links import body_links, resolve_link
 
 
 class OkfExportError(ValueError):
@@ -299,8 +300,23 @@ def _valid_offset(value: Any) -> bool:
     return (isinstance(value, str) and _ISO_OFFSET.fullmatch(value) is not None) or (isinstance(value, datetime) and value.tzinfo is not None and value.utcoffset() is not None)
 
 
-def _audit_advisories(documents: Mapping[str, str]) -> list[dict[str, str]]:
+def okf_link_warnings(documents: Mapping[str, str]) -> list[dict[str, str]]:
+    """bundle 内で解決できない本文リンクを警告にする。
+
+    相対リンクは文書の位置から、ルート相対リンクは bundle ルートから解決する。
+    bundle の外へ出るリンク（元 KB の `content_root` 外を指していたもの）も切れとして扱う。
+    """
     warnings: list[dict[str, str]] = []
+    for path, text in sorted(documents.items()):
+        for link in body_links(text):
+            target = resolve_link("/" + path, link)
+            if target is None or target.lstrip("/") not in documents:
+                warnings.append(_audit_diag("okf.link.broken", path, f"link target is not in the bundle: {link}"))
+    return warnings
+
+
+def _audit_advisories(documents: Mapping[str, str]) -> list[dict[str, str]]:
+    warnings: list[dict[str, str]] = okf_link_warnings(documents)
     parsed: dict[str, tuple[dict[str, Any], str]] = {}
     for path, text in sorted(documents.items()):
         if Path(path).name != "log.md":

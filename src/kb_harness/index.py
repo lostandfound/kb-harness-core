@@ -16,7 +16,8 @@ SECTION_RE = re.compile(
     r"(^## エンティティ一覧\n)(.*?)(?=^## |\Z)",
     re.MULTILINE | re.DOTALL,
 )
-COUNT_LINE_RE = re.compile(r"(\[[^\]]+\]\(/([^/]+)/index\.md\))（\d+件）")
+# 旧形式のルート相対リンク（/dir/index.md）の件数行も更新対象にする
+COUNT_LINE_RE = re.compile(r"(\[[^\]]+\]\(/?([^/)]+)/index\.md\))（\d+件）")
 TAG_INDEX_START = "<!-- tag-index:start -->"
 TAG_INDEX_END = "<!-- tag-index:end -->"
 TAG_INDEX_HEADING = "## 分野別一覧"
@@ -38,7 +39,7 @@ def _entity_lines(dir_path: Path) -> str:
         description = frontmatter.get("description", "")
         separator = " — " if description else ""
         entries.append(
-            f"- [{title}](/{dir_path.name}/{path.name}){separator}{description}\n"
+            f"- [{title}]({path.name}){separator}{description}\n"
         )
     return "".join(entries)
 
@@ -102,7 +103,8 @@ def render_tag_index(
                 continue
             entities.append(
                 (
-                    f"/{directory_name}/{path.name}",
+                    # ルート index.md からの相対リンク
+                    f"{directory_name}/{path.name}",
                     str(frontmatter.get("title", path.stem)),
                     type_name,
                     [str(tag) for tag in (frontmatter.get("tags") or [])],

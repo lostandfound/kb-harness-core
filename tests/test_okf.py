@@ -492,3 +492,24 @@ def test_render_okf_wraps_yaml_serialization_failures(monkeypatch):
 
     # Then the failure is exposed as a stable domain error.
     assert raised.value.code == "okf.yaml.serialize"
+
+
+def test_audit_warns_on_links_unresolvable_in_bundle(tmp_path):
+    # Given a bundle whose concepts link relatively, root-relatively, and outside the bundle.
+    bundle = tmp_path / "bundle"
+    (bundle / "notes").mkdir(parents=True)
+    (bundle / "people").mkdir()
+    (bundle / "people" / "someone.md").write_text("---\ntype: Person\n---\n\nBody\n", encoding="utf-8")
+    (bundle / "notes" / "memo.md").write_text(
+        "---\ntype: Note\n---\n\n[ok](../people/someone.md) [root](/people/someone.md) "
+        "[gone](../people/nobody.md) [out](../../README.md) [url](https://example.test/x.md)\n",
+        encoding="utf-8",
+    )
+    # When auditing the bundle.
+    result = audit_okf_bundle(bundle)
+    # Then only unresolvable links are advisory warnings, not hard diagnostics.
+    assert result["diagnostics"] == []
+    assert result["warnings"] == [
+        {"code": "okf.link.broken", "path": "notes/memo.md", "message": "link target is not in the bundle: ../../README.md"},
+        {"code": "okf.link.broken", "path": "notes/memo.md", "message": "link target is not in the bundle: ../people/nobody.md"},
+    ]

@@ -35,7 +35,7 @@ class FlashcardsTest(unittest.TestCase):
         (concepts / "first.md").write_text(
             "---\ntype: Concept\ntitle: First\ndescription: First overview.\ntags: [topic-one]\n"
             "relations:\n  - predicate: related-to\n    target: /concepts/second.md\n---\n"
-            "## Details\n\nThe full explanation links to [Second](/concepts/second.md).\n",
+            "## Details\n\nThe full explanation links to [Second](second.md).\n",
             encoding="utf-8",
         )
         (concepts / "second.md").write_text(
@@ -56,6 +56,8 @@ class FlashcardsTest(unittest.TestCase):
         self.assertEqual(payload["title"], "Test Knowledge Base")
         self.assertEqual(payload["tagLabels"], {"topic-one": "Topic One"})
         self.assertIn("The full explanation", first["details"])
+        # 画面はリンク先を識別子で引くので、本文の相対リンクは識別子に直して渡す
+        self.assertIn("[Second](/concepts/second.md)", first["details"])
         self.assertEqual(first["related"][0]["id"], second["id"])
         self.assertEqual(second["related"][0]["id"], first["id"])
 

@@ -26,7 +26,8 @@ from .references import (
 )
 from .graph import plan_graph
 from .index import plan_index
-from .okf import OkfExportError, audit_okf_bundle, plan_okf_export
+from .links import plan_link_migration
+from .okf import OkfExportError, audit_okf_bundle, okf_link_warnings, plan_okf_export
 from .project import Project, ProjectError
 from .serve import serve
 from .sync import (
@@ -94,6 +95,13 @@ def _parser() -> argparse.ArgumentParser:
         command_parser = graph_commands.add_parser(command)
         command_parser.add_argument("--dry-run", action="store_true")
         _add_common_options(command_parser)
+
+    link_parser = subcommands.add_parser("link", help="maintain body links")
+    link_commands = link_parser.add_subparsers(dest="link_command", required=True)
+    migrate_parser = link_commands.add_parser("migrate", help="rewrite root-relative body links as relative links")
+    migrate_parser.add_argument("--check", action="store_true")
+    migrate_parser.add_argument("--dry-run", action="store_true")
+    _add_common_options(migrate_parser)
 
     sync_parser = subcommands.add_parser("sync", help="synchronize derived files")
     sync_parser.add_argument("--check", action="store_true")
@@ -627,17 +635,26 @@ def _okf_export(project: Project, args: Any) -> int:
         return _internal_error(error, args.format)
 
     relative = [str(path.relative_to(output_root)) for path in plan.changes]
-    result: Result = {"ok": True, "changed": relative, "diagnostics": [], "diff": plan.diff}
+    # リンク切れは bundle の適合性を損なわないので、書き出しは止めず警告にとどめる
+    warnings = okf_link_warnings({path.relative_to(output_root).as_posix(): text for path, text in changes.items()})
+    result: Result = {"ok": True, "changed": relative, "diagnostics": [], "warnings": warnings, "diff": plan.diff}
     if args.dry_run:
         result["dry_run"] = True
-        _emit(result, args.format)
+        _emit_okf_export(result, args.format)
         return 0
     try:
         execute_write_plan(plan, apply=apply_changes_atomically)
     except Exception as error:
         return _internal_error(error, args.format)
-    _emit(result, args.format)
+    _emit_okf_export(result, args.format)
     return 0
+
+
+def _emit_okf_export(result: Result, output_format: str) -> None:
+    _emit(result, output_format)
+    if output_format != "json":
+        for item in result["warnings"]:
+            print(f"WARNING {item['path']}: {item['code']}: {item['message']}", file=sys.stderr)
 
 
 def _okf_validate(args: Any) -> int:
@@ -814,6 +831,17 @@ def _main(argv: Sequence[str] | None = None) -> int:
             ),
             stale_code=lambda _path: "graph.stale",
             stale_message=lambda path: f"graph is stale: {path}",
+        )
+
+    if args.command == "link" and args.link_command == "migrate":
+        return _run_derived(
+            project,
+            check=args.check,
+            dry_run=args.dry_run,
+            output_format=args.format,
+            planner=lambda: plan_link_migration(project.content_root),
+            stale_code=lambda _path: "link.root_relative",
+            stale_message=lambda path: f"root-relative body links remain: {path}",
         )
 
     if args.command == "sync":

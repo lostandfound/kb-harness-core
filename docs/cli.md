@@ -27,7 +27,7 @@
 
 ### `kb validate [--check-urls]`
 
-KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml`・述語の階層（`vocabulary.yml` の `broader` / `maps_to`、[設定リファレンス](configuration.md#述語の階層と標準対応)）を対象とする。ERROR にならない指摘は `warnings` に入れる。text では `<SEVERITY> <message>` の形で stderr に、json では `diagnostics` と同じ構造の `{severity, code, message}` の配列で返す（`severity` は `warning` か `info`、`message` は text と同じ文字列）。コードは `validation.description.same_as_title` / `validation.description.long` / `validation.reference.unreferenced` / `validation.reference.pending_referenced` / `validation.reference.pending_unreferenced`（info）/ `validation.relation.refinable` / `validation.relation.unclassified`（info）。`related-to` のエッジは未分類として件数を INFO で報告し、始点と終点の型が層 1 のちょうど 1 つの述語に収まるものは精緻化の余地として WARNING を出す。`kb-domain.yml` に `views.root` があればビュー定義も検査する（[設定リファレンス](configuration.md#ビュー任意)）。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。 `--check-urls` を付けると、エンティティの `sources` と `references.yml` の URL・DOI に到達できるかも HTTP で確認する。ネットワークに依存するため既定では行わない。
+KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml`・述語の階層（`vocabulary.yml` の `broader` / `maps_to`、[設定リファレンス](configuration.md#述語の階層と標準対応)）を対象とする。ERROR にならない指摘は `warnings` に入れる。text では `<SEVERITY> <message>` の形で stderr に、json では `diagnostics` と同じ構造の `{severity, code, message}` の配列で返す（`severity` は `warning` か `info`、`message` は text と同じ文字列）。コードは `validation.description.same_as_title` / `validation.description.long` / `validation.reference.unreferenced` / `validation.reference.pending_referenced` / `validation.reference.pending_unreferenced`（info）/ `validation.relation.refinable` / `validation.relation.unclassified`（info）/ `validation.link.root_relative`。本文リンクはリンク元ファイルからの相対パスで解決し、存在しないリンク先を ERROR にする（[設定リファレンス](configuration.md#本文リンク)）。旧形式のルート相対リンク（`/people/example.md`）は解決するが、件数をまとめて `validation.link.root_relative` の WARNING で示す。`related-to` のエッジは未分類として件数を INFO で報告し、始点と終点の型が層 1 のちょうど 1 つの述語に収まるものは精緻化の余地として WARNING を出す。`kb-domain.yml` に `views.root` があればビュー定義も検査する（[設定リファレンス](configuration.md#ビュー任意)）。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。 `--check-urls` を付けると、エンティティの `sources` と `references.yml` の URL・DOI に到達できるかも HTTP で確認する。ネットワークに依存するため既定では行わない。
 
 ### `kb doctor`
 
@@ -66,6 +66,12 @@ kb flashcards --port 8123 --open
 ### `kb sync` / `kb sync --check`
 
 index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。`index.by_tag` が有効ならタグ別一覧の陳腐化も `--check` で検出する。`views.root` が設定されていればビュー一覧（`views.index`）も生成し、陳腐化を `views.stale` として検出する。
+
+## 移行
+
+### `kb link migrate` / `kb link migrate --check`
+
+`content_root` 配下の Markdown にある旧形式のルート相対リンク（`[名前](/people/example.md)`）を、リンク元ファイルからの相対リンク（`[名前](../people/example.md)`）に書き換える。見出しへのフラグメント（`#見出し`）は保つ。相対リンク・URL・frontmatter の識別子（relations の `target` など）は変えない。`--check` は書き換えの残るファイルを `link.root_relative` として報告し、残りがあれば終了コード 1 を返す。`--dry-run` に対応する。
 
 ## 書き込み（原子的）
 
@@ -125,13 +131,13 @@ spec を `references.yml` に原子的に追加する。既存レジストリの
 
 ### `kb export okf --output PATH`
 
-内部プロファイルを strict OKF v0.2 bundle に決定論的に変換する。出力パスは output root 配下に限定され、ref ID は小文字 kebab-case、入力 Markdown の symlink は拒否し（symlink ディレクトリは走査対象外）、任意階層の `log.md` は予約ファイルとして扱う。`--dry-run` に対応する。
+内部プロファイルを strict OKF v0.2 bundle に決定論的に変換する。出力パスは output root 配下に限定され、ref ID は小文字 kebab-case、入力 Markdown の symlink は拒否し（symlink ディレクトリは走査対象外）、任意階層の `log.md` は予約ファイルとして扱う。`--dry-run` に対応する。出力する bundle の中で解決できない本文リンク（`content_root` の外を指すリンクなど）は `okf.link.broken` の警告として `warnings` に入れ、書き出しは止めない。
 
 内部プロファイルから OKF への変換方針（どの型・述語をどう対応付けるか）は導入先 KB が文書化する。
 
 ### `kb okf validate PATH [--strict]`
 
-既存の OKF bundle の適合性を検証する。
+既存の OKF bundle の適合性を検証する。適合性の違反は `diagnostics`、推奨事項の逸脱は `warnings` に入る。本文リンクは相対リンクなら文書の位置から、ルート相対リンクなら bundle ルートから解決し、bundle 内に無いものを `okf.link.broken` の警告にする。`--strict` を付けると警告も失敗扱いにする。
 
 ## Python API
 

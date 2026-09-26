@@ -94,6 +94,7 @@ kb sync --check                                                   # index.md や
 | `kb flashcards` | 任意の KB をローカルの学習カード画面で学ぶ |
 | `kb validate` | KB 全体のスキーマ・リンク・リレーションを検証 |
 | `kb index build\|check` / `kb graph build\|check` / `kb sync` | `index.md` と `graph.json` の自動生成・差分検査 |
+| `kb link migrate [--check]` | 旧形式のルート相対の本文リンクを相対リンクへ書き換え |
 | `kb entity create --from spec.yml` | spec ファイルからエンティティを検証付きで原子的に作成 |
 | `kb claim create\|inspect\|list\|validate\|transition` | Claim の作成・照会・一覧表示・検証・状態遷移 |
 | `kb view list\|resolve\|validate` | エンティティの外に置いたビュー（束ね・導出）の一覧・解決・検証 |
