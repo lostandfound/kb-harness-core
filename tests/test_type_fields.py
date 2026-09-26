@@ -129,6 +129,12 @@ class EntityCreateFieldsTest(unittest.TestCase):
         self.assertIn("born: '1940'\n", text)
         self.assertIn("died: '2000'\n", text)
 
+    def test_type_without_sections_gets_default_sections_regardless_of_name(self):
+        vocab = VOCAB.replace("    sections: [概要]\n", "")
+        (self.root / "knowledge" / "vocabulary.yml").write_text(vocab, encoding="utf-8")
+        with self.assertRaisesRegex(EntitySpecError, "missing sections: 詳細, 関連項目"):
+            self.created("fields:\n  born: '1940'\n")
+
     def test_required_and_unknown_fields(self):
         with self.assertRaisesRegex(EntitySpecError, "missing required field 'born'"):
             self.created("fields:\n  died: '2000'\n")

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- 標準型を文書で定めた。`Person` / `Organization` / `Place` / `Event` / `Work` / `Concept` の 6 つで、名前と意味と schema.org / CIDOC-CRM / Wikidata への対応だけを定め、フィールド・章立て・ディレクトリ名は導入先が決める。検査はしない。標準述語の `domain` / `range` を束縛する目安もこの型名で書いた。考察は `docs/notes/hyojun-kata-memo.md`
+
+### Changed
+- `kb entity create` / `kb entity template` が、型が `sections` を宣言しないときに型名（`Person` / `Style` / `Kata` / `Term` / `HistoricalEvent` / `Note`）で選んでいた既定の章立てを廃止した。特定の導入先の章立てがハーネスに焼き込まれていたもので、`sections` を書かない型はすべて 概要 / 詳細 / 関連項目 になる。これらの型名で既定に依存していた導入先は `vocabulary.yml` の `sections` に章立てを書く。`kb validate` は章立てを見ないので既存エンティティの検証は変わらない
+
 ## 0.4.0 — 2026-09-26
 
 ### Added
