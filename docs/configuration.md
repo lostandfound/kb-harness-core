@@ -153,6 +153,31 @@ predicates:
 
 `kb graph build` は、語彙のいずれかの述語が `broader` か `maps_to` を持つときだけ、`graph.json` に `predicates` オブジェクト（述語名 → `broader` / `maps_to`）を出す。汎化は消費側で行うため、階層をここで渡す。どちらも書かない語彙では `graph.json` は従来どおり `nodes` / `edges` / `claims`（と有効時の `views`）のみで変わらない。エッジの `predicate` は書かれた葉の述語のままである。
 
+### フィールドの写し方と推奨名
+
+`extra_fields` は型ごとに導入先が決める。ハーネスは検査の対象を `born` / `died` の形式と非空文字列に限り、フィールドの型宣言は持たない（判断の経緯は [docs/notes/field-preset-memo.md](notes/field-preset-memo.md)）。その代わり、schema.org などの外部語彙からプロパティを写すときの規則と、推奨するフィールド名を定める。
+
+写し方の規則:
+
+- **range が Thing（別のモノ）のプロパティはフィールドにしない。** 述語で書く（`worksFor` / `memberOf` → `part-of` の層 2、`birthPlace` → `located-in` の層 2、`parent` → `derived-from` の層 2、`author` → `created-by`）か、相手をノードにするほど重要でなければ本文に書く。文字列フィールドに押し込むと、役割や期間が括弧書きで溜まる。
+- **range が DataType で、並べる・絞る・突合するのに使う値だけをフィールドにする。** 時間の端点と外部識別子がこれに当たる。
+- **分類的属性（職業・性別・国籍など）はフィールドにしない。** その軸で絞る問い合わせが実際に来るならタグに、来ないなら本文か `description` に書く。フィールドにすると統制語彙の外に値が散る。
+
+推奨するフィールド名（検査はしない。名前を揃えることで、複数の KB を同じスキルで扱うときの読み書きが安定する）:
+
+| フィールド | 意味 | schema.org | 使う型の例 |
+|---|---|---|---|
+| `born` / `died` | 生没 | `birthDate` / `deathDate` | Person |
+| `founded` / `dissolved` | 設立・解散 | `foundingDate` / `dissolutionDate` | Organization |
+| `start` / `end` | 開始・終了 | `startDate` / `endDate` | Event |
+| `created` / `published` | 成立・刊行 | `dateCreated` / `datePublished` | Work |
+| `same_as` | 外部識別子の IRI（Wikidata / VIAF / NDL 典拠など） | `sameAs` | 全型 |
+
+- 期間は `start` / `end` のように始点と終点を別のフィールドにする。`1594-1654` のように 1 フィールドに入れると並べられない。
+- `born` / `died` 以外の時間フィールドは形式を検査しないので、年に落とせない表現（「殷代後期」など）をそのまま書いてよい。並べる機能が要るようになった時点で年表現へ直す。
+- 型名は導入先が自由に決めてよい。フィールドの意味は名前で決まるので、`Person` を `人物` にしても推奨名は同じ。
+- 章構成（`sections`）は推奨を置かない。型に共通の章立てを強いるのは比較可能性に寄与しない。
+
 ## references.yml
 
 文献レジストリ。エンティティの `sources` と本文インラインの `（出典: ref-id）` は、ここに定義された ID を参照する。
