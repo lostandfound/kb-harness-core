@@ -9,6 +9,7 @@
 ### Changed
 - 同梱スキルから導入先固有の記述（AGENTS.md の行数上限、`packages/kb-harness-core` パス、born/died、特定考証エージェント名、CONTRIBUTING の節番号）を除き、正本参照に置き換えた
 - 導入先ルートの `scripts/` をモジュールへの symlink にする手順を廃止。補助スクリプトは `apm_modules/lostandfound/kb-harness-core/scripts/<name>.py` で直接呼び、pre-commit テンプレートは `kb validate` / `kb eval smoke` のみを呼ぶ。`install-hooks.sh` は自身の位置から `hooks/pre-commit` を探すので `apm_modules` 配下から実行できる（#4）
+- 動作確認する apm の版を 0.32 に上げた。0.32 で `--target claude` / `--target codex` の配置と `apm audit` を確認済み。導入ガイドに、配置先 target の指定が必須であること、短縮 SHA での固定が拒否されること、Codex ではエージェントの `tools` が落ちることを追記した
 
 ### Added
 - `kb validate --check-urls` を追加。出典 URL・DOI の到達性確認を `scripts/validate.py` と同じく CLI からも行える。スキルが前提にしていたが CLI に無かった

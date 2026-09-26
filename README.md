@@ -147,7 +147,7 @@ AI エージェント（Claude Code 等）から呼び出して利用する定�
 
 - **Python**: 3.10 以上（CI は 3.12 で実行）
 - **主要な依存パッケージ**: PyYAML、[`kb-ontology-core`](https://github.com/lostandfound/kb-ontology-core) v0.2.0（詳細は `pyproject.toml` / `requirements.txt` を参照）
-- **ツール**: [`apm`](https://github.com/microsoft/apm) CLI
+- **ツール**: [`apm`](https://github.com/microsoft/apm) CLI 0.32 以上
 - **その他**: 一部の補助スクリプトは追加の環境（外部 API キー、Chromium 等）を必要とする（詳細は [scripts リファレンス](docs/scripts.md) を参照）
 
 ## 開発

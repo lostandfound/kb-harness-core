@@ -5,7 +5,7 @@
 ## 前提
 
 - Python 3.10 以上
-- [`apm`](https://github.com/microsoft/apm) CLI（0.28 以上で動作確認）
+- [`apm`](https://github.com/microsoft/apm) CLI（0.32 以上で動作確認）
 
 ## 1. `kb-domain.yml` を書く
 
@@ -20,17 +20,21 @@
 ```yaml
 dependencies:
   apm:
-    - lostandfound/kb-harness-core          # GitHub。#tag または #sha で固定を推奨
+    - lostandfound/kb-harness-core          # GitHub。#tag または完全な #sha で固定を推奨
     # - ../kb-harness-core                  # ローカルパス（モノレポ内・開発中）
 ```
 
 依存は文字列形式で書く。`github:` キーを持つオブジェクト形式は apm が受理しない。
+
+apm 0.32 以降は短縮 SHA での固定を受理しない。SHA で固定するときは 40 桁で書く。
 
 ```bash
 apm install --target claude
 ```
 
 `apm install` はパッケージを `apm_modules/lostandfound/kb-harness-core/` に展開し、`.apm/skills/` `.apm/agents/` を `.claude/skills/` `.claude/agents/` へ配置する。`--target codex` など他ランタイムも選べる。
+
+配置先ランタイムは `--target` か導入先 `apm.yml` の `targets:` で必ず指定する。どちらも無いと `apm install` はエラーで止まる。`--target codex` では、エージェント定義の `tools` が Codex 側に写らず落ちる旨の警告が出る。Codex でエージェントのツールを絞りたい場合は、生成された `.codex/agents/*.toml` を使わない。
 
 ## 4. `kb` CLI をインストールする
 
