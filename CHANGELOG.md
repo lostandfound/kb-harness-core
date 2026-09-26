@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- `kb-ontology-core` を必須の依存から `claims` extra に移した。`pip install kb-harness-core` ではコアが入らず、Claim を使う導入先は `pip install "kb-harness-core[claims] @ ..."`（apm 配下なら `"apm_modules/lostandfound/kb-harness-core[claims]"`）で入れる。既に Claim を使っている導入先は、次に `pip install` し直すときに extra を付けないとコアが落ちる（`kb doctor` が WARNING、Claim の検証が `ontology.core.missing` で止まる）。`requirements.txt` は開発・CI 用の全部入りのまま
+
 ### Added
 - `kb-ontology-core` が無い環境でもハーネスが動くようにした。コアの import を Claim の検証・出力・語彙構築を呼ぶ時点まで遅らせ、Claim を使わない KB では `kb validate` / `kb sync` / `kb graph build` / `kb doctor` などがコアなしで通る。Claim を扱おうとしたときは `ontology.core.missing` の診断（終了コード 1）で止まり、内部エラーにはしない。`kb doctor` はコアが無いことを `doctor.ontology.not_installed`（WARNING）で報告する。CI にコアなしのジョブを足し、Claim を使うテストと `test_distribution_alignment.py` はそれぞれコア・兄弟ディレクトリが無ければ skip する
 - 標準型を文書で定めた。`Person` / `Organization` / `Place` / `Event` / `Work` / `Concept` の 6 つで、名前と意味と schema.org / CIDOC-CRM / Wikidata への対応だけを定め、フィールド・章立て・ディレクトリ名は導入先が決める。検査はしない。標準述語の `domain` / `range` を束縛する目安もこの型名で書いた。考察は `docs/notes/hyojun-kata-memo.md`
