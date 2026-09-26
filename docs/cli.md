@@ -115,7 +115,7 @@ Claim の `status` を明示的に遷移させる。許容される遷移は `kb
 
 ### `kb reference search TERM... [--field FIELD] [--url URL] [--doi DOI] [--limit N] [--full]`
 
-`references.yml` を語句で探す。語句は大小無視の部分一致で、複数与えると AND。既定の対象フィールドは `id` / `title` / `author` / `publisher` / `journal` / `url` / `doi` / `note` で、`--field` で絞る（複数指定可）。`--url` / `--doi` は正規化（scheme・`www.`・末尾スラッシュ・fragment、`doi.org/` 接頭辞の除去、小文字化）後の完全一致で、登録前の重複確認に使う。語句・`--url`・`--doi` は組み合わせると全条件の AND。結果はレジストリの記載順。text は 1 件 1 行（`id`・`type`・`title`・`author`・`year`・`url` をタブ区切り）で件数を stderr に出し、`--full` で YAML ブロック表示。json は `{ok, entries, count, shown}`。索引は持たず毎回レジストリを読む。
+`references.yml` を語句で探す。語句は大小無視の部分一致で、複数与えると AND。既定の対象フィールドは `id` / `title` / `author` / `publisher` / `journal` / `url` / `doi` / `note` / `lineage` で、`--field` で絞る（複数指定可）。`--field lineage <ラベル>` で同じ由来の資料群（[設定リファレンス](configuration.md#referencesyml)）を引ける。`--url` / `--doi` は正規化（scheme・`www.`・末尾スラッシュ・fragment、`doi.org/` 接頭辞の除去、小文字化）後の完全一致で、登録前の重複確認に使う。語句・`--url`・`--doi` は組み合わせると全条件の AND。結果はレジストリの記載順。text は 1 件 1 行（`id`・`type`・`title`・`author`・`year`・`url` をタブ区切り）で件数を stderr に出し、`--full` で YAML ブロック表示。json は `{ok, entries, count, shown}`。索引は持たず毎回レジストリを読む。
 
 ### `kb reference spec --from search-result.json --output reference.yml`
 

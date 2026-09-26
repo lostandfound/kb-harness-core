@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `kb reference show ID...` / `kb reference show --for ENTITY` と `kb reference search TERM... [--field] [--url] [--doi] [--limit] [--full]` を追加。エージェントが `references.yml` を丸ごと文脈に読み込まず、ID・エンティティ・語句・URL・DOI で必要な書誌だけを引ける。`--url` / `--doi` は正規化後の完全一致で、登録前の重複確認に使う
+- 設定リファレンスの `references.yml` 節に必須キーと任意キー `lineage` を明記。`lineage` は「同じ由来の資料群のラベル」として汎用化し、流派・学派の伝承だけでなく、同じ記事の別言語版・転載、当事者の自己発信も単位に含める
+
+### Changed
+- evidence-reviewer は `references.yml` を丸ごと読まず `kb reference show --for` で対象の出典だけを引く。`lineage` 未記載を未判定として扱い、由来の共有を見極めて付与を提案する
+- find-book / find-paper に登録前の `kb reference search` による重複確認と、`lineage` 付与の手順を戻した。add-entity の出典登録にも同じ手順を足した
+
 ## 0.7.0 — 2026-09-26
 
 ### Changed

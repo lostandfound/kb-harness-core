@@ -16,7 +16,7 @@ description: KB に新規エンティティを追加する確定的手順。「�
 
 4. 他エンティティとの `relations` を張る。使える述語とその型制約（domain/range）は `<content_root>/vocabulary.yml` の `predicates` 定義が正。エッジは一方向のみ（逆向き・重複は検証で落ちる）。該当する関係がなければ省略してよい。単一源や同一系統の資料のみに基づくエッジには optional key `confidence: C` を付与する（省略時は独立2源以上を意味するため、確度が満たない場合は必須。詳細は CONTRIBUTING.md の確度の規定）。
 
-5. `sources` には実在が確認できた文献のみを記載する。URL を含める場合は WebSearch や WebFetch で実在を確認してから記載し、書誌情報は確実なもののみ書く。争いのある主張（説の対立や単一源依拠）には、本文の当該箇所に `（出典: <ref-id>）` を付与できる（形式・運用は CONTRIBUTING.md の「主張単位の出典」が正）。導入先のドメイン固有の考証を経た場合は、その結果が示す説ごとの ref-id をそのまま使う。
+5. `sources` には実在が確認できた文献のみを記載する。`references.yml` に新規登録する出典は、登録前に `kb reference search --url <URL>`（語句でも可）で既存エントリを確認し、同じ由来の資料（同じ記事の別言語版・転載、当事者の自己発信など。単位の例は `kb-domain.yml` の `domain.lineage_example`）には既存ラベルに揃えた `lineage` を付ける。URL を含める場合は WebSearch や WebFetch で実在を確認してから記載し、書誌情報は確実なもののみ書く。争いのある主張（説の対立や単一源依拠）には、本文の当該箇所に `（出典: <ref-id>）` を付与できる（形式・運用は CONTRIBUTING.md の「主張単位の出典」が正）。導入先のドメイン固有の考証を経た場合は、その結果が示す説ごとの ref-id をそのまま使う。
 
 6. `kb entity create --from entity.yml --dry-run` で生成される差分（エンティティ本体・index.md・graph.json）を確認し、問題がなければ `kb entity create --from entity.yml` で反映する。既存 slug と衝突する場合は上書きせず停止するので、slug を見直す。旧手順で雛形を手編集した場合は、代わりに `kb sync` を実行して index と graph を更新する（index の一覧は手で編集しない）。
 

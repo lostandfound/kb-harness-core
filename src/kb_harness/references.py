@@ -180,7 +180,7 @@ def reference_health(path: Path) -> dict[str, Any]:
 # 読み直す（数百〜数千件なら十分速く、決定性を保てる）。
 # ---------------------------------------------------------------------------
 
-SEARCH_FIELDS = ("id", "title", "author", "publisher", "journal", "url", "doi", "note")
+SEARCH_FIELDS = ("id", "title", "author", "publisher", "journal", "url", "doi", "note", "lineage")
 SUMMARY_FIELDS = ("type", "title", "author", "year", "url")
 
 _CITATION_RE = re.compile(r"（出典:\s*([^（）]*)）")

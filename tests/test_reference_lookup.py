@@ -31,6 +31,7 @@ wikipedia-ja-karate:
   note: 概要と流派
 doe-2020:
   type: journal-article
+  lineage: doe-school
   author: Jane Doe
   title: Bowing Etiquette
   doi: 10.1000/example.2020
@@ -110,6 +111,13 @@ def test_search_by_normalized_url_and_doi(tmp_path: Path):
     hits = reference_search(registry, [], doi="https://doi.org/10.1000/EXAMPLE.2020")["entries"]
     assert [e["id"] for e in hits] == ["doe-2020"]
     assert reference_search(registry, ["karate"], url="https://example.test/karate", doi="10.1000/x")["entries"] == []
+
+
+def test_search_lineage_field(tmp_path: Path):
+    root = _project(tmp_path)
+    registry = root / "content" / "references.yml"
+    assert [e["id"] for e in reference_search(registry, ["doe-school"], fields=("lineage",))["entries"]] == ["doe-2020"]
+    assert reference_search(registry, ["doe-school"], fields=("title",))["entries"] == []
 
 
 def test_normalizers():

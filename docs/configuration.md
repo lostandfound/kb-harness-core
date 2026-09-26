@@ -43,7 +43,7 @@ validate:
 | `domain.kb_title` | 要 | KB 自体の呼称。エージェントの説明文中で使う。 |
 | `domain.description` | 要 | KB が扱う範囲の一文説明。 |
 | `domain.content_root` | 要 | エンティティ Markdown を置くディレクトリ名。scripts の `--root` 既定値はここから解決する。 |
-| `domain.lineage_example` | 任意 | 系統・分類の具体例。エージェントのプロンプトが参照する補助情報。 |
+| `domain.lineage_example` | 任意 | `references.yml` の `lineage`（[同じ由来の資料群のラベル](#referencesyml)）をどの単位でつけるかの具体例。find-book / find-paper / add-entity が出典登録時に参照する。 |
 | `exploration.wikipedia_categories` | 任意 | `explore_diff.py` が既定で走査する Wikipedia カテゴリ名の一覧。 |
 | `index.by_tag` | 任意 | `true` のとき `kb sync` / `kb index build` が `<content_root>/index.md` の `<!-- tag-index:start -->` 〜 `<!-- tag-index:end -->` 区間にタグ別一覧を生成する。区間がなければ末尾に追記し、区間外の本文は保持する。並び順は `vocabulary.yml` の `tags` 順、該当エンティティのないタグは省く。`kb sync --check` が陳腐化を検出する。既定は無効。 |
 | `index.tag_labels` | 任意 | タグ ID から見出し表示名への対応。未登録のタグは ID をそのまま見出しにする。 |
@@ -245,7 +245,7 @@ predicates:
 
 各エントリの必須キーは `type` と `title`。`type: web` は `url` も必須。`url` は `http://` / `https://` で始まる。
 
-各エントリは任意キー `lineage`（非空文字列。資料の系統・由来）を持てる。evidence-reviewer は `lineage` が同じ資料を独立源として数えない。未記載は「独立」ではなく「未判定」を意味し、`scripts/refs_health.py --lineage` が未判定の文献を列挙する。系統に属さないと判定済みの資料には予約値 `系統外` を書く。
+各エントリは任意キー `lineage`（非空文字列）を持てる。同じ由来の資料群につけるラベルで、evidence-reviewer は `lineage` が同じ資料を独立源として数えない（複数あっても 1 つの源として扱う）。由来の単位はドメインが決め、`kb-domain.yml` の `domain.lineage_example` に書く。流派・学派の伝承（`上地流系`）、同じ記事の別言語版・転載・要約（`wikipedia:三星堆`）、当事者や利害関係者の自己発信（`anthropic-official`）などが典型で、ラベルの綴りは KB 内で揃える。未記載は「独立」ではなく「未判定」を意味し、`scripts/refs_health.py --lineage` が未判定の文献を列挙する。他の資料と由来を共有しないと判定済みの資料には予約値 `系統外` を書く。`kb reference search --field lineage <ラベル>` で同じ由来の資料を引ける。
 
 各エントリは任意キー `pending`（非空文字列の待ち理由）を持てる。付与すると未参照 WARNING が個別に出ず件数集計の INFO 1 行にまとまり、参照済みなのに `pending` が残っていると WARNING で警告される。
 

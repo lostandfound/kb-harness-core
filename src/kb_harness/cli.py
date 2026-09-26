@@ -155,7 +155,7 @@ def _parser() -> argparse.ArgumentParser:
     _add_common_options(rshow)
     rsearch = reference_commands.add_parser("search", help="search references by terms, url or doi")
     rsearch.add_argument("terms", nargs="*", metavar="TERM")
-    rsearch.add_argument("--field", action="append", dest="fields", choices=("id", "title", "author", "publisher", "journal", "url", "doi", "note"), default=None)
+    rsearch.add_argument("--field", action="append", dest="fields", choices=("id", "title", "author", "publisher", "journal", "url", "doi", "note", "lineage"), default=None)
     rsearch.add_argument("--url", default=None)
     rsearch.add_argument("--doi", default=None)
     rsearch.add_argument("--limit", type=int, default=None)
