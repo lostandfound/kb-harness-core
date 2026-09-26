@@ -7,7 +7,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import yaml
@@ -38,7 +38,7 @@ def default_content_root() -> str:
         except ProjectError as error:
             last_error = error
             continue
-        return str(project.content_root.relative_to(project.repo_root))
+        return str(project.content_root)
     raise FileNotFoundError(str(last_error)) from last_error
 
 REQUIRED_FIELDS = ["type", "title", "description", "tags", "timestamp"]
@@ -326,9 +326,23 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
         if not FILENAME_RE.match(path.name):
             errors.append(f"ERROR {rel}: ファイル名がケバブケース規約に反する '{path.name}'")
 
+        # YAML は無引用の 2024-01-01T00:00:00Z を datetime に解決する。文字列でも datetime でも
+        # 「UTC・秒精度・Z 表記」の契約に合うかを見る（field_text の isoformat は +00:00 になるので使わない）
         timestamp = fm.get("timestamp")
-        if isinstance(timestamp, str) and not TIMESTAMP_RE.match(timestamp):
-            errors.append(f"ERROR {rel}: timestamp の形式が不正 '{timestamp}'")
+        if timestamp is not None:
+            if isinstance(timestamp, str):
+                if not TIMESTAMP_RE.match(timestamp):
+                    errors.append(f"ERROR {rel}: timestamp の形式が不正 '{timestamp}'")
+            elif isinstance(timestamp, datetime):
+                if timestamp.tzinfo is None or timestamp.utcoffset() != timedelta(0) or timestamp.microsecond:
+                    errors.append(f"ERROR {rel}: timestamp は UTC 秒精度の 'YYYY-MM-DDTHH:MM:SSZ' である必要がある '{timestamp}'")
+            else:
+                errors.append(f"ERROR {rel}: timestamp は文字列である必要がある")
+
+        for field in ("title", "description"):
+            value = fm.get(field)
+            if value is not None and not isinstance(value, str):
+                errors.append(f"ERROR {rel}: '{field}' は文字列である必要がある（YAML が {type(value).__name__} に解決）")
 
         for field in LIST_FIELDS:
             value = fm.get(field)
@@ -744,12 +758,13 @@ def fix_timestamps(root: Path) -> list[Path]:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", default=default_content_root())
+    parser.add_argument("--root", default=None, help="コンテンツルート（省略時は kb-domain.yml から解決）")
     parser.add_argument("--fix-timestamps", action="store_true")
     parser.add_argument("--check-urls", action="store_true")
     args = parser.parse_args()
 
-    root = Path(args.root)
+    # 既定値は parser 構築時ではなく、ここで遅延評価する（--help や --root 指定時に KB 探索で落ちない）
+    root = Path(args.root) if args.root else Path(default_content_root())
     if args.fix_timestamps:
         fixed = fix_timestamps(root)
         for path in fixed:

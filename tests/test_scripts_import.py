@@ -26,10 +26,8 @@ class ScriptImportTest(unittest.TestCase):
                 )
                 for marker in ("ImportError", "ModuleNotFoundError", "cannot import"):
                     self.assertNotIn(marker, result.stderr, name)
-                # new_entity.py / validate.py は --help の前にスクリプトの位置から KB を探し、
-                # ここでは見つからずに落ちる。import が通ったことだけを見る
-                if name not in ("new_entity.py", "validate.py"):
-                    self.assertEqual(result.returncode, 0, f"{name}: {result.stderr}")
+                # --root の既定値は遅延評価なので、KB が無い cwd でも --help は通る
+                self.assertEqual(result.returncode, 0, f"{name}: {result.stderr}")
 
 
 if __name__ == "__main__":

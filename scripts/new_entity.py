@@ -19,11 +19,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("type")
     parser.add_argument("slug")
-    parser.add_argument("--root", default=default_content_root())
+    parser.add_argument("--root", default=None, help="コンテンツルート（省略時は kb-domain.yml から解決）")
     args = parser.parse_args()
 
+    root = Path(args.root) if args.root else Path(default_content_root())
     try:
-        path = new_entity(Path(args.root), args.type, args.slug)
+        path = new_entity(root, args.type, args.slug)
     except ValueError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)

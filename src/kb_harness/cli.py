@@ -14,6 +14,7 @@ import yaml
 
 from .diagnostics import HarnessError
 from .doctor import diagnose
+from .evaluation import smoke_result, summary_result
 from .sync import unified_diff
 from .entity import EntitySpecError, plan_entity_create
 from .claim import ClaimSpecError, plan_claim_create, plan_claim_transition, inspect_claim, list_claims, validate_claim_file
@@ -170,8 +171,10 @@ def _parser() -> argparse.ArgumentParser:
     rs.add_argument("--format", choices=("text", "json"), default="text")
     evaluation = subcommands.add_parser("eval", help="inspect evaluation assets")
     evaluation_commands = evaluation.add_subparsers(dest="eval_command", required=True)
-    for name in ("summary", "smoke"):
-        _add_common_options(evaluation_commands.add_parser(name))
+    _add_common_options(evaluation_commands.add_parser("summary", help="summarize evals/rag-eval.yml and detect regressions"))
+    smoke = evaluation_commands.add_parser("smoke", help="check that expected evidence ranks in lexical search")
+    smoke.add_argument("--limit", type=int, default=5)
+    _add_common_options(smoke)
     return parser
 
 
@@ -820,26 +823,13 @@ def _main(argv: Sequence[str] | None = None) -> int:
         _emit(result, args.format, error=not result["ok"])
         return 0 if result["ok"] else 1
     if args.command == "eval":
-        roots = [project.repo_root / "evals", project.repo_root / "eval", project.repo_root / "evaluations", project.content_root / "eval"]
-        assets = sorted(str(p.relative_to(project.repo_root)) for root in roots if root.is_dir() for p in root.rglob("*") if p.is_file())
-        result = {"ok": bool(assets), "assets": assets, "diagnostics": [] if assets else [{"code": "eval.assets.missing", "message": "no local evaluation assets found"}]}
-        if assets:
-            path = project.repo_root / assets[0]
-            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            entries = data if isinstance(data, list) else data.get("entries", [])
-            verdicts = Counter()
-            open_gaps = []
-            for entry in entries:
-                history = entry.get("history", []) if isinstance(entry, dict) else []
-                if not history:
-                    continue
-                latest = history[-1]
-                verdict = str(latest.get("verdict", "")).strip()
-                verdicts[verdict] += 1
-                if verdict != "OK" and entry.get("gap") != "by-design":
-                    open_gaps.append({"id": entry.get("id"), "kind": entry.get("kind"), "gap": entry.get("gap")})
-            result["summary"] = {"evaluated": sum(verdicts.values()), "by_verdict": dict(sorted(verdicts.items()))}
-            result["open_gaps"] = sorted(open_gaps, key=lambda item: str(item.get("id", "")))
+        try:
+            if args.eval_command == "smoke":
+                result = smoke_result(project.repo_root, project.content_root, limit=args.limit)
+            else:
+                result = summary_result(project.repo_root)
+        except Exception as error:
+            return _internal_error(error, args.format)
         _emit(result, args.format, error=not result["ok"])
         return 0 if result["ok"] else 1
     if args.command == "validate":

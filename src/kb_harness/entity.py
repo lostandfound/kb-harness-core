@@ -58,6 +58,8 @@ def _string_list(value: object, name: str, *, required: bool = False) -> list[st
 def _timestamp(value: object, name: str) -> str:
     if isinstance(value, datetime):
         parsed = value
+        if parsed.tzinfo is None:
+            raise EntitySpecError(f"{name} must include a timezone")
     elif isinstance(value, str):
         candidate = value.strip()
         if candidate.endswith("Z"):

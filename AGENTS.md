@@ -58,9 +58,9 @@ Claim のルール（許容 status、遷移、domain/range 制約、値Claim の
 
 - スキル・エージェントの正本は `.apm/skills/` `.apm/agents/`。`apm install --target claude` が `.claude/` 配下へ展開する。**`.claude/` 側は生成物であり編集しない。**
 - エージェント定義は `.apm/` では `*.agent.md`、デプロイ後は `*.md` に正規化される。
-- `scripts/` は APM のデプロイ対象外。導入先ではコピーか symlink で手動配線する。
+- `scripts/` は APM のデプロイ対象外。導入先は `python3 apm_modules/lostandfound/kb-harness-core/scripts/<name>.py` で直接実行する（`scripts/` の symlink は 0.3.0 で廃止。`docs/integration.md` 参照）。
 - hooks も APM 管理外（`docs/integration.md` 参照）。
-- 導入先が本パッケージを submodule + `scripts/` symlink で組み込んでいる場合、導入先で実行されるのは submodule 側のコードである。ハーネスの修正は本リポジトリ側をコミットし、導入先で submodule 参照を更新して反映する。
+- 導入先で実行されるのは `apm_modules/` に展開された固定コミットのコードである。ハーネスの修正は本リポジトリ側をコミットしてリリースし、導入先で `apm.yml` の固定コミットを上げて `apm install` で反映する。
 
 ## 自身の作業台帳
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- `kb validate` が `timestamp` を、YAML が datetime に解決した値（無引用の `2024-01-01T00:00:00Z` など）でも検査するようになった。これまで文字列のときだけ検査していたため、`kb entity create` が書く無引用の正典形式は素通りし、UTC でない時刻や日付だけの値も通っていた。`title` / `description` が文字列でない（`description: 2020-01-01` が date に解決される等）場合も ERROR にする。これまでは validate が通るのに `kb sync` が内部エラーで落ちていた。既存 KB でこれらの値を持つファイルは新たに ERROR になる
+- `kb eval smoke` が文書どおり「期待根拠が字面検索の上位に入るか」を検査するようになった（`--limit`、`eval.smoke.miss`）。これまで `summary` と同一の集計を返し、pre-commit の 3 段目は実質何も検査していなかった。`kb eval summary` は退行（過去 OK → 最新非 OK）を `eval.regression` として報告し exit 1 を返す。評価ファイルは `evals/rag-eval.yml` 固定になり、`evals/` に別ファイルがあっても落ちない
+- 集計と字面検索の実装を `kb_harness.evaluation` に移し、`scripts/rag_smoke.py` / `scripts/eval_summary.py` はそれを呼ぶ互換入口にした（AGENTS.md の「scripts にロジックを二重に持たない」を回復）
+- `kb claim transition` がオントロジーコアの解決を `ontology.load_ontology_core` に委ねるようになった。これまで `kb_ontology_core` を直接 import していたため、兄弟ディレクトリへのフォールバックが効かず、コア不在時に `ontology.core.missing` ではなく内部エラーになっていた
+- `scripts/kb_config.default_content_root()` が絶対パスを返し、探索起点をカレントディレクトリにした。これまでリポジトリ相対の文字列を返していたため、cwd がリポジトリ直下でないと別の場所を読んでいた。`new_entity.py` / `validate.py` / `rag_smoke.py` の `--root` 既定値は遅延評価になり、`--help` や `--root` 指定が KB 探索で落ちなくなった
+- Python 3.10 でテストが通るようにした（`tomllib` のフォールバック）。CI は 3.10 と 3.12 の両方で回す
+
+### Changed
+- AGENTS.md の `scripts/` 配線の記述を現行（`apm_modules/` の固定コミットを直接実行、symlink は 0.3.0 で廃止）に合わせた
+
 ## 0.8.0 — 2026-09-27
 
 ### Added
