@@ -27,7 +27,7 @@
 
 ### `kb validate [--check-urls]`
 
-KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml`・述語の階層（`vocabulary.yml` の `broader` / `maps_to`、[設定リファレンス](configuration.md#述語の階層と標準対応)）を対象とする。ERROR にならない指摘は `warnings` に入れる（text では stderr、json では `warnings` 配列）。`related-to` のエッジは未分類として件数を INFO で報告し、始点と終点の型が層 1 のちょうど 1 つの述語に収まるものは精緻化の余地として WARNING を出す。`kb-domain.yml` に `views.root` があればビュー定義も検査する（[設定リファレンス](configuration.md#ビュー任意)）。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。 `--check-urls` を付けると、エンティティの `sources` と `references.yml` の URL・DOI に到達できるかも HTTP で確認する。ネットワークに依存するため既定では行わない。
+KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml`・述語の階層（`vocabulary.yml` の `broader` / `maps_to`、[設定リファレンス](configuration.md#述語の階層と標準対応)）を対象とする。ERROR にならない指摘は `warnings` に入れる。text では `<SEVERITY> <message>` の形で stderr に、json では `diagnostics` と同じ構造の `{severity, code, message}` の配列で返す（`severity` は `warning` か `info`、`message` は text と同じ文字列）。コードは `validation.description.same_as_title` / `validation.description.long` / `validation.reference.unreferenced` / `validation.reference.pending_referenced` / `validation.reference.pending_unreferenced`（info）/ `validation.relation.refinable` / `validation.relation.unclassified`（info）。`related-to` のエッジは未分類として件数を INFO で報告し、始点と終点の型が層 1 のちょうど 1 つの述語に収まるものは精緻化の余地として WARNING を出す。`kb-domain.yml` に `views.root` があればビュー定義も検査する（[設定リファレンス](configuration.md#ビュー任意)）。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。 `--check-urls` を付けると、エンティティの `sources` と `references.yml` の URL・DOI に到達できるかも HTTP で確認する。ネットワークに依存するため既定では行わない。
 
 ### `kb doctor`
 

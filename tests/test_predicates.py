@@ -15,6 +15,7 @@ from kb_harness.predicates import (
     descendants,
     export_predicates,
     load_predicates,
+    nonstandard_layer1,
     refinement_candidates,
     validate_predicates,
 )
@@ -124,10 +125,53 @@ class PredicateHierarchyTest(unittest.TestCase):
     def test_unconstrained_parent_allows_any_child(self):
         with tempfile.TemporaryDirectory() as tempdir:
             vocabulary = BASE_VOCABULARY.replace(
-                "tags:\n", "  kind-of:\n    broader: related-to\n    domain: [Concept]\n    range: [Concept]\ntags:\n"
+                "tags:\n", "  part-of:\n    description: 部分→全体\n  kind-of:\n    broader: part-of\n    domain: [Concept]\n    range: [Concept]\ntags:\n"
             )
             project = build_kb(Path(tempdir), vocabulary)
             self.assertEqual(validate_predicates(load_predicates(project.content_root)), [])
+
+    def test_related_to_cannot_be_a_parent(self):
+        # related-to は未分類の印。親にできると層 1 の述語が doctor の目を逃れ、汎化が未分類の件数とずれる
+        with tempfile.TemporaryDirectory() as tempdir:
+            vocabulary = BASE_VOCABULARY.replace(
+                "tags:\n", "  kind-of:\n    broader: related-to\n    domain: [Concept]\n    range: [Concept]\ntags:\n"
+            )
+            project = build_kb(Path(tempdir), vocabulary)
+            predicates = load_predicates(project.content_root)
+            errors = validate_predicates(predicates)
+            self.assertTrue(any("predicates.kind-of.broader に 'related-to' は使えない" in e for e in errors), errors)
+            self.assertEqual(descendants(predicates, "related-to"), {"related-to"})
+            self.assertIn("kind-of", nonstandard_layer1(predicates))
+
+    def test_cycle_blames_only_nodes_on_the_cycle(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            vocabulary = BASE_VOCABULARY.replace(
+                "tags:\n",
+                "  x:\n    broader: y\n    domain: [Nope]\n    range: [Script]\n"
+                "  y:\n    broader: z\n    domain: [Script]\n    range: [Script]\n"
+                "  z:\n    broader: y\n    domain: [Script]\n    range: [Script]\n"
+                "tags:\n",
+            )
+            project = build_kb(Path(tempdir), vocabulary)
+            errors = validate_predicates(load_predicates(project.content_root))
+            cycles = [e for e in errors if "循環している" in e]
+            self.assertEqual(cycles, ["ERROR /vocabulary.yml: predicates の broader が循環している（y → z → y）"])
+            # 循環に至るだけの x は循環の責めを負わず、直接の親との包含は検査される
+            self.assertTrue(any("predicates.x.domain は親 y の domain の部分集合" in e for e in errors), errors)
+
+    def test_scalar_domain_is_rejected_not_silently_unconstrained(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            vocabulary = BASE_VOCABULARY.replace(
+                "    broader: derived-from\n    domain: [Script]\n    range: [Script]\n",
+                "    broader: derived-from\n    domain: Script\n    range: [Script]\n",
+            )
+            project = build_kb(Path(tempdir), vocabulary)
+            predicates = load_predicates(project.content_root)
+            self.assertEqual(predicates["borrowed-from"].domain, ("Script",))
+            errors = validate(project.content_root)
+            self.assertIn("ERROR /vocabulary.yml: predicates.borrowed-from.domain は型名のリストでなければならない", errors)
+            # 1 要素として扱うので、部分集合違反や relation の型制約違反を誤報しない
+            self.assertFalse([e for e in errors if "部分集合" in e or "型制約違反" in e], errors)
 
 
 class RefinementHintTest(unittest.TestCase):
@@ -189,6 +233,29 @@ class ViewGeneralizationTest(unittest.TestCase):
             )
 
 
+class ViewCliTest(unittest.TestCase):
+    def test_view_resolve_generalizes_over_descendants(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            build_kb(root, with_views=True)
+            (root / "views" / "from-sogdian.yml").write_text(
+                "name: ソグド文字系\ndescription: ソグド文字に由来する文字。\nkind: query\n"
+                "where:\n  relation: {predicate: derived-from, target: /scripts/sogdian.md}\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["view", "resolve", "from-sogdian", "--start", str(root), "--format", "json"])
+            self.assertEqual(exit_code, 0, output.getvalue())
+            payload = json.loads(output.getvalue())
+            self.assertEqual([m["path"] for m in payload["members"]], ["/scripts/uyghur.md"])
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["view", "list", "--start", str(root), "--format", "json"])
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(json.loads(output.getvalue())["views"][0]["members"], 1)
+
+
 class GraphExportTest(unittest.TestCase):
     def test_graph_without_hierarchy_is_unchanged(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -233,7 +300,16 @@ class CliWarningsTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             payload = json.loads(output.getvalue())
             self.assertTrue(payload["ok"])
-            self.assertIn("INFO relations: related-to のエッジ 1 件（未分類）", payload["warnings"])
+            self.assertIn(
+                {
+                    "severity": "info",
+                    "code": "validation.relation.unclassified",
+                    "message": "INFO relations: related-to のエッジ 1 件（未分類）",
+                },
+                payload["warnings"],
+            )
+            self.assertEqual({w["severity"] for w in payload["warnings"]}, {"info", "warning"})
+            self.assertTrue(all(set(w) == {"severity", "code", "message"} for w in payload["warnings"]))
 
     def test_validate_text_prints_warnings_to_stderr(self):
         with tempfile.TemporaryDirectory() as tempdir:

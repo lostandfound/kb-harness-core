@@ -34,7 +34,7 @@ from .sync import (
     plan_sync,
     plan_write,
 )
-from .validation import check_urls, run_extra_checks, validate
+from .validation import check_urls, run_extra_checks, validate, warning_record
 from .views import (
     ViewError,
     load_entities as _load_view_entities,
@@ -314,7 +314,7 @@ def _view_action(project: Project, args: Any) -> int:
             return 1 if diagnostics else 0
         entities = _load_view_entities(project.content_root)
         excluded = query_excluded_types(project.content_root)
-        matches = query_predicate_matches(project.content_root)
+        predicate_matches = query_predicate_matches(project.content_root)
         views = load_views(project.views_root)
         if args.view_command == "list":
             items = [
@@ -323,7 +323,7 @@ def _view_action(project: Project, args: Any) -> int:
                     "name": view.name,
                     "kind": view.kind,
                     "basis": view.basis,
-                    "members": len(resolve_view(view, entities, excluded, matches)),
+                    "members": len(resolve_view(view, entities, excluded, predicate_matches)),
                 }
                 for view in views
             ]
@@ -349,7 +349,7 @@ def _view_action(project: Project, args: Any) -> int:
         view = matches[0]
         members = [
             {"path": member.path, "note": member.note, "title": (entities.get(member.path) or {}).get("title")}
-            for member in resolve_view(view, entities, excluded, matches)
+            for member in resolve_view(view, entities, excluded, predicate_matches)
         ]
         if args.format == "json":
             print(
@@ -401,13 +401,18 @@ def _validate(project: Project, output_format: str, *, urls: bool = False) -> in
                 "returncode": check["returncode"],
             }
         )
-    result: dict[str, Any] = {"ok": not diagnostics, "changed": [], "diagnostics": diagnostics, "warnings": warnings}
+    result: dict[str, Any] = {
+        "ok": not diagnostics,
+        "changed": [],
+        "diagnostics": diagnostics,
+        "warnings": [warning_record(warning) for warning in warnings],
+    }
     if project.extra_checks:
         result["extra_checks"] = checks
     _emit(result, output_format)
     if output_format != "json":
         for warning in warnings:
-            print(warning, file=sys.stderr)
+            print(str(warning), file=sys.stderr)
     return 1 if diagnostics else 0
 
 

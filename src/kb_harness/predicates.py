@@ -2,15 +2,15 @@
 
 述語は詳細度で三層に分けて扱う（docs/notes/jutsugo-kaisou-memo.md）。
 
-- 層 0: `related-to`。未分類の印。方向も型制約も持たない。
+- 層 0: `related-to`。未分類の印。方向も型制約も持たず、親にもならない。
 - 層 1: `broader` を持たない述語。方向と domain / range を持ち、検証器に効く。
   ハーネスは名前・向き・意味を標準として文書で定め、型への束縛は導入先が決める。
-- 層 2: `broader` で親に吊るした述語。意味の精緻化であり、導入先が任意で足す。
+- 層 2: `broader` で層 1 以下の親に吊るした述語。意味の精緻化であり、導入先が任意で足す。
 
-このモジュールは語彙ファイルの `broader` / `maps_to` を読み、階層の整合を検査し、
-親の述語で問うたときに子孫のエッジも拾う汎化を提供する。推移閉包（`part-of` の多段）は
-導かない。汎化は書かれたエッジを固定長の祖先列に写すだけで新しい事実を生まないが、
-推移律は書かれていないエッジを導くからである。
+このモジュールは語彙ファイルの述語を唯一の正規化器として読み（validation._load_vocabulary も
+ここを経由する）、階層の整合を検査し、親の述語で問うたときに子孫のエッジも拾う汎化を提供する。
+推移閉包（`part-of` の多段）は導かない。汎化は書かれたエッジを固定長の祖先列に写すだけで
+新しい事実を生まないが、推移律は書かれていないエッジを導くからである。
 """
 
 from __future__ import annotations
@@ -41,44 +41,69 @@ class Predicate:
     range: tuple[str, ...] = ()
     broader: Any = None
     maps_to: Any = None
+    # domain / range が YAML でリスト以外（スカラー等）だったキー。検査で ERROR にする
+    malformed: tuple[str, ...] = ()
 
     @property
     def constrained(self) -> bool:
         return bool(self.domain) and bool(self.range)
 
 
-def _as_tuple(value: Any) -> tuple[str, ...]:
-    if isinstance(value, list):
-        return tuple(str(item) for item in value)
-    return ()
+def _type_list(value: Any) -> tuple[tuple[str, ...], bool]:
+    """domain / range の値を型名の組に正規化する。戻り値の第 2 要素は形式が正しいか。
 
-
-def load_predicates(root: Path) -> dict[str, Predicate]:
-    """`<content_root>/vocabulary.yml` の述語を、階層と標準対応のキーを含めて読む。
-
-    `broader` / `maps_to` は形式検査のため生値のまま持つ。検査は validate_predicates が行う。
+    スカラー文字列は 1 要素として扱う（無制約に化けさせない）が、形式違反として報告する。
     """
-    data = yaml.safe_load((root / "vocabulary.yml").read_text(encoding="utf-8")) or {}
-    raw = data.get("predicates") or {}
+    if value is None:
+        return (), True
+    if isinstance(value, list):
+        return tuple(str(item) for item in value), all(isinstance(item, str) and item for item in value)
+    if isinstance(value, str) and value:
+        return (value,), False
+    return (), False
+
+
+def predicates_from_mapping(raw: Mapping[str, Any] | None) -> dict[str, Predicate]:
+    """`vocabulary.yml` の `predicates` を Predicate に正規化する。語彙の述語はすべてここを通す。"""
     predicates: dict[str, Predicate] = {}
-    for name, value in raw.items():
+    for name, value in (raw or {}).items():
         if isinstance(value, dict):
+            domain, domain_ok = _type_list(value.get("domain"))
+            range_, range_ok = _type_list(value.get("range"))
+            malformed = tuple(key for key, ok in (("domain", domain_ok), ("range", range_ok)) if not ok)
             predicates[name] = Predicate(
                 name=name,
                 description=str(value.get("description", "") or ""),
-                domain=_as_tuple(value.get("domain")),
-                range=_as_tuple(value.get("range")),
+                domain=domain,
+                range=range_,
                 broader=value.get("broader"),
                 maps_to=value.get("maps_to"),
+                malformed=malformed,
             )
         else:
             predicates[name] = Predicate(name=name, description=str(value or ""))
     return predicates
 
 
+def load_predicates(root: Path) -> dict[str, Predicate]:
+    """`<content_root>/vocabulary.yml` の述語を読む。"""
+    data = yaml.safe_load((root / "vocabulary.yml").read_text(encoding="utf-8")) or {}
+    return predicates_from_mapping(data.get("predicates"))
+
+
+def as_mapping(predicates: Mapping[str, Predicate]) -> dict[str, dict[str, Any]]:
+    """kb-ontology-core の Ontology.from_mapping に渡す形（description / domain / range）。"""
+    return {
+        name: {"description": predicate.description, "domain": list(predicate.domain), "range": list(predicate.range)}
+        for name, predicate in predicates.items()
+    }
+
+
 def _parent(predicates: Mapping[str, Predicate], name: str) -> str | None:
     broader = predicates[name].broader
-    return broader if isinstance(broader, str) and broader in predicates else None
+    if isinstance(broader, str) and broader in predicates and broader != name and not is_unclassified(broader):
+        return broader
+    return None
 
 
 def ancestors(predicates: Mapping[str, Predicate], name: str) -> list[str]:
@@ -91,6 +116,28 @@ def ancestors(predicates: Mapping[str, Predicate], name: str) -> list[str]:
         seen.add(current)
         current = _parent(predicates, current)
     return chain
+
+
+def _cycles(predicates: Mapping[str, Predicate]) -> list[list[str]]:
+    """broader が作る循環を、循環上のノードだけで列挙する。各循環は最小の名前から始める。"""
+    cycles: list[list[str]] = []
+    reported: set[str] = set()
+    for name in sorted(predicates):
+        if name in reported:
+            continue
+        path: list[str] = []
+        current: str | None = name
+        while current is not None and current not in path:
+            path.append(current)
+            current = _parent(predicates, current)
+        if current is None or current in reported:
+            continue
+        cycle = path[path.index(current):]
+        start = cycle.index(min(cycle))
+        cycle = cycle[start:] + cycle[:start]
+        cycles.append(cycle)
+        reported.update(cycle)
+    return cycles
 
 
 def descendants(predicates: Mapping[str, Predicate], name: str) -> frozenset[str]:
@@ -111,10 +158,10 @@ def is_unclassified(name: str) -> bool:
 
 
 def layer1_predicates(predicates: Mapping[str, Predicate]) -> list[str]:
-    """層 1: `related-to` 以外で `broader` を持たない述語。"""
+    """層 1: `related-to` 以外で、有効な親（related-to 以外の実在する述語）を持たない述語。"""
     return sorted(
-        name for name, predicate in predicates.items()
-        if not is_unclassified(name) and predicate.broader is None
+        name for name in predicates
+        if not is_unclassified(name) and _parent(predicates, name) is None
     )
 
 
@@ -142,35 +189,40 @@ def refinement_candidates(
 
 
 def validate_predicates(predicates: Mapping[str, Predicate]) -> list[str]:
-    """`broader` / `maps_to` の整合を検査する。戻り値は `kb validate` の errors と同じ形式。"""
+    """述語定義の形式と `broader` / `maps_to` の整合を検査する。戻り値は `kb validate` の errors と同じ形式。"""
     errors: list[str] = []
+    for cycle in _cycles(predicates):
+        errors.append(
+            f"ERROR {VOCABULARY_PATH}: predicates の broader が循環している（{' → '.join([*cycle, cycle[0]])}）"
+        )
     for name in sorted(predicates):
         predicate = predicates[name]
+        for key in predicate.malformed:
+            errors.append(f"ERROR {VOCABULARY_PATH}: predicates.{name}.{key} は型名のリストでなければならない")
         broader = predicate.broader
         if broader is not None:
             if not isinstance(broader, str) or not broader:
                 errors.append(f"ERROR {VOCABULARY_PATH}: predicates.{name}.broader は述語名の文字列でなければならない")
             elif broader == name:
                 errors.append(f"ERROR {VOCABULARY_PATH}: predicates.{name}.broader が自身を指している")
+            elif is_unclassified(broader):
+                errors.append(
+                    f"ERROR {VOCABULARY_PATH}: predicates.{name}.broader に '{broader}' は使えない"
+                    "（未分類の印であり、述語の親にならない）"
+                )
             elif broader not in predicates:
                 errors.append(f"ERROR {VOCABULARY_PATH}: predicates.{name}.broader に未知の述語 '{broader}'")
             else:
-                chain = ancestors(predicates, name)
-                if chain and _parent(predicates, chain[-1]) is not None:
+                # 循環の有無にかかわらず、直接の親との domain / range の包含は検査する
+                parent = predicates[broader]
+                if parent.domain and not (predicate.domain and set(predicate.domain) <= set(parent.domain)):
                     errors.append(
-                        f"ERROR {VOCABULARY_PATH}: predicates.{name}.broader が循環している"
-                        f"（{' → '.join([name, *chain])}）"
+                        f"ERROR {VOCABULARY_PATH}: predicates.{name}.domain は親 {broader} の domain の部分集合でなければならない"
                     )
-                else:
-                    parent = predicates[broader]
-                    if parent.domain and not (predicate.domain and set(predicate.domain) <= set(parent.domain)):
-                        errors.append(
-                            f"ERROR {VOCABULARY_PATH}: predicates.{name}.domain は親 {broader} の domain の部分集合でなければならない"
-                        )
-                    if parent.range and not (predicate.range and set(predicate.range) <= set(parent.range)):
-                        errors.append(
-                            f"ERROR {VOCABULARY_PATH}: predicates.{name}.range は親 {broader} の range の部分集合でなければならない"
-                        )
+                if parent.range and not (predicate.range and set(predicate.range) <= set(parent.range)):
+                    errors.append(
+                        f"ERROR {VOCABULARY_PATH}: predicates.{name}.range は親 {broader} の range の部分集合でなければならない"
+                    )
         maps_to = predicate.maps_to
         if maps_to is not None and (
             not isinstance(maps_to, list)
@@ -191,8 +243,9 @@ def export_predicates(predicates: Mapping[str, Predicate]) -> dict[str, dict[str
     for name in sorted(predicates):
         predicate = predicates[name]
         item: dict[str, Any] = {}
-        if isinstance(predicate.broader, str) and predicate.broader in predicates and predicate.broader != name:
-            item["broader"] = predicate.broader
+        parent = _parent(predicates, name)
+        if parent is not None:
+            item["broader"] = parent
         if isinstance(predicate.maps_to, list) and predicate.maps_to:
             item["maps_to"] = [str(entry) for entry in predicate.maps_to]
         if item:
