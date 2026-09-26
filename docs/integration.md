@@ -39,11 +39,12 @@ apm install --target claude
 ## 4. `kb` CLI をインストールする
 
 ```bash
-python3 -m pip install apm_modules/lostandfound/kb-harness-core
+python3 -m pip install apm_modules/lostandfound/kb-harness-core              # Claim を使わない KB
+python3 -m pip install "apm_modules/lostandfound/kb-harness-core[claims]"    # Claim を使う KB
 kb doctor
 ```
 
-`pyproject.toml` は `kb-ontology-core` を `git+https://` で参照するため、ssh 鍵は不要。
+`kb-ontology-core` は `claims` extra でだけ入る。Claim 型を `vocabulary.yml` に定義しない KB には要らず、無ければ `kb doctor` が `doctor.ontology.not_installed` の WARNING で知らせる。Claim を扱おうとした時点で `ontology.core.missing` の診断になる。`pyproject.toml` は `kb-ontology-core` を `git+https://` で参照するため、ssh 鍵は不要。
 
 ## 5. 補助スクリプトの呼び出し
 

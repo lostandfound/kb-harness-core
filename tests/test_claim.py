@@ -8,7 +8,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 from export_graph import export_graph
 from validate import validate
-from kb_harness.ontology import core_available
+from kb_harness.ontology import ontology_core_available
 
 
 VOCAB = """\
@@ -56,7 +56,7 @@ Body.
 """
 
 
-@unittest.skipUnless(core_available(), "kb-ontology-core が入っていない（Claim を使うテスト）")
+@unittest.skipUnless(ontology_core_available(), "kb-ontology-core が入っていない（Claim を使うテスト）")
 class ClaimTest(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()

@@ -1,2 +1,3 @@
+# 開発・CI 用の全部入り（Claim 対応を含む）。導入先は pyproject.toml の宣言で入れる
 PyYAML==6.0.2
 kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.2.0

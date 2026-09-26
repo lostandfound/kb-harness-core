@@ -2,7 +2,7 @@ import pytest
 from pathlib import Path
 import json
 
-from kb_harness.ontology import core_available
+from kb_harness.ontology import ontology_core_available
 from kb_harness.cli import main
 from kb_harness.sync import execute_write_plan, plan_write
 
@@ -69,7 +69,7 @@ def _claim_project(tmp_path: Path) -> tuple[Path, Path]:
     return content, claims
 
 
-@pytest.mark.skipif(not core_available(), reason="kb-ontology-core が入っていない（Claim を使うテスト）")
+@pytest.mark.skipif(not ontology_core_available(), reason="kb-ontology-core が入っていない（Claim を使うテスト）")
 def test_claim_create_dry_run_has_relative_diff_and_preserves_kb(tmp_path: Path, capsys):
     _content, claims = _claim_project(tmp_path)
     spec = tmp_path / "claim.yml"
@@ -104,7 +104,7 @@ def test_claim_create_dry_run_has_relative_diff_and_preserves_kb(tmp_path: Path,
     assert list(claims.glob("*.md")) == []
 
 
-@pytest.mark.skipif(not core_available(), reason="kb-ontology-core が入っていない（Claim を使うテスト）")
+@pytest.mark.skipif(not ontology_core_available(), reason="kb-ontology-core が入っていない（Claim を使うテスト）")
 def test_claim_transition_dry_run_has_relative_diff_and_preserves_claim(
     tmp_path: Path, capsys
 ):
