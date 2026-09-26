@@ -88,6 +88,9 @@ def build_kb(root: Path, vocabulary: str = BASE_VOCABULARY, *, with_views: bool 
 
 
 class PredicateHierarchyTest(unittest.TestCase):
+    def test_standard_predicates(self):
+        self.assertEqual(sorted(STANDARD_PREDICATES), ["created-by", "derived-from", "follows", "located-in", "part-of"])
+
     def test_load_and_descendants(self):
         with tempfile.TemporaryDirectory() as tempdir:
             project = build_kb(Path(tempdir))
@@ -284,7 +287,12 @@ class DoctorTest(unittest.TestCase):
 
     def test_standard_and_refined_predicates_pass(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            project = build_kb(Path(tempdir))
+            vocabulary = BASE_VOCABULARY.replace(
+                "tags:\n",
+                "  follows:\n    description: 後続→先行\n  succeeds:\n    broader: follows\n"
+                "  child-of:\n    broader: derived-from\n    domain: [Concept]\n    range: [Concept]\ntags:\n",
+            )
+            project = build_kb(Path(tempdir), vocabulary)
             _details, diagnostics = diagnose(project)
             self.assertFalse([d for d in diagnostics if d["code"] == "doctor.predicate.nonstandard"])
 

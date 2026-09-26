@@ -27,6 +27,7 @@ STANDARD_PREDICATES: Mapping[str, str] = {
     "derived-from": "派生物 → 起源",
     "created-by": "対象 → 主体",
     "located-in": "対象 → 場所",
+    "follows": "後続 → 先行",
 }
 UNCLASSIFIED_PREDICATE = "related-to"
 
