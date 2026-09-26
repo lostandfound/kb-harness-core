@@ -14,6 +14,7 @@ import yaml
 
 from .diagnostics import HarnessError
 from .markdown import field_text, parse_document
+from .naming import validate_vocabulary_names_at
 from .ontology import build_ontology, validate_claim
 from .predicates import (
     Predicate,
@@ -259,6 +260,7 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     errors.extend(validate_predicates(predicate_defs))
     types = _load_types(root)
     errors.extend(f"ERROR vocabulary.yml: {problem}" for problem in validate_type_fields(types))
+    errors.extend(f"ERROR vocabulary.yml: {problem}" for problem in validate_vocabulary_names_at(root))
     type_dir_map = {t["directory"]: name for name, t in types.items()}
     references, ref_errors = _load_references(root)
     errors.extend(ref_errors)

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- 語彙の名前の文字種を定め、`kb validate` が検査するようにした。型名は PascalCase、述語名とプロパティ名は kebab-case、フィールド名は snake_case、タグは kebab-case で、外れていれば ERROR。これまでは規則が文書に無く、検査もしていなかった（slug・ファイル名・ref ID は従来どおり）。規則は設定リファレンス「名前の文字種」
+
 ## 0.5.0 — 2026-09-26
 
 ### Changed
