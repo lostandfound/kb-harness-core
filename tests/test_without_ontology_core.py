@@ -65,6 +65,17 @@ def run_kb_without_ontology_core(root: Path, *args: str) -> tuple[int, dict]:
     return proc.returncode, json.loads(payload)
 
 
+class DependencyDeclarationTest(unittest.TestCase):
+    def test_core_is_an_extra_not_a_base_dependency(self):
+        import tomllib
+
+        data = tomllib.loads((SRC.parent / "pyproject.toml").read_text(encoding="utf-8"))
+        base = data["project"]["dependencies"]
+        claims = data["project"]["optional-dependencies"]["claims"]
+        self.assertFalse([d for d in base if d.lower().startswith("kb-ontology-core")], base)
+        self.assertEqual(len([d for d in claims if d.lower().startswith("kb-ontology-core")]), 1, claims)
+
+
 class WithoutOntologyCoreTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

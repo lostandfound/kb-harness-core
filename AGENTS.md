@@ -45,12 +45,12 @@ CI は Python 3.12 で `python3 -m pytest` を、`kb-ontology-core` あり・な
 
 ### kb-ontology-core との境界
 
-呼称: この文書とコード内のコメントでは、本パッケージ `kb-harness-core` を「ハーネス」、`kb-ontology-core` を「オントロジーコア」と呼ぶ。どちらも `-core` で終わるので、「コア」単独では書かない。
+呼称: この文書とコード内のコメントでは、本パッケージ `kb-harness-core` を「ハーネス」、`kb-ontology-core` を「オントロジーコア」と呼ぶ。どちらも `-core` で終わるので、「オントロジーコア」単独では書かない。
 
 - 通常エンティティ（frontmatter・リンク・relations・タグ・出典）の検証は `kb_harness.validation` に閉じている。
 - **Claim（出典と確度を伴う関係主張）の検証・状態遷移・シリアライズは `kb-ontology-core` が正本**。ここには実装を持たない。
 - `kb_harness.ontology`（旧 `scripts/ontology_adapter.py`）が橋渡しで、責務は 2 つだけ：(a) `kb_ontology_core` の import 解決（pip 導入か、兄弟ディレクトリ `../kb-ontology-core/src` へのフォールバック）、(b) オントロジーコアの `Diagnostic` をハーネスの構造化診断（`code` / `field` / `context`）へ翻訳。解決は**遅延**で、Claim の検証・出力・語彙構築を呼んだ時点で行う。オントロジーコアはモジュール読み込み時に import しない。Claim を使わない KB はオントロジーコアなしで全機能が動き、Claim を扱おうとしたときだけ `ontology.core.missing` で止まる。
-- 依存タグは `pyproject.toml` / `requirements.txt` に固定し、`kb doctor` と `test_distribution_alignment.py` が整合を検査する。タグを上げるときは両方と CI の clone ブランチを同時に更新する。
+- 依存タグは `pyproject.toml`（`claims` extra）/ `requirements.txt` に固定し、`kb doctor` と `test_distribution_alignment.py` が整合を検査する。タグを上げるときは両方と CI の clone ブランチを同時に更新する。
 
 Claim のルール（許容 status、遷移、domain/range 制約、値Claim の形式）を変えたくなったら、変更先は `kb-ontology-core` であってこのリポジトリではない。翻訳層に条件分岐を足して挙動を変えるのは層の侵犯。
 

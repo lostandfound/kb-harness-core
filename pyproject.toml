@@ -16,6 +16,12 @@ classifiers = [
 ]
 dependencies = [
   "PyYAML>=6.0,<7",
+]
+
+# Claim（出典と確度を伴う関係主張）を使う導入先だけが要る。
+# pip install "kb-harness-core[claims] @ ..." で入れる。無ければ kb doctor が WARNING で知らせる
+[project.optional-dependencies]
+claims = [
     "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.2.0",
 ]
 
