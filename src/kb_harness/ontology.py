@@ -1,8 +1,8 @@
 """Bridge from the Markdown harness to the ontology domain package.
 
 kb-ontology-core は Claim（出典と確度を伴う関係主張）を使う導入先だけが要る。
-この層は読み込み時にコアを import せず、Claim の検証・出力・語彙の構築を
-呼ばれた時点で解決する。Claim を使わない KB はコアなしで全機能が動く。
+この層は読み込み時にオントロジーコアを import せず、Claim の検証・出力・語彙の構築を
+呼ばれた時点で解決する。Claim を使わない KB はオントロジーコアなしで全機能が動く。
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ from typing import Any, Iterable, Mapping
 
 from .diagnostics import Diagnostic as HarnessDiagnostic, HarnessError
 
-_CORE_NAME = "kb_ontology_core"
-_core_module: Any = None
+_ONTOLOGY_CORE_MODULE = "kb_ontology_core"
+_ontology_core_module: Any = None
 
 
 class OntologyCoreMissing(HarnessError):
@@ -32,21 +32,21 @@ class OntologyCoreMissing(HarnessError):
 
 def _try_import() -> Any:
     # テストや上位が sys.modules に None を置いて「無い」状態を作れるようにする
-    if sys.modules.get(_CORE_NAME, False) is None:
+    if sys.modules.get(_ONTOLOGY_CORE_MODULE, False) is None:
         return None
     try:
-        return __import__(_CORE_NAME)
+        return __import__(_ONTOLOGY_CORE_MODULE)
     except ModuleNotFoundError as error:
-        if error.name != _CORE_NAME:
+        if error.name != _ONTOLOGY_CORE_MODULE:
             raise
         return None
 
 
-def load_core() -> Any:
+def load_ontology_core() -> Any:
     """kb_ontology_core を解決して返す。pip 導入か、兄弟ディレクトリ ../kb-ontology-core/src へのフォールバック。"""
-    global _core_module
-    if _core_module is not None:
-        return _core_module
+    global _ontology_core_module
+    if _ontology_core_module is not None:
+        return _ontology_core_module
     module = _try_import()
     if module is None:
         sibling_src = Path(__file__).resolve().parents[3] / "kb-ontology-core" / "src"
@@ -55,35 +55,35 @@ def load_core() -> Any:
             module = _try_import()
     if module is None:
         raise OntologyCoreMissing()
-    _core_module = module
+    _ontology_core_module = module
     return module
 
 
-def core_available() -> bool:
-    """コアを解決できるか。テストの skip 判定と kb doctor が使う。"""
+def ontology_core_available() -> bool:
+    """オントロジーコアを解決できるか。テストの skip 判定と kb doctor が使う。"""
     try:
-        load_core()
+        load_ontology_core()
     except OntologyCoreMissing:
         return False
     return True
 
 
 def build_ontology(mapping: Mapping[str, object]) -> Any:
-    """語彙の写像からコアの Ontology を組む。Claim の検証にだけ要る。"""
-    return load_core().Ontology.from_mapping(mapping)
+    """語彙の写像からオントロジーコアの Ontology を組む。Claim の検証にだけ要る。"""
+    return load_ontology_core().Ontology.from_mapping(mapping)
 
 
 def export_claim(path: str, frontmatter: Mapping[str, object]) -> Any:
-    """Claim を graph.json 用に直列化する（コアの export_claim）。"""
-    return load_core().export_claim(path, frontmatter)
+    """Claim を graph.json 用に直列化する（オントロジーコアの export_claim）。"""
+    return load_ontology_core().export_claim(path, frontmatter)
 
 
 def __getattr__(name: str) -> Any:
-    # 互換: `ontology.Ontology` / `ontology.Diagnostic` / `ontology._core` はコアを遅延解決して返す
+    # 互換: `ontology.Ontology` / `ontology.Diagnostic` / `ontology._core` はオントロジーコアを遅延解決して返す
     if name in ("Ontology", "Diagnostic"):
-        return getattr(load_core(), name)
+        return getattr(load_ontology_core(), name)
     if name == "_core":
-        return load_core()
+        return load_ontology_core()
     raise AttributeError(name)
 
 
@@ -141,5 +141,5 @@ def validate_claim(
     relation_edges: Iterable[tuple[str, str, str]],
 ) -> list[str]:
     """Validate through kb-ontology-core while preserving harness diagnostics."""
-    core = load_core()
+    core = load_ontology_core()
     return [_translate_diagnostic(path, diagnostic) for diagnostic in core.validate_claim(claim, entities, ontology, relation_edges)]

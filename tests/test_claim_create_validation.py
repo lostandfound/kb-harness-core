@@ -6,10 +6,10 @@ import yaml
 
 from kb_harness.claim import ClaimSpecError, plan_claim_create
 from kb_harness.project import Project
-from kb_harness.ontology import core_available
+from kb_harness.ontology import ontology_core_available
 
 
-@unittest.skipUnless(core_available(), "kb-ontology-core が入っていない（Claim を使うテスト）")
+@unittest.skipUnless(ontology_core_available(), "kb-ontology-core が入っていない（Claim を使うテスト）")
 class ClaimCreateValidationTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

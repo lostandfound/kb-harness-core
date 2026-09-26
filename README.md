@@ -157,7 +157,7 @@ pip install -r requirements.txt pytest
 python3 -m pytest
 ```
 
-※ `tests/test_distribution_alignment.py` は兄弟ディレクトリ `../kb-ontology-core`（v0.2.0）が無ければ skip される。Claim を使うテストは `kb-ontology-core` が無ければ skip され、CI はコアあり・なしの両方で回す。
+※ `tests/test_distribution_alignment.py` は兄弟ディレクトリ `../kb-ontology-core`（v0.2.0）が無ければ skip される。Claim を使うテストは `kb-ontology-core` が無ければ skip され、CI はオントロジーコアあり・なしの両方で回す。
 
 ### リリース
 
