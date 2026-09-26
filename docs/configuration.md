@@ -61,7 +61,8 @@ validate:
 types:
   <型名>:
     directory: <対応ディレクトリ名>     # 必須。frontmatter の type とディレクトリの対応検査に使う
-    extra_fields: [born, died]           # 任意。この型で追加必須になる frontmatter フィールド
+    extra_fields: [born]                 # 任意。この型で追加必須になる frontmatter フィールド
+    optional_fields: [died, same_as]     # 任意。書いてもよい frontmatter フィールド。無くても検査は通る
     graph: false                         # 任意（既定 true）。false の型は relations を持てない
     sources_required: false              # 任意（既定 true）。false の型は sources を省略できる
 predicates:
@@ -79,7 +80,8 @@ tags:
   - <タグ2>
 ```
 
-- `types.<型>.extra_fields` に `born` または `died` を含めると、値は「西暦4桁（`?` 付き可）」「西暦4桁+頃」「不詳」のいずれかの形式に限定される。それ以外のフィールド名は非空文字列であることのみ検査する。
+- `types.<型>.extra_fields` は必須、`optional_fields` は任意のフィールドである。任意のフィールドは書かなくてよいが、書いたら必須のものと同じ検査を受ける。同じ名前を両方に置くと `kb validate` が ERROR にする。`kb entity create` の spec の `fields` に書けるのはこの二つに宣言された名前だけである。
+- `born` または `died` を宣言すると、値は「西暦4桁（`?` 付き可）」「西暦4桁+頃」「不詳」のいずれかの形式に限定される。それ以外のフィールド名は非空文字列であることのみ検査する。YAML が数値や日付として読む値（`year: 2021`、`date: 2021-05-01`）は文字列として扱うので、引用符は要らない。
 - `types.<型>.graph: false` を指定した型のエンティティは `relations` を持てない。索引・付録的なエンティティ型に使う。
 - `predicates.<述語>.domain` / `range` は、frontmatter の `relations` に書かれた `predicate` と `target` エンティティの型が一致するかを検査する型制約である。
 - `tags` は frontmatter の `tags` に使える語の全量である。一覧にない語は validate エラーになる。
@@ -155,7 +157,7 @@ predicates:
 
 ### フィールドの写し方と推奨名
 
-`extra_fields` は型ごとに導入先が決める。ハーネスは検査の対象を `born` / `died` の形式と非空文字列に限り、フィールドの型宣言は持たない（判断の経緯は [docs/notes/field-preset-memo.md](notes/field-preset-memo.md)）。その代わり、schema.org などの外部語彙からプロパティを写すときの規則と、推奨するフィールド名を定める。
+`extra_fields` / `optional_fields` は型ごとに導入先が決める。ハーネスは検査の対象を `born` / `died` の形式と非空文字列に限り、フィールドの型宣言は持たない（判断の経緯は [docs/notes/field-preset-memo.md](notes/field-preset-memo.md)）。その代わり、schema.org などの外部語彙からプロパティを写すときの規則と、推奨するフィールド名を定める。
 
 写し方の規則:
 
@@ -174,6 +176,8 @@ predicates:
 | `same_as` | 外部識別子の IRI（Wikidata / VIAF / NDL 典拠など） | `sameAs` | 全型 |
 
 - 期間は `start` / `end` のように始点と終点を別のフィールドにする。`1594-1654` のように 1 フィールドに入れると並べられない。
+- 対の後者（`died` / `dissolved` / `end`）は `optional_fields` に置く。存命の人物や継続中の出来事には値が無く、必須にすると `不詳` や「なし」のような値で埋めることになる。`不詳` は「調べても分からない」の印であり、「まだ無い」の印ではない。
+- 相手がモノである情報を文字列で持たない規則の裏返しとして、値が「無い」ことをフィールドに書かない。書く場所が無いなら宣言を任意にする。
 - `born` / `died` 以外の時間フィールドは形式を検査しないので、年に落とせない表現（「殷代後期」など）をそのまま書いてよい。並べる機能が要るようになった時点で年表現へ直す。
 - 型名は導入先が自由に決めてよい。フィールドの意味は名前で決まるので、`Person` を `人物` にしても推奨名は同じ。
 - 章構成（`sections`）は推奨を置かない。型に共通の章立てを強いるのは比較可能性に寄与しない。
@@ -209,7 +213,7 @@ fields:                         # 任意。型の extra_fields に対応
 timestamp: 2026-01-01T00:00:00Z # 任意。省略時は SOURCE_DATE_EPOCH → clock
 ```
 
-`type` / `slug` / `title` / `description` / `tags` / `sections` が必須。`sources` は型の `sources_required` が `false` でない限り必須。型ごとの章構成と `extra_fields` は `vocabulary.yml` を正本とする。
+`type` / `slug` / `title` / `description` / `tags` / `sections` が必須。`sources` は型の `sources_required` が `false` でない限り必須。型ごとの章構成と `extra_fields` / `optional_fields` は `vocabulary.yml` を正本とする。`fields` には必須のフィールドをすべて、任意のフィールドは値があるものだけ書く。数値で書いた年（`born: 1900`）は文字列として書き出される。
 
 `description` は有無だけでなく内容も検査する。空文字はエラー、同じ文が二度出るものもエラーとする（改版で前の版の断片が残ると、形式は正しいまま検索結果と index に重複が出続けるため）。`title` と同一のもの、240 文字を超えるものは警告にとどめる。
 

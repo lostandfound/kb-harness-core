@@ -3,7 +3,11 @@
 ## Unreleased
 
 ### Added
+- `vocabulary.yml` の型定義に `optional_fields` を追加。書いてもよいが無くても通る frontmatter フィールドを宣言できる。これまで `extra_fields` は必須しか宣言できず、存命の人物の `died` や継続中の出来事の `end` を `不詳` や「なし」で埋めるしかなかった。`kb validate` は任意フィールドが書かれていれば必須と同じ検査を行い、同じ名前が両方に宣言されていれば ERROR にする。`kb entity create` の spec `fields` に任意フィールドを書ける。考察は `docs/notes/field-preset-memo.md`
 - リリースタグを打つ GitHub Actions ワークフロー `release.yml` を追加。`workflow_dispatch` で版を受け取り、`pyproject.toml` / `__init__.py` / `apm.yml` / `CHANGELOG.md` が一致するコミットにだけ注釈付きタグ `v<version>` を作る。手順は README の「リリース」
+
+### Fixed
+- 型固有フィールドを `year: 2021` や `born: 1940` のように引用符なしで書くと、YAML が数値として読むために `kb validate` が「missing required field」と誤った診断を出していた。数値・日付として読まれた値は文字列として扱い、文字列にできない値（リストなど）には「非空の文字列でなければならない」と実際の値を示す診断を出す。`kb entity create` の spec `fields` も同じ扱いにした
 
 ## 0.3.0 — 2026-09-26
 

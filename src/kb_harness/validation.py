@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 from .diagnostics import HarnessError
-from .markdown import parse_document
+from .markdown import field_text, parse_document
 from .ontology import Ontology, validate_claim
 from .predicates import (
     Predicate,
@@ -110,7 +110,7 @@ def _load_properties(root: Path) -> dict:
 def _load_types(root: Path) -> dict:
     """vocabulary.yml の types: セクションを読み込む。
 
-    戻り値は type 名 → {"directory", "extra_fields", "graph"} の辞書。
+    戻り値は type 名 → {"directory", "extra_fields", "optional_fields", "graph", ...} の辞書。
     types: が定義されていなければ、entity type の体系そのものが
     未定義でありフォールバックの余地が無いため例外を送出する。
     """
@@ -125,11 +125,33 @@ def _load_types(root: Path) -> dict:
         types[name] = {
             "directory": val.get("directory"),
             "extra_fields": val.get("extra_fields") or [],
+            "optional_fields": val.get("optional_fields") or [],
             "graph": val.get("graph", True),
             "sections": val.get("sections") or [],
             "sources_required": val.get("sources_required", True),
         }
     return types
+
+
+def _validate_type_fields(types: dict) -> list[str]:
+    """types.<型>.extra_fields / optional_fields の宣言そのものを検査する。"""
+    errors: list[str] = []
+    for name, type_def in types.items():
+        lists: dict[str, list[str]] = {}
+        for key in ("extra_fields", "optional_fields"):
+            value = type_def.get(key) or []
+            if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
+                errors.append(f"ERROR vocabulary.yml: types.{name}.{key} はフィールド名のリストでなければならない")
+                value = []
+                type_def[key] = value  # 以降のエンティティ検査で不正な宣言を読まないよう空にする
+            lists[key] = value
+        overlap = sorted(set(lists["extra_fields"]) & set(lists["optional_fields"]))
+        if overlap:
+            errors.append(
+                f"ERROR vocabulary.yml: types.{name} で extra_fields と optional_fields に同じフィールドがある: "
+                + ", ".join(overlap)
+            )
+    return errors
 
 
 def _load_references(root: Path):
@@ -271,6 +293,7 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     # 述語の階層（broader / maps_to）は kb-ontology-core には渡さず、ハーネス側で検査する
     errors.extend(validate_predicates(predicate_defs))
     types = _load_types(root)
+    errors.extend(_validate_type_fields(types))
     type_dir_map = {t["directory"]: name for name, t in types.items()}
     references, ref_errors = _load_references(root)
     errors.extend(ref_errors)
@@ -392,10 +415,16 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                     else:
                         used_references.add(ref_id)
 
-        for field in (type_def or {}).get("extra_fields", []):
-            value = fm.get(field)
-            if not isinstance(value, str) or not value.strip():
-                errors.append(f"ERROR {rel}: missing required field '{field}'")
+        declared_fields = [(field, True) for field in (type_def or {}).get("extra_fields") or []]
+        declared_fields += [(field, False) for field in (type_def or {}).get("optional_fields") or []]
+        for field, required in declared_fields:
+            if field not in fm:
+                if required:
+                    errors.append(f"ERROR {rel}: missing required field '{field}'")
+                continue
+            value = field_text(fm.get(field))
+            if value is None:
+                errors.append(f"ERROR {rel}: '{field}' は非空の文字列でなければならない（値: {fm.get(field)!r}）")
             elif field in ("born", "died") and not PERSON_DATE_RE.match(value):
                 errors.append(f"ERROR {rel}: '{field}' の形式が不正 '{value}'")
 
