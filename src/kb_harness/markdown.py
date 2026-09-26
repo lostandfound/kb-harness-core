@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Mapping
 
 import yaml
@@ -50,3 +51,23 @@ def parse_document(path: str, text: str) -> Document:
             )
         )
     return Document(path=path, frontmatter=frontmatter, body=match.group(2))
+
+
+def field_text(value: object) -> str | None:
+    """型固有フィールドの値を検査用の文字列にする。
+
+    YAML は `year: 2021` を int、`date: 2021-05-01` を date として読むが、
+    フィールドは文字列として扱う契約なので、これらのスカラーは文字列表現に写す。
+    文字列でもスカラーでもない値（None / bool / list / dict）は None を返す。
+    """
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    return None

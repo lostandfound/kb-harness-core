@@ -13,6 +13,8 @@ from typing import Any
 
 import yaml
 
+from .markdown import field_text
+
 SECTIONS_BY_TYPE = {
     "Person": ["概要", "生涯", "系譜（師と弟子）", "功績"],
     "Style": ["概要", "特徴", "主要人物", "代表的な型"],
@@ -54,6 +56,7 @@ def _load_types(root: Path) -> dict[str, dict[str, object]]:
         types[name] = {
             "directory": definition.get("directory"),
             "extra_fields": definition.get("extra_fields") or [],
+            "optional_fields": definition.get("optional_fields") or [],
             "sections": definition.get("sections") or [],
             "graph": definition.get("graph", True),
             "sources_required": definition.get("sources_required", True),
@@ -198,15 +201,29 @@ def _frontmatter_and_body(root: Path, spec: Mapping[str, Any], *, timestamp: str
         raise EntitySpecError("section layout mismatch (" + "; ".join(detail) + ")")
 
     extra_fields = definition.get("extra_fields") or []
-    if not isinstance(extra_fields, list) or not all(isinstance(item, str) for item in extra_fields):
-        raise EntitySpecError(f"type '{entity_type}' has invalid extra_fields configuration", argument=True)
+    optional_fields = definition.get("optional_fields") or []
+    for key, declared in (("extra_fields", extra_fields), ("optional_fields", optional_fields)):
+        if not isinstance(declared, list) or not all(isinstance(item, str) for item in declared):
+            raise EntitySpecError(f"type '{entity_type}' has invalid {key} configuration", argument=True)
+    if set(extra_fields) & set(optional_fields):
+        raise EntitySpecError(f"type '{entity_type}' declares the same field in extra_fields and optional_fields", argument=True)
     fields = spec.get("fields") or {}
-    unknown_fields = sorted(set(fields) - set(extra_fields))
+    if not isinstance(fields, Mapping):
+        raise EntitySpecError("fields must be a mapping")
+    unknown_fields = sorted(set(fields) - set(extra_fields) - set(optional_fields))
     if unknown_fields:
         raise EntitySpecError(f"unknown field(s): {', '.join(unknown_fields)}")
+    field_values: dict[str, str] = {}
     for field in extra_fields:
-        if field not in fields or not isinstance(fields[field], str) or not fields[field].strip():
+        if field not in fields:
             raise EntitySpecError(f"missing required field '{field}'")
+    for field in [*extra_fields, *optional_fields]:
+        if field not in fields:
+            continue
+        value = field_text(fields[field])
+        if value is None:
+            raise EntitySpecError(f"field '{field}' must be a non-empty string")
+        field_values[field] = value
 
     frontmatter: dict[str, object] = {
         "type": entity_type,
@@ -222,8 +239,8 @@ def _frontmatter_and_body(root: Path, spec: Mapping[str, Any], *, timestamp: str
         frontmatter["aliases"] = _string_list(spec["aliases"], "aliases")
     if "relations" in spec:
         frontmatter["relations"] = spec["relations"]
-    for field in extra_fields:
-        frontmatter[field] = fields[field].strip()
+    for field, value in field_values.items():
+        frontmatter[field] = value
     rendered = yaml.safe_dump(frontmatter, allow_unicode=True, sort_keys=False, default_flow_style=False).rstrip()
     # Keep the repository's canonical, unquoted UTC timestamp spelling.
     rendered = re.sub(r"(?m)^timestamp: ['\"]([^'\"]+)['\"]$", r"timestamp: \1", rendered)
