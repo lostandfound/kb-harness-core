@@ -62,6 +62,10 @@ Claim のルール（許容 status、遷移、domain/range 制約、値Claim の
 - hooks も APM 管理外（`docs/integration.md` 参照）。
 - 導入先が本パッケージを submodule + `scripts/` symlink で組み込んでいる場合、導入先で実行されるのは submodule 側のコードである。ハーネスの修正は本リポジトリ側をコミットし、導入先で submodule 参照を更新して反映する。
 
+## 自身の作業台帳
+
+ハーネス自身の未着手・完了・保留の一覧はルートの `BACKLOG.md` に置く。設計判断の保留は `docs/notes/` の各メモの「未決事項」節が正本で、`BACKLOG.md` は所在の一覧だけを持つ。導入先 KB 向けの `docs/BACKLOG.md` / `docs/CONCERNS.md` の規約（`docs/integration.md`）とは別物である。
+
 ## 変更時の作法
 
 - README.md と `docs/` はこのパッケージの**対外契約の正本**である。`kb` サブコマンドの追加・変更は `docs/cli.md` と README の一覧を、スクリプトの追加・オプション変更は `docs/scripts.md` を、語彙・spec 契約の変更は `docs/configuration.md` を同時に更新する。乖離はハーネス利用者側の破損に直結する。
