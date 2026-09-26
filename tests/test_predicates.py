@@ -14,6 +14,7 @@ from kb_harness.predicates import (
     STANDARD_PREDICATES,
     descendants,
     export_predicates,
+    layer1_predicates,
     load_predicates,
     nonstandard_layer1,
     refinement_candidates,
@@ -145,6 +146,32 @@ class PredicateHierarchyTest(unittest.TestCase):
             self.assertTrue(any("predicates.kind-of.broader に 'related-to' は使えない" in e for e in errors), errors)
             self.assertEqual(descendants(predicates, "related-to"), {"related-to"})
             self.assertIn("kind-of", nonstandard_layer1(predicates))
+
+    def test_related_to_itself_cannot_have_broader(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            vocabulary = BASE_VOCABULARY.replace(
+                "  related-to:\n    description: 未分類\n",
+                "  related-to:\n    description: 未分類\n    broader: derived-from\n",
+            )
+            project = build_kb(Path(tempdir), vocabulary)
+            predicates = load_predicates(project.content_root)
+            errors = validate_predicates(predicates)
+            self.assertTrue(any("predicates.related-to に broader は書けない" in e for e in errors), errors)
+            # 親を書いても階層には入らない。derived-from で問うても未分類エッジは拾わない
+            self.assertEqual(descendants(predicates, "derived-from"), {"derived-from", "borrowed-from"})
+            self.assertNotIn("related-to", export_predicates(predicates))
+
+    def test_related_to_domain_range_are_still_enforced(self):
+        # 層 0 は方向と意味を持たないが、書かれた domain / range は型の粗い制限として通常どおり検査する
+        with tempfile.TemporaryDirectory() as tempdir:
+            vocabulary = BASE_VOCABULARY.replace(
+                "  related-to:\n    description: 未分類\n",
+                "  related-to:\n    description: 未分類\n    domain: [Script]\n    range: [Script]\n",
+            )
+            project = build_kb(Path(tempdir), vocabulary)
+            errors = validate(project.content_root)
+            self.assertTrue(any("/concepts/snowflake.md" in e and "型制約違反" in e for e in errors), errors)
+            self.assertNotIn("related-to", layer1_predicates(load_predicates(project.content_root)))
 
     def test_cycle_blames_only_nodes_on_the_cycle(self):
         with tempfile.TemporaryDirectory() as tempdir:

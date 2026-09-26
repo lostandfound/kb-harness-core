@@ -2,7 +2,8 @@
 
 述語は詳細度で三層に分けて扱う（docs/notes/jutsugo-kaisou-memo.md）。
 
-- 層 0: `related-to`。未分類の印。方向も型制約も持たず、親にもならない。
+- 層 0: `related-to`。未分類の印。方向も意味も持たず、階層に属さない（親にも子にもならない）。
+  domain / range は書けば通常どおり検査するが、それは型の粗い制限であって層 1 の資格ではない。
 - 層 1: `broader` を持たない述語。方向と domain / range を持ち、検証器に効く。
   ハーネスは名前・向き・意味を標準として文書で定め、型への束縛は導入先が決める。
 - 層 2: `broader` で層 1 以下の親に吊るした述語。意味の精緻化であり、導入先が任意で足す。
@@ -101,6 +102,9 @@ def as_mapping(predicates: Mapping[str, Predicate]) -> dict[str, dict[str, Any]]
 
 
 def _parent(predicates: Mapping[str, Predicate], name: str) -> str | None:
+    # 層 0 は階層に属さない。related-to 自身の broader も、related-to を指す broader も親にしない
+    if is_unclassified(name):
+        return None
     broader = predicates[name].broader
     if isinstance(broader, str) and broader in predicates and broader != name and not is_unclassified(broader):
         return broader
@@ -202,7 +206,11 @@ def validate_predicates(predicates: Mapping[str, Predicate]) -> list[str]:
             errors.append(f"ERROR {VOCABULARY_PATH}: predicates.{name}.{key} は型名のリストでなければならない")
         broader = predicate.broader
         if broader is not None:
-            if not isinstance(broader, str) or not broader:
+            if is_unclassified(name):
+                errors.append(
+                    f"ERROR {VOCABULARY_PATH}: predicates.{name} に broader は書けない（未分類の印であり、階層に属さない）"
+                )
+            elif not isinstance(broader, str) or not broader:
                 errors.append(f"ERROR {VOCABULARY_PATH}: predicates.{name}.broader は述語名の文字列でなければならない")
             elif broader == name:
                 errors.append(f"ERROR {VOCABULARY_PATH}: predicates.{name}.broader が自身を指している")
