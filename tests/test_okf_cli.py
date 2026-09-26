@@ -21,6 +21,25 @@ class OkfCliTest(unittest.TestCase):
         (content / "note.md").write_text("---\ntype: Note\n---\n\nBody\n", encoding="utf-8")
         return tempdir, root
 
+    def test_export_warns_on_links_leaving_content_root_but_writes_bundle(self):
+        tempdir, root = self._kb()
+        with tempdir:
+            (root / "README.md").write_text("# readme\n", encoding="utf-8")
+            (root / "knowledge" / "note.md").write_text(
+                "---\ntype: Note\n---\n\n[README](../README.md)\n", encoding="utf-8"
+            )
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                code = main(["export", "okf", "--output", str(root / "bundle"), "--start", str(root), "--format", "json"])
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(code, 0)
+            self.assertTrue(result["ok"])
+            self.assertTrue((root / "bundle" / "note.md").is_file())
+            self.assertEqual(
+                result["warnings"],
+                [{"code": "okf.link.broken", "path": "note.md", "message": "link target is not in the bundle: ../README.md"}],
+            )
+
     def test_validate_okf_json_reports_warning_without_failing(self):
         # Given a valid bundle with an advisory-only usage issue.
         with tempfile.TemporaryDirectory() as tempdir:

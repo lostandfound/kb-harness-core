@@ -27,7 +27,7 @@ from .references import (
 from .graph import plan_graph
 from .index import plan_index
 from .links import plan_link_migration
-from .okf import OkfExportError, audit_okf_bundle, plan_okf_export
+from .okf import OkfExportError, audit_okf_bundle, okf_link_warnings, plan_okf_export
 from .project import Project, ProjectError
 from .serve import serve
 from .sync import (
@@ -635,17 +635,26 @@ def _okf_export(project: Project, args: Any) -> int:
         return _internal_error(error, args.format)
 
     relative = [str(path.relative_to(output_root)) for path in plan.changes]
-    result: Result = {"ok": True, "changed": relative, "diagnostics": [], "diff": plan.diff}
+    # リンク切れは bundle の適合性を損なわないので、書き出しは止めず警告にとどめる
+    warnings = okf_link_warnings({path.relative_to(output_root).as_posix(): text for path, text in changes.items()})
+    result: Result = {"ok": True, "changed": relative, "diagnostics": [], "warnings": warnings, "diff": plan.diff}
     if args.dry_run:
         result["dry_run"] = True
-        _emit(result, args.format)
+        _emit_okf_export(result, args.format)
         return 0
     try:
         execute_write_plan(plan, apply=apply_changes_atomically)
     except Exception as error:
         return _internal_error(error, args.format)
-    _emit(result, args.format)
+    _emit_okf_export(result, args.format)
     return 0
+
+
+def _emit_okf_export(result: Result, output_format: str) -> None:
+    _emit(result, output_format)
+    if output_format != "json":
+        for item in result["warnings"]:
+            print(f"WARNING {item['path']}: {item['code']}: {item['message']}", file=sys.stderr)
 
 
 def _okf_validate(args: Any) -> int:

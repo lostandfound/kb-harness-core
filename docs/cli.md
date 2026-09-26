@@ -131,13 +131,13 @@ spec を `references.yml` に原子的に追加する。既存レジストリの
 
 ### `kb export okf --output PATH`
 
-内部プロファイルを strict OKF v0.2 bundle に決定論的に変換する。出力パスは output root 配下に限定され、ref ID は小文字 kebab-case、入力 Markdown の symlink は拒否し（symlink ディレクトリは走査対象外）、任意階層の `log.md` は予約ファイルとして扱う。`--dry-run` に対応する。
+内部プロファイルを strict OKF v0.2 bundle に決定論的に変換する。出力パスは output root 配下に限定され、ref ID は小文字 kebab-case、入力 Markdown の symlink は拒否し（symlink ディレクトリは走査対象外）、任意階層の `log.md` は予約ファイルとして扱う。`--dry-run` に対応する。出力する bundle の中で解決できない本文リンク（`content_root` の外を指すリンクなど）は `okf.link.broken` の警告として `warnings` に入れ、書き出しは止めない。
 
 内部プロファイルから OKF への変換方針（どの型・述語をどう対応付けるか）は導入先 KB が文書化する。
 
 ### `kb okf validate PATH [--strict]`
 
-既存の OKF bundle の適合性を検証する。
+既存の OKF bundle の適合性を検証する。適合性の違反は `diagnostics`、推奨事項の逸脱は `warnings` に入る。本文リンクは相対リンクなら文書の位置から、ルート相対リンクなら bundle ルートから解決し、bundle 内に無いものを `okf.link.broken` の警告にする。`--strict` を付けると警告も失敗扱いにする。
 
 ## Python API
 

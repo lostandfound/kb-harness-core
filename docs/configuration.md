@@ -235,6 +235,7 @@ predicates:
 
 - `kb validate` はリンクを `content_root` 起点の識別子（`/people/someone.md`）へ解決してから、存在と index の網羅を検査する。`content_root` の外へ出るリンクはファイルの実在だけを見る。
 - `kb index build` / `kb sync` が生成する一覧も相対リンクで出力する。ビュー一覧（`views.index`）は出力先から `content_root` 内のメンバーへの相対リンクになる。
+- `kb export okf` は `content_root` 配下だけを bundle に写すので、`content_root` の外を指すリンクは bundle の中で切れる。書き出しは止めず、`okf.link.broken` の警告を出す。
 - 旧形式のルート相対リンク（`[誰か](/people/someone.md)`）も解決するが、GitHub では `/` がリポジトリルートを指すため遷移できない。`kb validate` が WARNING を出すので、`kb link migrate` で書き換える。
 - frontmatter の `relations` の `target`、Claim の `subject` / `object`、ビューの `members`、`evals/rag-eval.yml` の `evidence` はリンクではなく識別子なので、従来どおりルート相対パスで書く。
 
