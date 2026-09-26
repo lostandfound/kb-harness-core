@@ -7,7 +7,7 @@ import re
 import yaml
 
 from .markdown import parse_document
-from .ontology import Ontology, export_claim, validate_claim
+from .ontology import build_ontology, export_claim, validate_claim
 
 class ClaimSpecError(ValueError):
     def __init__(self, message: str, code: str = "claim.invalid"):
@@ -131,7 +131,7 @@ def _validate_proposed_claim(content_root: Path, claim: dict, exclude: Path | No
     from .validation import _iter_entity_files, _load_properties, _load_vocabulary
 
     predicates, _ = _load_vocabulary(content_root)
-    ontology = Ontology.from_mapping({"predicates": predicates, "properties": _load_properties(content_root)})
+    ontology = build_ontology({"predicates": predicates, "properties": _load_properties(content_root)})
     entities: dict[str, str] = {}
     edges: set[tuple[str, str, str]] = set()
     claims: set[tuple[str, str, str, str]] = set()

@@ -12,6 +12,7 @@ from typing import Any
 
 import yaml
 
+from .diagnostics import HarnessError
 from .doctor import diagnose
 from .sync import unified_diff
 from .entity import EntitySpecError, plan_entity_create
@@ -212,6 +213,11 @@ def _project_error(error: ProjectError, output_format: str) -> int:
 
 
 def _internal_error(error: Exception, output_format: str) -> int:
+    if isinstance(error, HarnessError):
+        # 利用者が直せる失敗（例: Claim を使うのに kb-ontology-core が無い）は安定したコードで返す
+        result = {"ok": False, "changed": [], "diagnostics": [error.diagnostic.to_dict()]}
+        _emit(result, output_format, error=output_format != "json")
+        return 1
     result = {
         "ok": False,
         "changed": [],

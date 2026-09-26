@@ -8,7 +8,7 @@ description: KB に新規エンティティを追加する確定的手順。「�
 
 反映は `kb entity create` で行う。エンティティ本体・各型の `index.md`・ルートの `graph.json` を一度に原子的に更新し、事前検証に失敗すればファイルを書き換えずに停止する（`kb` が未導入なら CONTRIBUTING.md の導入手順で入れる）。雛形を手で編集する旧手順（`python3 apm_modules/lostandfound/kb-harness-core/scripts/new_entity.py`）を使う場合は、手順 6 の `kb sync` を必ず実行する。`graph.json` はチェックイン済みで CI が `kb sync --check` で陳腐化を検出するため、index だけ更新して graph を忘れると CI が落ちる。
 
-1. 追加する型と slug を決める。`type` に使える値と各型の必須フィールド・本文セクション（`sections`）は `<content_root>/vocabulary.yml` の `types` 定義が正。`slug` はローマ字ケバブケース。
+1. 追加する型と slug を決める。`type` に使える値と各型の必須・任意フィールド（`extra_fields` / `optional_fields`）・本文セクション（`sections`）は `<content_root>/vocabulary.yml` の `types` 定義が正。`slug` はローマ字ケバブケース。
 
 2. 作業用ディレクトリ（リポジトリ外のスクラッチ領域）に spec ファイル `entity.yml` を書く。必須キーは `type` / `slug` / `title` / `description` / `tags` / `sources` / `sections`、任意キーは `aliases` / `relations` / `fields`（型固有フィールド。例: born / died / founded_year）/ `timestamp`。`sections` は「見出し → 本文」のマッピングで、その型に定義された見出しを過不足なく含める（`kb entity create --help` と失敗時の診断メッセージが正）。
 

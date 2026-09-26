@@ -8,6 +8,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 from export_graph import export_graph
 from validate import validate
+from kb_harness.ontology import core_available
 
 VOCAB = """\
 types:
@@ -50,6 +51,7 @@ sources: [Test source]
 Body.
 """
 
+@unittest.skipUnless(core_available(), "kb-ontology-core が入っていない（Claim を使うテスト）")
 class ValueClaimTest(unittest.TestCase):
     def test_value_claim_validates_and_exports(self):
         with tempfile.TemporaryDirectory() as tmp:

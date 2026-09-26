@@ -61,8 +61,10 @@ validate:
 types:
   <型名>:
     directory: <対応ディレクトリ名>     # 必須。frontmatter の type とディレクトリの対応検査に使う
+    description: <説明>                  # 任意。型の意味。ハーネスは検査にも表示にも使わない
     extra_fields: [born]                 # 任意。この型で追加必須になる frontmatter フィールド
     optional_fields: [died, same_as]     # 任意。書いてもよい frontmatter フィールド。無くても検査は通る
+    sections: [概要, 生涯, 功績]         # 任意。本文の章立て。kb entity create が過不足を検査する。省略時は 概要 / 詳細 / 関連項目
     graph: false                         # 任意（既定 true）。false の型は relations を持てない
     sources_required: false              # 任意（既定 true）。false の型は sources を省略できる
 predicates:
@@ -87,6 +89,28 @@ tags:
 - `tags` は frontmatter の `tags` に使える語の全量である。一覧にない語は validate エラーになる。
 
 `predicates.<述語>` の `domain` / `range` は省略できる。省略した側は無制約になる。ハーネスが読む述語のキーは `description` / `domain` / `range` と、下記の `broader` / `maps_to` である。
+
+### 標準型
+
+ハーネスは型名を予約しない（機構として意味を持つのは `Index` と `Claim` だけ）。ただし、標準述語の `domain` / `range` を束縛するには主体・場所・作品に当たる型が要り、`graph.json` や OKF で KB をまたいで突き合わせるには同じ名前か対応表が要る。そのため上位の型については次の 6 つを推奨名として定める。述語と同じく、名前と意味はここで定め、フィールド・章立て・ディレクトリ名は導入先が決める。
+
+| 推奨名 | 意味 | schema.org | CIDOC-CRM | Wikidata |
+|---|---|---|---|---|
+| `Person` | 個人 | `schema:Person` | E21 Person | Q5 |
+| `Organization` | 集団・組織 | `schema:Organization` | E74 Group | Q43229 |
+| `Place` | 場所 | `schema:Place` | E53 Place | Q17334923 |
+| `Event` | 出来事 | `schema:Event` | E5 Event | Q1190554 |
+| `Work` | 作品・著作物 | `schema:CreativeWork` | E73 Information Object | Q386724 |
+| `Concept` | 概念。上の 5 つに入らないもの | `schema:Intangible` | E28 Conceptual Object | Q151885 |
+
+- 対応の列は、その語彙で最も近い上位クラスであって同値ではない（`schema:Person` は E21 と一致するが、`schema:CreativeWork` と E73 は物理的な作品の扱いが違う）。型に `maps_to` を置くときは導入先が絞る。
+- 標準述語の束縛の目安: `created-by` の range は `Person` / `Organization`、`located-in` の range は `Place`、`part-of` / `derived-from` / `follows` は同じ型どうしが基本。導入先はこれを自分の型に写して `vocabulary.yml` に書く。
+- 上の 6 つより細かい型（`Dish` / `Kata` / `Script` など）は導入先が任意で足す。述語の層 2 に相当するが、型には `broader` を置かない。型の継承は `domain` / `range` の継承を連れてきて検証が重くなる。推奨型の細分なら（`Kata` は `Work` の細分など）、そのことを型の `description` に一言書く。どの推奨型にも入らない型（`Dish` など）があってもよい。
+- 型名は検査しない。`kb doctor` も非標準の型名を警告しない。型は述語より導入先固有になりやすく、`Dish` を `Work` に押し込む方が害が大きい。
+- 標準語彙への対応（`maps_to`）は型にはまだ置かない。読む側（RDF 出力、KB の突合）ができた時点で、述語と同じ形で足す。
+- ハーネスは型ごとの既定の章立てや必須フィールドを持たない。`Person` にどの章があるかは導入先の `sections` で決まる。`sections` を書かない型は 概要 / 詳細 / 関連項目 になる。既存のエンティティが別の章立てなら、`sections` に書いておかないと `kb entity create` と `scripts/new_entity.py` が既存と食い違う章立てを作る。
+
+背景は [docs/notes/hyojun-kata-memo.md](notes/hyojun-kata-memo.md) にある。
 
 ### 標準述語
 
@@ -180,7 +204,7 @@ predicates:
 - 相手がモノである情報を文字列で持たない規則の裏返しとして、値が「無い」ことをフィールドに書かない。書く場所が無いなら宣言を任意にする。
 - `born` / `died` 以外の時間フィールドは形式を検査しないので、年に落とせない表現（「殷代後期」など）をそのまま書いてよい。並べる機能が要るようになった時点で年表現へ直す。
 - 型名は導入先が自由に決めてよい。フィールドの意味は名前で決まるので、`Person` を `人物` にしても推奨名は同じ。
-- 章構成（`sections`）は推奨を置かない。型に共通の章立てを強いるのは比較可能性に寄与しない。
+- 章構成（`sections`）は推奨を置かない。型に共通の章立てを強いるのは比較可能性に寄与しない。ハーネスは型名ごとの既定の章立ても持たず、`sections` を書かない型は 概要 / 詳細 / 関連項目 になる。
 
 ## references.yml
 
@@ -208,7 +232,7 @@ aliases: []                     # 任意
 relations:                      # 任意
   - predicate: taught
     target: /people/other.md
-fields:                         # 任意。型の extra_fields に対応
+fields:                         # 任意。型の extra_fields（必須）と optional_fields（任意）に対応
   born: "1900"
 timestamp: 2026-01-01T00:00:00Z # 任意。省略時は SOURCE_DATE_EPOCH → clock
 ```

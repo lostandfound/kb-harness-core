@@ -105,7 +105,11 @@ python3 apm_modules/lostandfound/kb-harness-core/scripts/check_source_attrition.
 
 pre-commit が閉じるのはコミットするときだけなので、コミットせずに終わるターンでは検証が走らない。`.claude/settings.json` の Stop hook に `scripts/verify_turn.sh` を登録すると、ターンの終了時に `kb validate` と `kb sync --check` を実行し、失敗したらその場で Claude に直させる。設定例は [スクリプト一覧](scripts.md#verify_turnsh) を参照。
 
-## 7. 運用ファイルを置く（任意）
+## 7. 版を上げるとき
+
+`apm.yml` の固定コミットを新しいタグへ変え、`apm install` で lock と配布物を再生成してから `kb validate` と `kb sync --check` を通す。その前に CHANGELOG の **Changed** を読む。`kb validate` は通るのに新規作成の挙動だけが変わる項目（型の既定の章立てなど）は、検証では見つからない。
+
+## 8. 運用ファイルを置く（任意）
 
 `docs/CONCERNS.md`（懸念台帳）と `docs/BACKLOG.md`（拡張バックログ）は、README の推奨構成に載せている任意の運用ファイルである。ハーネスはこれらを自動生成しない。`explore-kb` `expand-kb` スキルは既存ファイルにだけ追記し、依頼がなければ新設しないため、使う場合は導入時に手で置く。存在しなくても `kb validate` は失敗しない。
 

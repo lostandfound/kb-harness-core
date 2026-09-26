@@ -23,7 +23,7 @@ python3 scripts/validate.py [--root DIR] [--fix-timestamps] [--check-urls]
 
 ### new_entity.py
 
-エンティティ雛形（frontmatter・見出し構成）を生成する。
+エンティティ雛形（frontmatter・見出し構成）を生成する。見出しは `vocabulary.yml` の型の `sections`、無ければ 概要 / 詳細 / 関連項目。型名による既定の章立ては持たない。
 
 ```bash
 python3 scripts/new_entity.py <type> <slug> [--root DIR]
@@ -140,7 +140,7 @@ python3 scripts/refs_health.py [--refs FILE] [--stale-days N] [--lineage] [--pen
 
 ### concerns_summary.py
 
-懸念台帳（Markdown）の状態別集計と、着手可能な懸念の抽出。台帳の形式は導入先が定める。雛形と状態語彙は [導入ガイド](integration.md#7-運用ファイルを置く任意) を参照。
+懸念台帳（Markdown）の状態別集計と、着手可能な懸念の抽出。台帳の形式は導入先が定める。雛形と状態語彙は [導入ガイド](integration.md#8-運用ファイルを置く任意) を参照。
 
 ```bash
 python3 scripts/concerns_summary.py [--ledger FILE]

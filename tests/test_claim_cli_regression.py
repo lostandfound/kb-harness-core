@@ -1,9 +1,13 @@
+import pytest
 import json
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 from pathlib import Path
 
 from kb_harness.cli import _parser, main
+from kb_harness.ontology import core_available
+
+pytestmark = pytest.mark.skipif(not core_available(), reason="kb-ontology-core が入っていない（Claim を使うテスト）")
 
 
 def test_claim_parser_preserves_command_surface_and_options():

@@ -81,7 +81,7 @@ kb sync --check                                                   # index.md や
 - **`graph.json`**: エンティティ間の関係を記録した知識グラフファイル。`kb graph build` または `kb sync` によって自動生成される。
 - **`index.md`**: 各ディレクトリのエンティティ一覧などを記載するインデックス文書。ファイル内の管理対象セクションが `kb sync` によって自動同期される。
 - **`log.md`**: 各階層の更新履歴を記録するファイル（OKF v0.2 仕様で予約されているが、必須ではない）。
-- **`docs/CONCERNS.md` / `docs/BACKLOG.md`**: 知識の抜け漏れや運用上の課題を記録するための運用文書（任意）。ファイルが存在しなくても検証エラーにはならない。また、エンティティそのものではないため OKF バンドルには含めない。 ハーネスは自動生成しないため、使う場合は [導入ガイド](docs/integration.md#7-運用ファイルを置く任意) の雛形から手で置く。
+- **`docs/CONCERNS.md` / `docs/BACKLOG.md`**: 知識の抜け漏れや運用上の課題を記録するための運用文書（任意）。ファイルが存在しなくても検証エラーにはならない。また、エンティティそのものではないため OKF バンドルには含めない。 ハーネスは自動生成しないため、使う場合は [導入ガイド](docs/integration.md#8-運用ファイルを置く任意) の雛形から手で置く。
 - **その他の `docs/` 配下**: 上記以外のファイル名や用途は、導入先が自由に定めてよい。
 
 ## 提供物
@@ -146,7 +146,7 @@ AI エージェント（Claude Code 等）から呼び出して利用する定�
 ## 動作要件
 
 - **Python**: 3.10 以上（CI は 3.12 で実行）
-- **主要な依存パッケージ**: PyYAML、[`kb-ontology-core`](https://github.com/lostandfound/kb-ontology-core) v0.2.0（詳細は `pyproject.toml` / `requirements.txt` を参照）
+- **主要な依存パッケージ**: PyYAML、[`kb-ontology-core`](https://github.com/lostandfound/kb-ontology-core) v0.2.0（詳細は `pyproject.toml` / `requirements.txt` を参照）。`kb-ontology-core` は Claim 型を使う導入先だけが要る。無くても Claim 以外の全機能は動き、`kb doctor` が WARNING で知らせる
 - **ツール**: [`apm`](https://github.com/microsoft/apm) CLI 0.32 以上
 - **その他**: 一部の補助スクリプトは追加の環境（外部 API キー、Chromium 等）を必要とする（詳細は [scripts リファレンス](docs/scripts.md) を参照）
 
@@ -157,7 +157,7 @@ pip install -r requirements.txt pytest
 python3 -m pytest
 ```
 
-※ `tests/test_distribution_alignment.py` を実行する場合は、兄弟ディレクトリに `../kb-ontology-core`（v0.2.0）が存在することを前提とする。
+※ `tests/test_distribution_alignment.py` は兄弟ディレクトリ `../kb-ontology-core`（v0.2.0）が無ければ skip される。Claim を使うテストは `kb-ontology-core` が無ければ skip され、CI はコアあり・なしの両方で回す。
 
 ### リリース
 

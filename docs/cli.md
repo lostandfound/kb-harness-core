@@ -31,7 +31,7 @@ KB 全体を検証する。frontmatter・リンク・relations の型制約・�
 
 ### `kb doctor`
 
-設定、`kb-ontology-core` のインストール状態と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在、述語が標準述語の体系に沿っているか（`related-to` でも[標準述語](configuration.md#標準述語)でもなく `broader` も持たない述語を `doctor.predicate.nonstandard` の WARNING で示す）を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。
+設定、`kb-ontology-core` のインストール状態（無ければ `doctor.ontology.not_installed` の WARNING。Claim を使わない限り不要）と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在、述語が標準述語の体系に沿っているか（`related-to` でも[標準述語](configuration.md#標準述語)でもなく `broader` も持たない述語を `doctor.predicate.nonstandard` の WARNING で示す）を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。
 
 ### `kb serve`
 

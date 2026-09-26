@@ -15,6 +15,7 @@ VOCAB = (
     "  Note:\n"
     "    directory: notes\n"
     "    sources_required: false\n"
+    "    sections: [概要, 本文, 関連項目]\n"
     "  Person:\n"
     "    directory: people\n"
     "predicates: {}\n"
