@@ -1,18 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 — 2026-09-26
 
 ### Changed
 - `kb-ontology-core` を必須の依存から `claims` extra に移した。`pip install kb-harness-core` ではオントロジーコアが入らず、Claim を使う導入先は `pip install "kb-harness-core[claims] @ ..."`（apm 配下なら `"apm_modules/lostandfound/kb-harness-core[claims]"`）で入れる。既に Claim を使っている導入先は、次に `pip install` し直すときに extra を付けないとオントロジーコアが落ちる（`kb doctor` が WARNING、Claim の検証が `ontology.core.missing` で止まる）。`requirements.txt` は開発・CI 用の全部入りのまま
+- `kb entity create` と `scripts/new_entity.py` が、型が `sections` を宣言しないときに型名（`Person` / `Style` / `Kata` / `Term` / `HistoricalEvent` / `Note`）で選んでいた既定の章立てを廃止した。特定の導入先の章立てがハーネスに焼き込まれていたもので、`sections` を書かない型はすべて 概要 / 詳細 / 関連項目 になる。`kb validate` は章立てを見ないので既存エンティティの検証は変わらないが、これらの型名で既定に依存していた導入先（omnibus-kb の `Person` / `Note`、沖縄空手 KB の `Person` / `Style` / `Kata`）は、この版に上げる前に `vocabulary.yml` の `sections` に既存エンティティと同じ章立てを書く。書かないと新規作成の章立てが既存と食い違う
+- 型定義（`types:`）の読み込みと `extra_fields` / `optional_fields` の宣言検査を `kb_harness.types` に一本化した。`kb validate` と `kb entity create` で判定が食い違っていた（空文字のフィールド名を validate は拒み、entity create は通していた）
+- 型固有フィールドの値が空（`died:` や `died: null`）のときは、キーを書いていないものとして扱う。任意フィールドなら通り、必須フィールドなら「missing required field」になる。これまでは「非空の文字列でなければならない」だった
 
 ### Added
 - `kb-ontology-core` が無い環境でもハーネスが動くようにした。オントロジーコアの import を Claim の検証・出力・語彙構築を呼ぶ時点まで遅らせ、Claim を使わない KB では `kb validate` / `kb sync` / `kb graph build` / `kb doctor` などがオントロジーコアなしで通る。Claim を扱おうとしたときは `ontology.core.missing` の診断（終了コード 1）で止まり、内部エラーにはしない。`kb doctor` はオントロジーコアが無いことを `doctor.ontology.not_installed`（WARNING）で報告する。CI にオントロジーコアなしのジョブを足し、Claim を使うテストと `test_distribution_alignment.py` はそれぞれオントロジーコア・兄弟ディレクトリが無ければ skip する
 - 標準型を文書で定めた。`Person` / `Organization` / `Place` / `Event` / `Work` / `Concept` の 6 つで、名前と意味と schema.org / CIDOC-CRM / Wikidata への対応だけを定め、フィールド・章立て・ディレクトリ名は導入先が決める。検査はしない。標準述語の `domain` / `range` を束縛する目安もこの型名で書いた。考察は `docs/notes/hyojun-kata-memo.md`
-
-### Changed
-- `kb entity create` と `scripts/new_entity.py` が、型が `sections` を宣言しないときに型名（`Person` / `Style` / `Kata` / `Term` / `HistoricalEvent` / `Note`）で選んでいた既定の章立てを廃止した。特定の導入先の章立てがハーネスに焼き込まれていたもので、`sections` を書かない型はすべて 概要 / 詳細 / 関連項目 になる。`kb validate` は章立てを見ないので既存エンティティの検証は変わらないが、これらの型名で既定に依存していた導入先（omnibus-kb の `Person` / `Note`、沖縄空手 KB の `Person` / `Style` / `Kata`）は、この版に上げる前に `vocabulary.yml` の `sections` に既存エンティティと同じ章立てを書く。書かないと新規作成の章立てが既存と食い違う
-- 型定義（`types:`）の読み込みと `extra_fields` / `optional_fields` の宣言検査を `kb_harness.types` に一本化した。`kb validate` と `kb entity create` で判定が食い違っていた（空文字のフィールド名を validate は拒み、entity create は通していた）
-- 型固有フィールドの値が空（`died:` や `died: null`）のときは、キーを書いていないものとして扱う。任意フィールドなら通り、必須フィールドなら「missing required field」になる。これまでは「非空の文字列でなければならない」だった
 
 ## 0.4.0 — 2026-09-26
 
