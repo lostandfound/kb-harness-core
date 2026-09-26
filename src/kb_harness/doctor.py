@@ -13,7 +13,7 @@ from pathlib import Path
 from . import __version__
 from .predicates import STANDARD_PREDICATES, load_predicates, nonstandard_layer1
 from .project import Project
-from .ontology import core_available
+from .ontology import ontology_core_available
 from .sync import plan_sync
 
 _CORE_APIS = (
@@ -72,7 +72,7 @@ def _core_diagnostics() -> list[dict[str, Any]]:
     """Check the installed core distribution and its public API, read-only."""
     # pip 導入でも兄弟ディレクトリでも解決できなければ、Claim は使えない。
     # Claim を使わない KB には要らないので、止めずに知らせる
-    if not core_available():
+    if not ontology_core_available():
         return [
             _diagnostic(
                 "doctor.ontology.not_installed",

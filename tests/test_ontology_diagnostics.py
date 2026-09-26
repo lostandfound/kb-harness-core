@@ -1,8 +1,8 @@
 import pytest
 from kb_harness import ontology
-from kb_harness.ontology import core_available
+from kb_harness.ontology import ontology_core_available
 
-pytestmark = pytest.mark.skipif(not core_available(), reason="kb-ontology-core が入っていない（Claim を使うテスト）")
+pytestmark = pytest.mark.skipif(not ontology_core_available(), reason="kb-ontology-core が入っていない（Claim を使うテスト）")
 
 
 def test_ontology_adapter_translates_by_structured_code(monkeypatch):
@@ -13,7 +13,7 @@ def test_ontology_adapter_translates_by_structured_code(monkeypatch):
         context={"value": "unknown"},
     )
     monkeypatch.setattr(
-        ontology.load_core(),
+        ontology.load_ontology_core(),
         "validate_claim",
         lambda *_args: [diagnostic],
     )

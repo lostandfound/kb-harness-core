@@ -52,7 +52,7 @@ def build_kb(root: Path, *, with_claim: bool) -> None:
     (content / "index.md").write_text(INDEX.format(title="root", links=links), encoding="utf-8")
 
 
-def run_kb_without_core(root: Path, *args: str) -> tuple[int, dict]:
+def run_kb_without_ontology_core(root: Path, *args: str) -> tuple[int, dict]:
     code = (
         "import sys, json\n"
         "sys.modules['kb_ontology_core'] = None\n"
@@ -76,7 +76,7 @@ class DependencyDeclarationTest(unittest.TestCase):
         self.assertEqual(len([d for d in claims if d.lower().startswith("kb-ontology-core")]), 1, claims)
 
 
-class WithoutCoreTest(unittest.TestCase):
+class WithoutOntologyCoreTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
@@ -86,13 +86,13 @@ class WithoutCoreTest(unittest.TestCase):
 
     def test_validate_and_doctor_work_for_a_kb_without_claims(self):
         build_kb(self.root, with_claim=False)
-        code, result = run_kb_without_core(self.root, "validate")
+        code, result = run_kb_without_ontology_core(self.root, "validate")
         self.assertEqual((code, result["ok"]), (0, True), result)
-        code, result = run_kb_without_core(self.root, "sync")
+        code, result = run_kb_without_ontology_core(self.root, "sync")
         self.assertEqual(code, 0, result)
-        code, result = run_kb_without_core(self.root, "sync", "--check")
+        code, result = run_kb_without_ontology_core(self.root, "sync", "--check")
         self.assertEqual(code, 0, result)
-        code, result = run_kb_without_core(self.root, "doctor")
+        code, result = run_kb_without_ontology_core(self.root, "doctor")
         self.assertEqual(code, 0, result)
         codes = {d["code"]: d for d in result["diagnostics"]}
         self.assertIn("doctor.ontology.not_installed", codes)
@@ -100,10 +100,10 @@ class WithoutCoreTest(unittest.TestCase):
 
     def test_claims_fail_with_a_stable_diagnostic(self):
         build_kb(self.root, with_claim=True)
-        code, result = run_kb_without_core(self.root, "validate")
+        code, result = run_kb_without_ontology_core(self.root, "validate")
         self.assertEqual(code, 1, result)
         self.assertEqual([d["code"] for d in result["diagnostics"]], ["ontology.core.missing"])
-        code, result = run_kb_without_core(self.root, "graph", "build", "--dry-run")
+        code, result = run_kb_without_ontology_core(self.root, "graph", "build", "--dry-run")
         self.assertEqual(code, 1, result)
         self.assertEqual([d["code"] for d in result["diagnostics"]], ["ontology.core.missing"])
 

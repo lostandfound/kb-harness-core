@@ -23,7 +23,7 @@ jobs:
       - run: pip install -r requirements.txt pytest==8.3.5 setuptools==75.8.0
       - run: python3 -m pytest
 
-  test-without-core:
+  test-without-ontology-core:
     # kb-ontology-core は Claim を使う導入先だけが要る。無くてもハーネスが動くことを保証する
     runs-on: ubuntu-latest
     steps:

@@ -483,7 +483,7 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     edge_keys = {(source, predicate, target) for source, predicate, target in edges}
     entity_types = {path: data[1].get("type") for path, data in entities.items()}
     if claims:
-        # kb-ontology-core はここで初めて要る。Claim の無い KB はコアなしで検証できる
+        # kb-ontology-core はここで初めて要る。Claim の無い KB はオントロジーコアなしで検証できる
         ontology = build_ontology({"predicates": predicates, "properties": properties})
         for claim_rel, claim in claims:
             errors.extend(validate_claim(claim_rel, claim, entity_types, ontology, edge_keys))
