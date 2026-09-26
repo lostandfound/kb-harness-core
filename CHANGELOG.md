@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 — 2026-09-26
+
+### Changed
+- 本文リンクをリンク元ファイルからの相対パス（`[名前](../people/example.md)`）で書く契約に改めた。これまでの `content_root` 起点のルート相対リンク（`/people/example.md`）は、GitHub が `/` をリポジトリルートとして解釈するため、`content_root` がサブディレクトリだとクリックしても遷移しなかった。相対リンクなら GitHub・Obsidian・エディタのどれでも遷移できる。規則は設定リファレンス「本文リンク」（#27）
+- `kb validate` が相対リンクを解決して、存在と index の網羅を検査するようになった。これまで検査の対象外だった相対リンクも見るので、既存の切れた相対リンクは新たに ERROR になる。`content_root` の外を指すリンクはファイルの実在だけを見る。旧形式のルート相対リンクは解決するが、件数をまとめて `validation.link.root_relative`（WARNING）で示す（#27）
+- `kb index build` / `kb sync` が生成する型別 index、タグ別一覧、ビュー一覧（`views.index`）を相対リンクで出力する。導入先はこの版に上げた後に `kb link migrate` と `kb sync` を実行する（#27）
+- `kb flashcards` は本文の相対リンクを識別子へ直して画面へ渡す。relations の `target`、Claim の `subject` / `object`、ビューの `members`、`evidence` は識別子なので、ルート相対のまま変わらない（#27）
+
+### Added
+- `kb link migrate [--check] [--dry-run]` を追加。旧形式のルート相対の本文リンクを相対リンクへ書き換える。見出しへのフラグメントは保つ（#27）
+- `kb okf validate` と `kb export okf` が、bundle 内で解決できない本文リンクを `okf.link.broken` の警告にする。`content_root` の外を指すリンクは bundle に写らないので切れる。書き出しは止めず、`kb okf validate --strict` のときだけ失敗扱いにする（#27）
+
 ## 0.6.0 — 2026-09-26
 
 ### Added
