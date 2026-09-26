@@ -194,9 +194,9 @@ class ResolveAndRenderTest(unittest.TestCase):
             self.assertEqual(first, second)
             self.assertIn("## 一度定義して各所で使う", first)
             self.assertIn("kind: list / basis: interpretation / 定義: views/teigi-once.yml", first)
-            self.assertIn("- [セマンティックレイヤー](/concepts/semantic-layer.md) — 指標を一度定義する", first)
+            self.assertIn("- [セマンティックレイヤー](../knowledge/concepts/semantic-layer.md) — 指標を一度定義する", first)
             self.assertIn("## 客家料理の料理", first)
-            self.assertIn("- [梅菜](/dishes/meicai.md)", first)
+            self.assertIn("- [梅菜](../knowledge/dishes/meicai.md)", first)
             # 導出ビューはエンティティ本文に書き戻さない
             self.assertNotIn("views", (project.content_root / "dishes" / "meicai.md").read_text(encoding="utf-8"))
 
@@ -331,7 +331,7 @@ class SyncAndGraphTest(unittest.TestCase):
             self.assertIn("views/index.md", changed)
             self.assertIn("graph.json", changed)
             new_index = plan.changes[project.views_index.resolve()]
-            self.assertIn("- [塩焗鶏](/dishes/yanju.md)", new_index)
+            self.assertIn("- [塩焗鶏](../knowledge/dishes/yanju.md)", new_index)
 
 
 class BrokenViewTest(unittest.TestCase):

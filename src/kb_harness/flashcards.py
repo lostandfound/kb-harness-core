@@ -5,6 +5,7 @@ from __future__ import annotations
 import yaml
 
 from .graph import export_graph
+from .links import rootify_body
 from .markdown import parse_document
 from .project import Project
 
@@ -24,7 +25,8 @@ def export_flashcards(project: Project) -> dict[str, object]:
             "title": node.get("title") or source.stem,
             "type": node.get("type") or "",
             "description": node.get("description") or "",
-            "details": document.body,
+            # 画面はリンク先を識別子で引くので、相対リンクを識別子へ直して渡す
+            "details": rootify_body(path, document.body),
             "tags": node.get("tags") or [],
             "related": [],
         }

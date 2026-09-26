@@ -178,7 +178,7 @@ class EntityCreateTagIndexTest(unittest.TestCase):
         (self.root / "knowledge" / "index.md").write_text(
             "---\ntype: Index\ntitle: Root\ndescription: Root index.\n"
             "tags: [index]\ntimestamp: 2026-09-01T00:00:00Z\n---\n\n# Root\n\n"
-            "- [Concepts](/concepts/index.md)（0件）\n",
+            "- [Concepts](concepts/index.md)（0件）\n",
             encoding="utf-8",
         )
 
@@ -186,6 +186,6 @@ class EntityCreateTagIndexTest(unittest.TestCase):
         code, result = self.run_cli("entity", "create", "--from", str(self.root / "entity.yml"))
         self.assertEqual(code, 0, result)
         text = (self.root / "knowledge" / "index.md").read_text(encoding="utf-8")
-        self.assertIn("### science（1件）\n\n- [量子論](/concepts/quantum-theory.md) — Concept\n", text)
+        self.assertIn("### science（1件）\n\n- [量子論](concepts/quantum-theory.md) — Concept\n", text)
         code, _ = self.run_cli("sync", "--check")
         self.assertEqual(code, 0)

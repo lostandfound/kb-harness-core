@@ -220,6 +220,24 @@ predicates:
 - 型名は導入先が自由に決めてよい。フィールドの意味は名前で決まるので、`Person` を `人物` にしても推奨名は同じ。
 - 章構成（`sections`）は推奨を置かない。型に共通の章立てを強いるのは比較可能性に寄与しない。ハーネスは型名ごとの既定の章立ても持たず、`sections` を書かない型は 概要 / 詳細 / 関連項目 になる。
 
+## 本文リンク
+
+エンティティ本文と `index.md` のリンクは、リンク元ファイルからの相対パスで書く。GitHub・Obsidian・エディタのどれでもクリックで遷移でき、`content_root` がリポジトリのサブディレクトリでも壊れない。
+
+```markdown
+<!-- /notes/memo.md から -->
+[誰か](../people/someone.md)
+[別のメモ](other.md)
+
+<!-- ルート index.md から -->
+[人物](people/index.md)
+```
+
+- `kb validate` はリンクを `content_root` 起点の識別子（`/people/someone.md`）へ解決してから、存在と index の網羅を検査する。`content_root` の外へ出るリンクはファイルの実在だけを見る。
+- `kb index build` / `kb sync` が生成する一覧も相対リンクで出力する。ビュー一覧（`views.index`）は出力先から `content_root` 内のメンバーへの相対リンクになる。
+- 旧形式のルート相対リンク（`[誰か](/people/someone.md)`）も解決するが、GitHub では `/` がリポジトリルートを指すため遷移できない。`kb validate` が WARNING を出すので、`kb link migrate` で書き換える。
+- frontmatter の `relations` の `target`、Claim の `subject` / `object`、ビューの `members`、`evals/rag-eval.yml` の `evidence` はリンクではなく識別子なので、従来どおりルート相対パスで書く。
+
 ## references.yml
 
 文献レジストリ。エンティティの `sources` と本文インラインの `（出典: ref-id）` は、ここに定義された ID を参照する。

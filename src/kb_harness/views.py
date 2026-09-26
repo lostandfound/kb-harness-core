@@ -10,6 +10,7 @@ Markdown には書き戻さない。事実（出典で支えられた記述）�
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Collection, Mapping
@@ -343,7 +344,13 @@ INDEX_NOTE = (
 )
 
 
-def render_views_index(content_root: Path, views_root: Path) -> str:
+def render_views_index(content_root: Path, views_root: Path, index_path: Path | None = None) -> str:
+    """ビュー一覧を描画する。メンバーへのリンクは一覧ファイルからの相対パスにする。
+
+    ``index_path`` を省くと既定の出力先 ``<views_root>/index.md`` を仮定する。
+    """
+    index_dir = (index_path or views_root / "index.md").resolve().parent
+    content_dir = content_root.resolve()
     entities = load_entities(content_root)
     excluded = query_excluded_types(content_root)
     matches = query_predicate_matches(content_root)
@@ -367,7 +374,8 @@ def render_views_index(content_root: Path, views_root: Path) -> str:
             frontmatter = entities.get(member.path) or {}
             title = str(frontmatter.get("title") or member.path)
             note = f" — {member.note}" if member.note else ""
-            lines.append(f"- [{title}]({member.path}){note}")
+            href = Path(os.path.relpath(content_dir / member.path.lstrip("/"), index_dir)).as_posix()
+            lines.append(f"- [{title}]({href}){note}")
         if not members:
             lines.append("- （該当なし）")
         lines.append("")
@@ -378,7 +386,7 @@ def plan_views_index(content_root: Path, views_root: Path | None, index_path: Pa
     """ビュー一覧の生成計画。views が未設定なら空。"""
     if views_root is None or index_path is None or not views_root.is_dir():
         return {}
-    rendered = render_views_index(content_root, views_root)
+    rendered = render_views_index(content_root, views_root, index_path)
     output = index_path.resolve()
     current = output.read_text(encoding="utf-8") if output.is_file() else None
     if current == rendered:

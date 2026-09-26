@@ -30,7 +30,7 @@ class IndexTest(unittest.TestCase):
             self.assertEqual(index.read_text(encoding="utf-8"), original)
             self.assertEqual(list(changes), [index.resolve()])
             self.assertIn(
-                "- [Example](/notes/example.md) — Description.",
+                "- [Example](example.md) — Description.",
                 changes[index.resolve()],
             )
 
@@ -80,8 +80,8 @@ class TagIndexTest(unittest.TestCase):
             self.assertTrue(rendered.startswith("# Root\n\n手書きの本文\n\n<!-- tag-index:start -->\n"))
             self.assertTrue(rendered.endswith("<!-- tag-index:end -->\n"))
             # vocabulary.yml の tags 順、ラベル未指定はタグ ID のまま、該当なしのタグは省く
-            self.assertIn("### 料理（2件）\n\n- [A-DISH](/dishes/a-dish.md) — Dish\n- [B-NOTE](/notes/b-note.md) — Note\n", rendered)
-            self.assertIn("### science（1件）\n\n- [B-NOTE](/notes/b-note.md) — Note\n", rendered)
+            self.assertIn("### 料理（2件）\n\n- [A-DISH](dishes/a-dish.md) — Dish\n- [B-NOTE](notes/b-note.md) — Note\n", rendered)
+            self.assertIn("### science（1件）\n\n- [B-NOTE](notes/b-note.md) — Note\n", rendered)
             self.assertNotIn("unused", rendered)
             self.assertLess(rendered.index("### 料理"), rendered.index("### science"))
 

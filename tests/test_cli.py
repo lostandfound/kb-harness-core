@@ -265,7 +265,7 @@ class CliTest(unittest.TestCase):
             result = json.loads(output.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertEqual(result["changed"], ["knowledge/notes/index.md"])
-            self.assertIn("[Example](/notes/example.md)", index.read_text(encoding="utf-8"))
+            self.assertIn("[Example](example.md)", index.read_text(encoding="utf-8"))
 
     def test_graph_check_reports_stale_graph_without_writing(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -528,7 +528,7 @@ class TagIndexCliTest(unittest.TestCase):
             with redirect_stdout(io.StringIO()):
                 self.assertEqual(main(["sync", "--start", str(root), "--format", "json"]), 0)
             text = index.read_text(encoding="utf-8")
-            self.assertIn("### 料理（1件）\n\n- [Example](/notes/example.md) — Note\n", text)
+            self.assertIn("### 料理（1件）\n\n- [Example](notes/example.md) — Note\n", text)
 
             with redirect_stdout(io.StringIO()):
                 self.assertEqual(main(["sync", "--check", "--start", str(root), "--format", "json"]), 0)

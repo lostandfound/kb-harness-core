@@ -26,6 +26,7 @@ from .references import (
 )
 from .graph import plan_graph
 from .index import plan_index
+from .links import plan_link_migration
 from .okf import OkfExportError, audit_okf_bundle, plan_okf_export
 from .project import Project, ProjectError
 from .serve import serve
@@ -94,6 +95,13 @@ def _parser() -> argparse.ArgumentParser:
         command_parser = graph_commands.add_parser(command)
         command_parser.add_argument("--dry-run", action="store_true")
         _add_common_options(command_parser)
+
+    link_parser = subcommands.add_parser("link", help="maintain body links")
+    link_commands = link_parser.add_subparsers(dest="link_command", required=True)
+    migrate_parser = link_commands.add_parser("migrate", help="rewrite root-relative body links as relative links")
+    migrate_parser.add_argument("--check", action="store_true")
+    migrate_parser.add_argument("--dry-run", action="store_true")
+    _add_common_options(migrate_parser)
 
     sync_parser = subcommands.add_parser("sync", help="synchronize derived files")
     sync_parser.add_argument("--check", action="store_true")
@@ -814,6 +822,17 @@ def _main(argv: Sequence[str] | None = None) -> int:
             ),
             stale_code=lambda _path: "graph.stale",
             stale_message=lambda path: f"graph is stale: {path}",
+        )
+
+    if args.command == "link" and args.link_command == "migrate":
+        return _run_derived(
+            project,
+            check=args.check,
+            dry_run=args.dry_run,
+            output_format=args.format,
+            planner=lambda: plan_link_migration(project.content_root),
+            stale_code=lambda _path: "link.root_relative",
+            stale_message=lambda path: f"root-relative body links remain: {path}",
         )
 
     if args.command == "sync":
