@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- リリースタグを打つ GitHub Actions ワークフロー `release.yml` を追加。`workflow_dispatch` で版を受け取り、`pyproject.toml` / `__init__.py` / `apm.yml` / `CHANGELOG.md` が一致するコミットにだけ注釈付きタグ `v<version>` を作る。手順は README の「リリース」
+
 ## 0.3.0 — 2026-09-26
 
 ### Changed

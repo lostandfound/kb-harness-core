@@ -159,6 +159,12 @@ python3 -m pytest
 
 ※ `tests/test_distribution_alignment.py` を実行する場合は、兄弟ディレクトリに `../kb-ontology-core`（v0.2.0）が存在することを前提とする。
 
+### リリース
+
+1. `CHANGELOG.md` の Unreleased を版と日付に確定し、`pyproject.toml` / `src/kb_harness/__init__.py` / `apm.yml` の版を揃えて `main` にマージする。
+2. Actions の **Tag release** ワークフロー（`.github/workflows/release.yml`）を `main` で手動実行し、`version` にその版を渡す。版ファイルが一致するコミットにだけ注釈付きタグ `v<version>` が打たれる。`target` に SHA を渡せば `main` 上の特定コミットを指せる。
+3. GitHub Releases は使わない。導入先は `apm.yml` / `requirements.txt` でタグを指す。
+
 ## ライセンス
 
 MIT

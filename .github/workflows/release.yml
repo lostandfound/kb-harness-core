@@ -1,0 +1,66 @@
+name: Tag release
+
+# リリースタグを打つ。版ファイル（pyproject.toml / __init__.py / apm.yml / CHANGELOG.md）が
+# 指定した版で揃っているコミットにだけ、注釈付きタグ v<version> を作る。
+# GitHub Releases は使わない（タグのみ）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "タグを打つ版（例 0.3.0）。版ファイルと一致していること"
+        required: true
+        type: string
+      target:
+        description: "タグを打つコミット SHA または ref。省略時は実行ブランチの先頭"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      TARGET: ${{ inputs.target }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Resolve target commit
+        id: target
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "version must be X.Y.Z: $VERSION" >&2
+            exit 1
+          fi
+          sha="$(git rev-parse --verify "${TARGET:-HEAD}^{commit}")"
+          if ! git merge-base --is-ancestor "$sha" "origin/${GITHUB_REF_NAME}"; then
+            echo "target $sha is not on ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Verify version files agree
+        run: |
+          set -euo pipefail
+          sha="${{ steps.target.outputs.sha }}"
+          git show "$sha:pyproject.toml" | grep -qxF "version = \"$VERSION\""
+          git show "$sha:src/kb_harness/__init__.py" | grep -qxF "__version__ = \"$VERSION\""
+          git show "$sha:apm.yml" | grep -qxF "version: $VERSION"
+          git show "$sha:CHANGELOG.md" | grep -qF "## $VERSION — "
+      - name: Create annotated tag
+        run: |
+          set -euo pipefail
+          sha="${{ steps.target.outputs.sha }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null; then
+            echo "tag v$VERSION already exists" >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" "$sha" -m "v$VERSION"
+          git push origin "refs/tags/v$VERSION"
