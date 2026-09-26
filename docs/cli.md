@@ -109,6 +109,14 @@ Claim の `status` を明示的に遷移させる。許容される遷移は `kb
 
 `references.yml` の構造を検査する。
 
+### `kb reference show ID...` / `kb reference show --for ENTITY`
+
+`references.yml` から指定 ID のエントリだけを取り出す。`--for` にエンティティファイルを渡すと、その `sources` と本文の `（出典: id）` に現れる ID を初出順に集めて書誌ごと返す（`ids` に ID 一覧、`entries` に書誌）。text は各エントリを YAML ブロックで、json は `{ok, entries, missing, diagnostics}` を返す。見つからない ID は `missing` と `reference.id.missing` の診断に載り終了コード 1。エージェントはレジストリ全体を文脈に読み込まず、このコマンドで必要な書誌だけを引く。
+
+### `kb reference search TERM... [--field FIELD] [--url URL] [--doi DOI] [--limit N] [--full]`
+
+`references.yml` を語句で探す。語句は大小無視の部分一致で、複数与えると AND。既定の対象フィールドは `id` / `title` / `author` / `publisher` / `journal` / `url` / `doi` / `note` で、`--field` で絞る（複数指定可）。`--url` / `--doi` は正規化（scheme・`www.`・末尾スラッシュ・fragment、`doi.org/` 接頭辞の除去、小文字化）後の完全一致で、登録前の重複確認に使う。語句・`--url`・`--doi` は組み合わせると全条件の AND。結果はレジストリの記載順。text は 1 件 1 行（`id`・`type`・`title`・`author`・`year`・`url` をタブ区切り）で件数を stderr に出し、`--full` で YAML ブロック表示。json は `{ok, entries, count, shown}`。索引は持たず毎回レジストリを読む。
+
 ### `kb reference spec --from search-result.json --output reference.yml`
 
 `ndl_search.py` / `cinii_search.py` の検索結果（JSON / YAML）を登録用 spec に変換する。`--dry-run` / `--force`（出力先の上書き）に対応する。
@@ -150,7 +158,7 @@ spec を `references.yml` に原子的に追加する。既存レジストリの
 | `kb_harness.markdown` | frontmatter 付き Markdown の解析・シリアライズ |
 | `kb_harness.entity` / `kb_harness.actions.entity` | エンティティ spec の検証と作成計画 |
 | `kb_harness.claim` | Claim の作成・照会・遷移 |
-| `kb_harness.references` | `references.yml` の点検・追記 |
+| `kb_harness.references` | `references.yml` の点検・追記・照会（show / search） |
 | `kb_harness.index` / `kb_harness.graph` / `kb_harness.sync` | 生成物の計画と適用 |
 | `kb_harness.okf` | OKF v0.2 の export と検証 |
 | `kb_harness.ontology` | `kb-ontology-core` の `Diagnostic` を構造化診断へ翻訳する。従来の `validate_claim`（文字列リスト）も互換入口として残る |

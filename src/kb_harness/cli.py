@@ -20,8 +20,13 @@ from .claim import ClaimSpecError, plan_claim_create, plan_claim_transition, ins
 from .references import (
     ReferencePlan,
     ReferenceSpecError,
+    format_reference_block,
+    format_reference_line,
     plan_reference_create,
     reference_health,
+    reference_search,
+    reference_show,
+    reference_show_for_entity,
     reference_spec_from_search,
 )
 from .graph import plan_graph
@@ -144,6 +149,18 @@ def _parser() -> argparse.ArgumentParser:
     rc.add_argument("--from", dest="spec", required=True)
     rc.add_argument("--dry-run", action="store_true")
     _add_common_options(rc)
+    rshow = reference_commands.add_parser("show", help="show reference entries by id or for one entity")
+    rshow.add_argument("ids", nargs="*", metavar="ID")
+    rshow.add_argument("--for", dest="entity", default=None, metavar="ENTITY", help="entity file whose sources and inline citations are shown")
+    _add_common_options(rshow)
+    rsearch = reference_commands.add_parser("search", help="search references by terms, url or doi")
+    rsearch.add_argument("terms", nargs="*", metavar="TERM")
+    rsearch.add_argument("--field", action="append", dest="fields", choices=("id", "title", "author", "publisher", "journal", "url", "doi", "note"), default=None)
+    rsearch.add_argument("--url", default=None)
+    rsearch.add_argument("--doi", default=None)
+    rsearch.add_argument("--limit", type=int, default=None)
+    rsearch.add_argument("--full", action="store_true", help="print full entries instead of one line per hit")
+    _add_common_options(rsearch)
     rs = reference_commands.add_parser("spec", help="convert search output to a reference spec")
     rs.add_argument("--from", dest="source", required=True)
     rs.add_argument("--output", required=True)
@@ -650,6 +667,52 @@ def _okf_export(project: Project, args: Any) -> int:
     return 0
 
 
+def _reference_lookup(project: Project, args: Any) -> int:
+    """``kb reference show`` / ``kb reference search``: レジストリを丸ごと読まずに必要な項目だけ返す。"""
+    registry = project.content_root / "references.yml"
+    try:
+        if args.reference_command == "show":
+            if args.entity:
+                if args.ids:
+                    raise ReferenceSpecError("reference.show.arguments", "give either ids or --for, not both")
+                entity = Path(args.entity)
+                if not entity.is_absolute():
+                    entity = Path.cwd() / entity
+                result = reference_show_for_entity(registry, entity)
+            elif args.ids:
+                result = reference_show(registry, list(args.ids))
+            else:
+                raise ReferenceSpecError("reference.show.arguments", "give at least one id or --for ENTITY")
+            full = True
+        else:
+            if not args.terms and not args.url and not args.doi:
+                raise ReferenceSpecError("reference.search.arguments", "give search terms, --url or --doi")
+            result = reference_search(
+                registry,
+                list(args.terms),
+                fields=tuple(args.fields) if args.fields else None,
+                url=args.url,
+                doi=args.doi,
+                limit=args.limit,
+            )
+            full = args.full
+    except ReferenceSpecError as error:
+        _emit({"ok": False, "entries": [], "diagnostics": [{"code": error.code, "message": str(error)}]}, args.format, error=True)
+        return 2
+    except Exception as error:
+        return _internal_error(error, args.format)
+    if args.format == "json":
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    else:
+        for entry in result["entries"]:
+            print(format_reference_block(entry) if full else format_reference_line(entry), end="" if full else "\n")
+        if args.reference_command == "search":
+            print(f"count: {result['count']}" + (f" (shown {result['shown']})" if result["shown"] != result["count"] else ""), file=sys.stderr)
+        for diagnostic in result.get("diagnostics", []):
+            print(diagnostic["message"], file=sys.stderr)
+    return 0 if result["ok"] else 1
+
+
 def _emit_okf_export(result: Result, output_format: str) -> None:
     _emit(result, output_format)
     if output_format != "json":
@@ -750,6 +813,8 @@ def _main(argv: Sequence[str] | None = None) -> int:
             dry_run=args.dry_run,
             extra={"spec": spec},
         )
+    if args.command == "reference" and args.reference_command in ("show", "search"):
+        return _reference_lookup(project, args)
     if args.command == "reference":
         result = reference_health(project.content_root / "references.yml")
         _emit(result, args.format, error=not result["ok"])

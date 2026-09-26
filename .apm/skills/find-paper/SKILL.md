@@ -9,10 +9,12 @@ description: CiNii API で論文を検索し references.yml へ登録する確�
 
 2. 出力される references.yml 登録案から、対象エンティティの主張を実際に裏付けられそうな文献を選ぶ。タイトルだけで判断できない場合は URL を WebFetch して要旨を確認する。
 
-3. JSON 出力は `kb reference spec --from search-result.json --output reference.yml --dry-run`（いずれも作業用ディレクトリ内のパス）で決定論的な spec に変換し、内容を確認してから `kb reference create --from reference.yml --dry-run` で登録差分を確認する。登録 ID は規約に沿って編集する（著者ローマ字姓-年、例: `kadekaru-2017`。仮 ID は必ず直す）。`<content_root>/references.yml`（content_root は `kb-domain.yml` の `domain.content_root`）への反映は `kb reference create --from reference.yml` を使う。フィールドは確認できた値のみ書く。特定系統内の資料と判断できる場合は optional key `lineage`（系統名の文字列。単位の例は `kb-domain.yml` の `domain.lineage_example`）を付与する（判断がつかない場合は省略）。
+3. 登録前に `kb reference search --url <URL>`（DOI があれば `--doi <DOI>`、書籍はタイトルや著者名の語句）で既存エントリを確認する。同じ資料が既にあればその ID を使い、新規登録はしない。
 
-4. 出典として使うエンティティの `sources` に `- "ref: <id>"` を追記する。本文の主張は必ず自分の言葉で書く。PDF 等の本文ファイルはリポジトリに保存しない。
+4. JSON 出力は `kb reference spec --from search-result.json --output reference.yml --dry-run`（いずれも作業用ディレクトリ内のパス）で決定論的な spec に変換し、内容を確認してから `kb reference create --from reference.yml --dry-run` で登録差分を確認する。登録 ID は規約に沿って編集する（著者ローマ字姓-年、例: `kadekaru-2017`。仮 ID は必ず直す）。`<content_root>/references.yml`（content_root は `kb-domain.yml` の `domain.content_root`）への反映は `kb reference create --from reference.yml` を使う。フィールドは確認できた値のみ書く。特定系統内の資料と判断できる場合は optional key `lineage`（系統名の文字列。単位の例は `kb-domain.yml` の `domain.lineage_example`）を付与する（判断がつかない場合は省略）。
 
-5. `kb validate` でエラーゼロ、URL を登録した場合は `--check-urls` も実行する。
+5. 出典として使うエンティティの `sources` に `- "ref: <id>"` を追記する。本文の主張は必ず自分の言葉で書く。PDF 等の本文ファイルはリポジトリに保存しない。
 
-6. コミットする。pre-commit hook が最終検証を行う。
+6. `kb validate` でエラーゼロ、URL を登録した場合は `--check-urls` も実行する。
+
+7. コミットする。pre-commit hook が最終検証を行う。

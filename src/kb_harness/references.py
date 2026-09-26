@@ -170,3 +170,161 @@ def reference_health(path: Path) -> dict[str, Any]:
         if entry.get("url") and not str(entry["url"]).startswith(("http://", "https://")):
             diagnostics.append({"code": "reference.url.invalid", "message": f"{ref_id}: URL must use http or https"})
     return {"ok": not diagnostics, "diagnostics": diagnostics, "count": len(data)}
+
+
+# ---------------------------------------------------------------------------
+# 照会（show / search）
+#
+# エージェントが references.yml を丸ごと文脈に読み込まずに済むよう、ID・語句・
+# エンティティ単位で必要なエントリだけを取り出す。索引は持たず、毎回レジストリを
+# 読み直す（数百〜数千件なら十分速く、決定性を保てる）。
+# ---------------------------------------------------------------------------
+
+SEARCH_FIELDS = ("id", "title", "author", "publisher", "journal", "url", "doi", "note")
+SUMMARY_FIELDS = ("type", "title", "author", "year", "url")
+
+_CITATION_RE = re.compile(r"（出典:\s*([^（）]*)）")
+
+
+def load_references(path: Path) -> dict[str, dict[str, Any]]:
+    """references.yml を読み、ID → エントリの mapping を返す。"""
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise ReferenceSpecError("reference.read", str(exc)) from exc
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise ReferenceSpecError("reference.root.mapping", "references.yml must be a mapping")
+    return {str(k): (v if isinstance(v, dict) else {}) for k, v in data.items()}
+
+
+def normalize_url(url: str) -> str:
+    """重複判定用に URL を正規化する（scheme・www・末尾スラッシュ・fragment の揺れを吸収）。"""
+    value = str(url).strip()
+    value = re.sub(r"^https?://", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"^www\.", "", value, flags=re.IGNORECASE)
+    value = value.split("#", 1)[0]
+    return value.rstrip("/").lower()
+
+
+def normalize_doi(doi: str) -> str:
+    value = str(doi).strip()
+    value = re.sub(r"^https?://(dx\.)?doi\.org/", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"^doi:\s*", "", value, flags=re.IGNORECASE)
+    return value.lower()
+
+
+def _entry_with_id(ref_id: str, entry: dict[str, Any]) -> dict[str, Any]:
+    return {"id": ref_id, **entry}
+
+
+def entity_reference_ids(entity_path: Path) -> list[str]:
+    """エンティティの ``sources`` と本文の ``（出典: id）`` から参照 ID を初出順に集める。"""
+    from .markdown import parse_document
+    from .diagnostics import HarnessError
+
+    try:
+        text = entity_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ReferenceSpecError("reference.entity.read", str(exc)) from exc
+    try:
+        document = parse_document(str(entity_path), text)
+    except HarnessError as exc:
+        raise ReferenceSpecError("reference.entity.frontmatter", exc.diagnostic.message) from exc
+    ids: list[str] = []
+
+    def _add(ref_id: str) -> None:
+        ref_id = ref_id.strip()
+        if ref_id and ref_id not in ids:
+            ids.append(ref_id)
+
+    sources = document.frontmatter.get("sources")
+    if isinstance(sources, list):
+        for source in sources:
+            if isinstance(source, str) and source.startswith("ref:"):
+                _add(source[len("ref:"):])
+    for match in _CITATION_RE.finditer(document.body):
+        for token in match.group(1).split(","):
+            token = token.strip()
+            if token.startswith("ref:"):
+                token = token[len("ref:"):]
+            _add(token)
+    return ids
+
+
+def reference_show(path: Path, ids: list[str]) -> dict[str, Any]:
+    """ID を指定してエントリを返す。見つからない ID は ``missing`` と診断に載る。"""
+    registry = load_references(path)
+    entries = [_entry_with_id(ref_id, registry[ref_id]) for ref_id in ids if ref_id in registry]
+    missing = [ref_id for ref_id in ids if ref_id not in registry]
+    diagnostics = [{"code": "reference.id.missing", "message": f"{ref_id}: reference id not found"} for ref_id in missing]
+    return {"ok": not missing, "entries": entries, "missing": missing, "diagnostics": diagnostics}
+
+
+def reference_show_for_entity(references_path: Path, entity_path: Path) -> dict[str, Any]:
+    """エンティティが引く出典の書誌をまとめて返す。"""
+    ids = entity_reference_ids(entity_path)
+    result = reference_show(references_path, ids)
+    result["entity"] = str(entity_path)
+    result["ids"] = ids
+    return result
+
+
+def reference_search(
+    path: Path,
+    terms: list[str],
+    *,
+    fields: tuple[str, ...] | None = None,
+    url: str | None = None,
+    doi: str | None = None,
+    limit: int | None = None,
+) -> dict[str, Any]:
+    """語句（部分一致・大小無視・AND）と URL / DOI（正規化後の完全一致）でエントリを探す。
+
+    ``terms`` ``url`` ``doi`` を複数与えたときは全条件を満たすものだけを返す。
+    結果はレジストリの記載順で、順序は入力に対して決定的である。
+    """
+    registry = load_references(path)
+    search_fields = fields or SEARCH_FIELDS
+    lowered = [t.lower() for t in terms if t.strip()]
+    want_url = normalize_url(url) if url else None
+    want_doi = normalize_doi(doi) if doi else None
+    hits: list[dict[str, Any]] = []
+    for ref_id, entry in registry.items():
+        if want_url is not None and normalize_url(str(entry.get("url", ""))) != want_url:
+            continue
+        if want_doi is not None:
+            candidates = [str(entry.get("doi", ""))]
+            if entry.get("url"):
+                candidates.append(str(entry["url"]))
+            if not any(normalize_doi(c) == want_doi for c in candidates if c):
+                continue
+        if lowered:
+            haystack = " ".join(
+                (ref_id if f == "id" else str(entry.get(f, ""))) for f in search_fields
+            ).lower()
+            if not all(term in haystack for term in lowered):
+                continue
+        hits.append(_entry_with_id(ref_id, entry))
+    total = len(hits)
+    if limit is not None:
+        hits = hits[: max(limit, 0)]
+    return {"ok": True, "entries": hits, "count": total, "shown": len(hits)}
+
+
+def format_reference_line(entry: dict[str, Any]) -> str:
+    """text 出力用の 1 行要約（id・type・title・author・year・url）。"""
+    parts = [entry.get("id", "")]
+    for field in SUMMARY_FIELDS:
+        value = entry.get(field)
+        if value not in (None, ""):
+            parts.append(str(value))
+    return "\t".join(str(p) for p in parts)
+
+
+def format_reference_block(entry: dict[str, Any]) -> str:
+    """text 出力用の全フィールド表示（YAML）。"""
+    ref_id = entry.get("id", "")
+    body = {k: v for k, v in entry.items() if k != "id"}
+    return yaml.safe_dump({ref_id: body}, allow_unicode=True, sort_keys=False)
