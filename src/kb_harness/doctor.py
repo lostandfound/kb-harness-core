@@ -11,6 +11,7 @@ from typing import Any
 from pathlib import Path
 
 from . import __version__
+from .predicates import STANDARD_PREDICATES, load_predicates, nonstandard_layer1
 from .project import Project
 from .sync import plan_sync
 
@@ -171,6 +172,27 @@ def _extra_check_diagnostics(project: Project) -> list[dict[str, Any]]:
     return diagnostics
 
 
+def _predicate_diagnostics(project: Project) -> list[dict[str, Any]]:
+    """標準述語でも related-to でもなく、broader も持たない述語を可視化する。止めはしない。"""
+    try:
+        predicates = load_predicates(project.content_root)
+    except Exception:
+        # 語彙が読めない場合は kb validate が ERROR にする。ここでは重ねて報告しない
+        return []
+    diagnostics: list[dict[str, Any]] = []
+    for name in nonstandard_layer1(predicates):
+        diagnostics.append(
+            _diagnostic(
+                "doctor.predicate.nonstandard",
+                f"WARNING predicate '{name}' is neither a standard predicate nor refined under one (broader)",
+                field=f"predicates.{name}",
+                context={"predicate": name, "standard": sorted(STANDARD_PREDICATES)},
+            )
+            | {"severity": "warning"}
+        )
+    return diagnostics
+
+
 _SHELL_BUILTINS = frozenset({"true", "false", "test", "[", "cd", "echo", "exit", "set", "export", "source", "."})
 
 
@@ -200,6 +222,7 @@ def diagnose(project: Project) -> tuple[dict[str, str], list[dict[str, Any]]]:
             }
         )
         return details, diagnostics
+    diagnostics.extend(_predicate_diagnostics(project))
     for path in plan_sync(project):
         relative = str(path.relative_to(project.repo_root))
         diagnostics.append(

@@ -133,7 +133,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(
                 json.loads(output.getvalue()),
-                {"changed": [], "diagnostics": [], "ok": True},
+                {"changed": [], "diagnostics": [], "ok": True, "warnings": []},
             )
 
     def test_validate_check_urls_reports_unreachable_source_url(self):

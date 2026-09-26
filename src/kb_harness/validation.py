@@ -15,6 +15,14 @@ import yaml
 from .diagnostics import HarnessError
 from .markdown import parse_document
 from .ontology import Ontology, validate_claim
+from .predicates import (
+    Predicate,
+    as_mapping,
+    is_unclassified,
+    predicates_from_mapping,
+    refinement_candidates,
+    validate_predicates,
+)
 from .project import Project, ProjectError
 
 
@@ -48,21 +56,40 @@ CITATION_RE = re.compile(r"（出典:\s*([^（）]*)）")
 # LLM 生成時に混入しうるラッパータグ（本文は純 Markdown であり HTML タグを含まない前提）
 ARTIFACT_RE = re.compile(r"</?(content|document|file|output|text)>", re.IGNORECASE)
 
-def _load_vocabulary(root: Path):
-    vocab_path = root / "vocabulary.yml"
-    data = yaml.safe_load(vocab_path.read_text(encoding="utf-8")) or {}
-    raw_predicates = data.get("predicates") or {}
-    predicates = {}
-    for name, val in raw_predicates.items():
-        if isinstance(val, dict):
-            predicates[name] = {
-                "description": val.get("description", ""),
-                "domain": val.get("domain") or [],
-                "range": val.get("range") or [],
-            }
-        else:
-            predicates[name] = {"description": val, "domain": [], "range": []}
+class ValidationWarning(str):
+    """validate() の warning。従来どおり文字列として印字でき、severity / code を併せ持つ。
+
+    文字列形は `<SEVERITY> <message>`。scripts/validate.py はそのまま stderr に出し、
+    `kb validate --format json` は warning_record で構造化する。
+    """
+
+    severity: str
+    code: str
+
+    def __new__(cls, message: str, *, code: str, severity: str = "warning"):
+        instance = super().__new__(cls, f"{severity.upper()} {message}")
+        instance.severity = severity
+        instance.code = code
+        return instance
+
+
+def warning_record(warning: str) -> dict[str, str]:
+    """warning を `diagnostics` と同じ構造（severity / code / message）にする。"""
+    if isinstance(warning, ValidationWarning):
+        return {"severity": warning.severity, "code": warning.code, "message": str(warning)}
+    return {"severity": "warning", "code": "validation.warning", "message": str(warning)}
+
+
+def _read_vocabulary(root: Path) -> tuple[dict, set[str], dict[str, Predicate]]:
+    """vocabulary.yml を 1 回読み、述語（Ontology 用の写像と Predicate）とタグを返す。"""
+    data = yaml.safe_load((root / "vocabulary.yml").read_text(encoding="utf-8")) or {}
+    predicate_defs = predicates_from_mapping(data.get("predicates"))
     tags = set(data.get("tags") or [])
+    return as_mapping(predicate_defs), tags, predicate_defs
+
+
+def _load_vocabulary(root: Path):
+    predicates, tags, _defs = _read_vocabulary(root)
     return predicates, tags
 
 def _load_properties(root: Path) -> dict:
@@ -238,9 +265,11 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     errors: list[str] = []
     if warnings is None:
         warnings = []
-    predicates, vocab_tags = _load_vocabulary(root)
+    predicates, vocab_tags, predicate_defs = _read_vocabulary(root)
     properties = _load_properties(root)
     ontology = Ontology.from_mapping({"predicates": predicates, "properties": properties})
+    # 述語の階層（broader / maps_to）は kb-ontology-core には渡さず、ハーネス側で検査する
+    errors.extend(validate_predicates(predicate_defs))
     types = _load_types(root)
     type_dir_map = {t["directory"]: name for name, t in types.items()}
     references, ref_errors = _load_references(root)
@@ -323,10 +352,18 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
         if isinstance(description, str):
             errors.extend(_check_description(rel, description))
             if isinstance(title, str) and description.strip() == title.strip():
-                warnings.append(f"{rel}: description が title と同一で説明になっていない")
+                warnings.append(
+                    ValidationWarning(
+                        f"{rel}: description が title と同一で説明になっていない",
+                        code="validation.description.same_as_title",
+                    )
+                )
             if len(description.strip()) > DESCRIPTION_LONG:
                 warnings.append(
-                    f"{rel}: description が長い（{len(description.strip())} 文字）。検索結果に出る一文として読めるか見直す"
+                    ValidationWarning(
+                        f"{rel}: description が長い（{len(description.strip())} 文字）。検索結果に出る一文として読めるか見直す",
+                        code="validation.description.long",
+                    )
                 )
 
         aliases = fm.get("aliases")
@@ -470,6 +507,32 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                     f"{target} との間に双方向で存在"
                 )
 
+    # related-to は未分類の印。件数は分類の負債量として報告し、層 1 のちょうど 1 つの述語に
+    # 収まるエッジは精緻化の余地として指す
+    unclassified_edges = [
+        (source_rel, target) for source_rel, predicate, target in edges if is_unclassified(predicate)
+    ]
+    for source_rel, target in unclassified_edges:
+        candidates = refinement_candidates(
+            predicate_defs, entity_types.get(source_rel), entity_types.get(target)
+        )
+        if len(candidates) == 1:
+            warnings.append(
+                ValidationWarning(
+                    f"{source_rel}: related-to → {target} は '{candidates[0]}' に精緻化できる可能性がある"
+                    f"（{entity_types.get(source_rel)}→{entity_types.get(target)}）",
+                    code="validation.relation.refinable",
+                )
+            )
+    if unclassified_edges:
+        warnings.append(
+            ValidationWarning(
+                f"relations: related-to のエッジ {len(unclassified_edges)} 件（未分類）",
+                code="validation.relation.unclassified",
+                severity="info",
+            )
+        )
+
     pending_unreferenced_count = 0
     for ref_id, entry in references.items():
         pending = entry.get("pending") if isinstance(entry, dict) else None
@@ -478,14 +541,26 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                 # pending は「実見待ち等で先行登録した」意図的な未参照なので、個別 WARNING ではなく件数集計にまとめる
                 pending_unreferenced_count += 1
             else:
-                warnings.append(f"WARNING /references.yml: '{ref_id}' はどのエンティティからも参照されていない")
+                warnings.append(
+                    ValidationWarning(
+                        f"/references.yml: '{ref_id}' はどのエンティティからも参照されていない",
+                        code="validation.reference.unreferenced",
+                    )
+                )
         elif pending:
             warnings.append(
-                f"WARNING /references.yml: '{ref_id}' は pending だが参照されている（解除忘れの可能性）"
+                ValidationWarning(
+                    f"/references.yml: '{ref_id}' は pending だが参照されている（解除忘れの可能性）",
+                    code="validation.reference.pending_referenced",
+                )
             )
     if pending_unreferenced_count:
         warnings.append(
-            f"INFO references.yml: pending の未参照エントリ {pending_unreferenced_count} 件（意図的未参照）"
+            ValidationWarning(
+                f"references.yml: pending の未参照エントリ {pending_unreferenced_count} 件（意図的未参照）",
+                code="validation.reference.pending_unreferenced",
+                severity="info",
+            )
         )
 
     return errors

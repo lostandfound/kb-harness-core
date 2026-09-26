@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from .ontology import export_claim
+from .predicates import export_predicates, load_predicates
 from .validation import _load_types, _parse_frontmatter
 
 
@@ -80,7 +81,13 @@ def export_graph(root: Path, warnings: list[str] | None = None) -> dict[str, obj
             if node["path"] not in referenced:
                 warnings.append(f"isolated: {node['path']}")
 
-    return {"nodes": nodes, "edges": edges, "claims": claims}
+    graph: dict[str, object] = {"nodes": nodes, "edges": edges, "claims": claims}
+    # 述語の階層と標準対応は、語彙が broader / maps_to を書いた KB だけに出す。
+    # 汎化（親で問うて子孫のエッジを拾う）は消費側が行うので、階層はここで渡す。
+    predicates = export_predicates(load_predicates(root))
+    if predicates:
+        graph["predicates"] = predicates
+    return graph
 
 
 def render_graph(root: Path, views_root: Path | None = None) -> str:

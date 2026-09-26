@@ -27,11 +27,11 @@
 
 ### `kb validate [--check-urls]`
 
-KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml` を対象とする。`kb-domain.yml` に `views.root` があればビュー定義も検査する（[設定リファレンス](configuration.md#ビュー任意)）。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。 `--check-urls` を付けると、エンティティの `sources` と `references.yml` の URL・DOI に到達できるかも HTTP で確認する。ネットワークに依存するため既定では行わない。
+KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml`・述語の階層（`vocabulary.yml` の `broader` / `maps_to`、[設定リファレンス](configuration.md#述語の階層と標準対応)）を対象とする。ERROR にならない指摘は `warnings` に入れる。text では `<SEVERITY> <message>` の形で stderr に、json では `diagnostics` と同じ構造の `{severity, code, message}` の配列で返す（`severity` は `warning` か `info`、`message` は text と同じ文字列）。コードは `validation.description.same_as_title` / `validation.description.long` / `validation.reference.unreferenced` / `validation.reference.pending_referenced` / `validation.reference.pending_unreferenced`（info）/ `validation.relation.refinable` / `validation.relation.unclassified`（info）。`related-to` のエッジは未分類として件数を INFO で報告し、始点と終点の型が層 1 のちょうど 1 つの述語に収まるものは精緻化の余地として WARNING を出す。`kb-domain.yml` に `views.root` があればビュー定義も検査する（[設定リファレンス](configuration.md#ビュー任意)）。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。 `--check-urls` を付けると、エンティティの `sources` と `references.yml` の URL・DOI に到達できるかも HTTP で確認する。ネットワークに依存するため既定では行わない。
 
 ### `kb doctor`
 
-設定、`kb-ontology-core` のインストール状態と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。
+設定、`kb-ontology-core` のインストール状態と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在、述語が標準述語の体系に沿っているか（`related-to` でも[標準述語](configuration.md#標準述語)でもなく `broader` も持たない述語を `doctor.predicate.nonstandard` の WARNING で示す）を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。
 
 ### `kb serve`
 
@@ -97,7 +97,7 @@ Claim の `status` を明示的に遷移させる。許容される遷移は `kb
 
 ### `kb view list` / `kb view resolve VIEW_ID` / `kb view validate`
 
-エンティティ本文の外に置いたビュー（[設定リファレンス](configuration.md#ビュー任意)）の一覧・解決・検証。`list` は各ビューの `kind` / `basis` と解決後のメンバー数を、`resolve` は指定したビュー（ファイル名の stem）のメンバーを `path` / `title` / `note` で返す。`views.root` が未設定なら `view.disabled` で終了コード 2。ビューの作成は YAML を手で書く（雛形生成コマンドは持たない）。
+エンティティ本文の外に置いたビュー（[設定リファレンス](configuration.md#ビュー任意)）の一覧・解決・検証。`list` は各ビューの `kind` / `basis` と解決後のメンバー数を、`resolve` は指定したビュー（ファイル名の stem）のメンバーを `path` / `title` / `note` で返す。`query` ビューの `where.relation.predicate` に親の述語を書くと、`broader` で吊るした子孫の述語のエッジも一致とみなす。`views.root` が未設定なら `view.disabled` で終了コード 2。ビューの作成は YAML を手で書く（雛形生成コマンドは持たない）。
 
 ### `kb reference health`
 
@@ -148,4 +148,5 @@ spec を `references.yml` に原子的に追加する。既存レジストリの
 | `kb_harness.index` / `kb_harness.graph` / `kb_harness.sync` | 生成物の計画と適用 |
 | `kb_harness.okf` | OKF v0.2 の export と検証 |
 | `kb_harness.ontology` | `kb-ontology-core` の `Diagnostic` を構造化診断へ翻訳する。従来の `validate_claim`（文字列リスト）も互換入口として残る |
+| `kb_harness.predicates` | 述語の階層（`broader`）と標準対応（`maps_to`）の読み込み・検査・汎化。標準述語の定義もここに置く |
 | `kb_harness.doctor` | 環境診断 |

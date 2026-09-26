@@ -84,6 +84,75 @@ tags:
 - `predicates.<述語>.domain` / `range` は、frontmatter の `relations` に書かれた `predicate` と `target` エンティティの型が一致するかを検査する型制約である。
 - `tags` は frontmatter の `tags` に使える語の全量である。一覧にない語は validate エラーになる。
 
+`predicates.<述語>` の `domain` / `range` は省略できる。省略した側は無制約になる。ハーネスが読む述語のキーは `description` / `domain` / `range` と、下記の `broader` / `maps_to` である。
+
+### 標準述語
+
+ハーネスはドメイン語彙を持たないが、述語の**名前・向き・意味**については次の 5 つを標準として定める。導入先は使う族だけを `vocabulary.yml` に写し、自分の型で `domain` / `range` を束縛する。型への束縛は導入先が決め、ハーネスは決めない。
+
+| 述語 | 族 | 向き | 主な対応標準 |
+|---|---|---|---|
+| `part-of` | 部分・所属・分類 | 部分 → 全体 | `dcterms:isPartOf`、Wikidata P361 |
+| `derived-from` | 起源・派生・系譜 | 派生物 → 起源 | `prov:wasDerivedFrom`、Wikidata P144 |
+| `created-by` | 主体・行為 | 対象 → 主体 | `prov:wasAttributedTo`、`dcterms:creator` |
+| `located-in` | 空間 | 対象 → 場所 | `schema:containedInPlace`、Wikidata P276 |
+| `follows` | 順序・継起 | 後続 → 先行 | OBO RO `preceded_by`、Wikidata P155、EDM `isNextInSequence` |
+
+- 向きは全述語で「**依存する側から、依存される側へ**」に統一する。逆向きの述語（`has-part` など）は定義しない。
+- `related-to` は標準述語の上に置く**未分類**の印であり、方向も意味も持たず、階層に属さない（`broader` を書けず、親にもなれない）。`domain` / `range` は書いてもよく、書けば他の述語と同じく型制約として検査するが、それはグラフに載せてよい型の粗い制限であって、層 1 の資格（方向と意味）ではない。関係の意味は本文の関連項目に一文で書く。`related-to` のエッジは、意味が定まった時点で標準述語か導入先の述語へ精緻化する候補である。
+- 時間の族（`during` など）は標準に含めない。時期はフィールド（`born` / `died` など）か Claim で表す。時代がエンティティになる導入先は自前の述語として足してよい。順序（`follows`）は時間ではなく二者の前後を言う関係であり、フィールドでは分岐・並行・合流を表せないため標準に含める。
+- 分類（kind-of）と部分（part-of）は標準では分けない。区別が問い合わせに効く導入先だけが、`part-of` の下に `kind-of` などを足す。
+- 標準述語より細かい述語（`borrowed-from` / `student-of` / `child-of` / `succeeds` など）は導入先が任意で足す。追加の目安は「検証器に弾かせたい型制約があるか」「その述語で絞る問い合わせが実際にあるか」のいずれかを満たすこと。relation の詳細度は出典なしで断言できる深さまでとし、それより細かい主張は Claim にする。
+
+#### 族の選び方（運用規約）
+
+- **複数の族に読める関係は、より多くを含意する族に置く。** 親子は「後先」も含意するが本体は「起源」なので `derived-from` の下（`child-of`）に置き、`follows` には置かない。時間順序は `born` / `died` のフィールドから出る。
+- **所属と順序、血縁と継承は別のエッジで書く。** 工程のステップは工程へ `part-of`、前のステップへ `follows`。家督を継いだ子は父へ `child-of` と `succeeds`（`follows` の層 2）。一本にまとめない。
+- **対称な関係（兄弟・婚姻・同盟など）はエッジにしない。** 向きの規則が適用できず、逆向き検査とも衝突する。兄弟は共有する親への `child-of` から導く。親が不明なら名前のない親エンティティを立てる。婚姻は「家」のようなハブ Concept への `part-of` で受けるか、`related-to` と本文の一文に留める。
+- **順序をフィールドで持たない。** 整数の順序は分岐・並行・合流を表せず、挿入で全件を書き換える。順序で問い合わせたいステップは `follows` で書く。工程に固有で説明の短いステップはエンティティにせず、工程の本文に番号付きで書く。
+- **同じ情報を述語に焼き込まない。** 父・母を別の述語にせず `child-of` 一つにし、親の性別は親エンティティの属性に置く。
+- **不確かなら Claim。** 争いのある親子・順序は relation ではなく、同じ述語（`child-of` / `follows`）を持つ Claim として確度付きで置く。
+
+背景は [docs/notes/jutsugo-kaisou-memo.md](notes/jutsugo-kaisou-memo.md) にある。
+
+### 述語の階層と標準対応
+
+述語は詳細度で三層に分けて扱う。`related-to` は未分類の印（層 0）、`broader` を持たない述語が層 1、`broader` で親に吊るした述語が層 2 である。層 1 は標準述語を写して使い、層 2 は導入先が任意で足す。
+
+```yaml
+predicates:
+  related-to:
+    description: 何らかの関係がある。意味は本文の関連項目に書く
+    maps_to: [dcterms:relation, skos:related]
+  derived-from:
+    description: 起源・派生元。派生物から起源へ向ける
+    maps_to: [prov:wasDerivedFrom, dcterms:source, wdt:P144]
+    domain: [Concept, Script]
+    range: [Concept, Script]
+  borrowed-from:
+    description: 表記体系を借用した。改良・継承とは区別する
+    broader: derived-from
+    domain: [Script]
+    range: [Script]
+```
+
+| キー | 内容 |
+|---|---|
+| `broader` | 親述語の名前。1 つだけ。`related-to` は未分類の印であって述語の親にはならないので指定できない。階層は単一の木に限り、確度や期間など別の軸で述語を派生させない（それらは Claim の領分） |
+| `maps_to` | 対応する標準語彙の CURIE または IRI の一覧。空でない文字列のリストであることだけを検査し、解決はしない |
+
+`kb validate` は次を検査する。
+
+- ERROR: `domain` / `range` が型名のリストでない（スカラーは 1 要素として扱った上で違反として報告する）。`related-to` 自身に `broader` がある、`broader` の先が存在しない、自身か `related-to` を指す、循環する（循環は循環上の述語だけを 1 件で報告し、循環に至るだけの述語は責めない）。子の `domain` / `range` が直接の親の部分集合でない（親が無制約の側は任意。親に制約があり子が無制約なら違反）。`maps_to` が空でない文字列のリストでない。
+- WARNING: `related-to` のエッジのうち、始点と終点の型がともに、`domain` と `range` の両方を持つ層 1 の述語のちょうど 1 つに収まるもの。精緻化の候補を示す。
+- INFO: `related-to` のエッジの件数。分類の負債量として報告する。
+
+`kb doctor` は `related-to` でも標準述語でもなく `broader` も持たない述語を `doctor.predicate.nonstandard`（WARNING）で示す。導入先が独自に層 1 を増やした状態の可視化であり、止めはしない。
+
+`query` ビューの `where.relation.predicate` に親を書くと、子孫の述語で書かれたエッジも一致とみなす（汎化）。書かれたエッジ 1 本を祖先の列に写すだけで新しい事実は生まない。推移閉包（`part-of` の多段）はこの機構では導かない。
+
+`kb graph build` は、語彙のいずれかの述語が `broader` か `maps_to` を持つときだけ、`graph.json` に `predicates` オブジェクト（述語名 → `broader` / `maps_to`）を出す。汎化は消費側で行うため、階層をここで渡す。どちらも書かない語彙では `graph.json` は従来どおり `nodes` / `edges` / `claims`（と有効時の `views`）のみで変わらない。エッジの `predicate` は書かれた葉の述語のままである。
+
 ## references.yml
 
 文献レジストリ。エンティティの `sources` と本文インラインの `（出典: ref-id）` は、ここに定義された ID を参照する。
