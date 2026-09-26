@@ -16,6 +16,7 @@ from typing import Any, Collection, Mapping
 
 import yaml
 
+from .predicates import descendant_map, load_predicates
 from .validation import (
     FILENAME_RE,
     _load_references,
@@ -210,21 +211,32 @@ def query_excluded_types(content_root: Path) -> frozenset[str]:
     )
 
 
+def query_predicate_matches(content_root: Path) -> Mapping[str, frozenset[str]]:
+    """where.relation.predicate に親を書いたとき拾う述語の集合（自身と子孫）。語彙の broader から作る。"""
+    return descendant_map(load_predicates(content_root))
+
+
 def resolve_view(
     view: View,
     entities: Mapping[str, dict],
     excluded: Collection[str] = ("Claim", "Index"),
+    predicate_matches: Mapping[str, Collection[str]] | None = None,
 ) -> list[ViewMember]:
     """ビューのメンバーを確定する。query は entities を AND 条件で絞る。
 
     excluded は語彙を読まずに済む既定値。graph: false の型も外すには
-    query_excluded_types(content_root) を渡す。
+    query_excluded_types(content_root) を渡す。predicate_matches を渡すと、
+    where.relation.predicate の子孫の述語で書かれたエッジも一致とみなす（汎化）。
+    省略時は述語名の完全一致だけを見る。
     """
     if view.kind == "list":
         return list(view.members)
     wanted_type = view.where.get("type")
     wanted_tags = set(view.where.get("tags") or [])
     relation = view.where.get("relation")
+    accepted_predicates: Collection[str] = ()
+    if relation is not None:
+        accepted_predicates = (predicate_matches or {}).get(relation["predicate"]) or {relation["predicate"]}
     hits: list[ViewMember] = []
     for path in sorted(entities):
         frontmatter = entities[path]
@@ -238,7 +250,7 @@ def resolve_view(
         if relation is not None:
             matched = any(
                 isinstance(entry, dict)
-                and entry.get("predicate") == relation["predicate"]
+                and entry.get("predicate") in accepted_predicates
                 and entry.get("target") == relation["target"]
                 for entry in frontmatter.get("relations") or []
             )
@@ -307,6 +319,7 @@ def export_views(content_root: Path, views_root: Path) -> list[dict[str, Any]]:
     entities = load_entities(content_root)
     exported: list[dict[str, Any]] = []
     excluded = query_excluded_types(content_root)
+    matches = query_predicate_matches(content_root)
     for view in load_views(views_root):
         item: dict[str, Any] = {
             "id": view.id,
@@ -318,7 +331,7 @@ def export_views(content_root: Path, views_root: Path) -> list[dict[str, Any]]:
             item["basis"] = view.basis
         if view.kind == "query":
             item["where"] = dict(view.where)
-        item["members"] = [member.path for member in resolve_view(view, entities, excluded)]
+        item["members"] = [member.path for member in resolve_view(view, entities, excluded, matches)]
         exported.append(item)
     return exported
 
@@ -333,9 +346,10 @@ INDEX_NOTE = (
 def render_views_index(content_root: Path, views_root: Path) -> str:
     entities = load_entities(content_root)
     excluded = query_excluded_types(content_root)
+    matches = query_predicate_matches(content_root)
     lines = [INDEX_HEADING, "", INDEX_NOTE, ""]
     for view in load_views(views_root):
-        members = resolve_view(view, entities, excluded)
+        members = resolve_view(view, entities, excluded, matches)
         lines.append(f"## {view.name}")
         lines.append("")
         lines.append(view.description)

@@ -15,6 +15,7 @@ import yaml
 from .diagnostics import HarnessError
 from .markdown import parse_document
 from .ontology import Ontology, validate_claim
+from .predicates import is_unclassified, load_predicates, refinement_candidates, validate_predicates
 from .project import Project, ProjectError
 
 
@@ -241,6 +242,9 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     predicates, vocab_tags = _load_vocabulary(root)
     properties = _load_properties(root)
     ontology = Ontology.from_mapping({"predicates": predicates, "properties": properties})
+    # 述語の階層（broader / maps_to）は kb-ontology-core には渡さず、ハーネス側で検査する
+    predicate_defs = load_predicates(root)
+    errors.extend(validate_predicates(predicate_defs))
     types = _load_types(root)
     type_dir_map = {t["directory"]: name for name, t in types.items()}
     references, ref_errors = _load_references(root)
@@ -469,6 +473,23 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
                     f"ERROR {source_rel}: relations 逆向きエッジ ({predicate}) が "
                     f"{target} との間に双方向で存在"
                 )
+
+    # related-to は未分類の印。件数は分類の負債量として報告し、層 1 のちょうど 1 つの述語に
+    # 収まるエッジは精緻化の余地として指す
+    unclassified_edges = [
+        (source_rel, target) for source_rel, predicate, target in edges if is_unclassified(predicate)
+    ]
+    for source_rel, target in unclassified_edges:
+        candidates = refinement_candidates(
+            predicate_defs, entity_types.get(source_rel), entity_types.get(target)
+        )
+        if len(candidates) == 1:
+            warnings.append(
+                f"WARNING {source_rel}: related-to → {target} は '{candidates[0]}' に精緻化できる可能性がある"
+                f"（{entity_types.get(source_rel)}→{entity_types.get(target)}）"
+            )
+    if unclassified_edges:
+        warnings.append(f"INFO relations: related-to のエッジ {len(unclassified_edges)} 件（未分類）")
 
     pending_unreferenced_count = 0
     for ref_id, entry in references.items():

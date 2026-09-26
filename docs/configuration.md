@@ -84,7 +84,7 @@ tags:
 - `predicates.<述語>.domain` / `range` は、frontmatter の `relations` に書かれた `predicate` と `target` エンティティの型が一致するかを検査する型制約である。
 - `tags` は frontmatter の `tags` に使える語の全量である。一覧にない語は validate エラーになる。
 
-`predicates.<述語>` の `domain` / `range` は省略できる。省略した側は無制約になる。`description` / `domain` / `range` 以外のキーはハーネスは読まない（下記の予約キーを含む）。
+`predicates.<述語>` の `domain` / `range` は省略できる。省略した側は無制約になる。ハーネスが読む述語のキーは `description` / `domain` / `range` と、下記の `broader` / `maps_to` である。
 
 ### 標準述語
 
@@ -105,12 +105,15 @@ tags:
 
 背景は [docs/notes/jutsugo-kaisou-memo.md](notes/jutsugo-kaisou-memo.md) にある。
 
-### 述語の予約キー（草案）
+### 述語の階層と標準対応
 
-次のキーは述語の階層と標準対応を書くために予約する。**現時点のハーネスはこれらを読まず、検査もしない。** 書いても無害であり、対応する検査・機能は導入時に本節を正本として更新する。
+述語は詳細度で三層に分けて扱う。`related-to` は未分類の印（層 0）、`broader` を持たない述語が層 1、`broader` で親に吊るした述語が層 2 である。層 1 は標準述語を写して使い、層 2 は導入先が任意で足す。
 
 ```yaml
 predicates:
+  related-to:
+    description: 何らかの関係がある。意味は本文の関連項目に書く
+    maps_to: [dcterms:relation, skos:related]
   derived-from:
     description: 起源・派生元。派生物から起源へ向ける
     maps_to: [prov:wasDerivedFrom, dcterms:source, wdt:P144]
@@ -125,8 +128,20 @@ predicates:
 
 | キー | 内容 |
 |---|---|
-| `broader` | 親述語の名前。1 つだけ。階層は単一の木に限り、確度や期間など別の軸で述語を派生させない（それらは Claim の領分）。導入予定の検査は、親の実在、循環の禁止、子の `domain` / `range` が親の部分集合であること（親が無制約なら任意）。導入予定の機能は、`query` ビューの `where.relation.predicate` に親を書くと子孫のエッジも拾う汎化。推移閉包（`part-of` の多段）はこの機構では導かない |
-| `maps_to` | 対応する標準語彙の CURIE または IRI の一覧。ハーネスは文字列のリストであることだけを検査し、解決はしない。`graph.json` / OKF への併記を予定する |
+| `broader` | 親述語の名前。1 つだけ。階層は単一の木に限り、確度や期間など別の軸で述語を派生させない（それらは Claim の領分） |
+| `maps_to` | 対応する標準語彙の CURIE または IRI の一覧。空でない文字列のリストであることだけを検査し、解決はしない |
+
+`kb validate` は次を検査する。
+
+- ERROR: `broader` の先が存在しない、自身を指す、循環する。子の `domain` / `range` が親の部分集合でない（親が無制約の側は任意。親に制約があり子が無制約なら違反）。`maps_to` が空でない文字列のリストでない。
+- WARNING: `related-to` のエッジのうち、始点と終点の型がともに、`domain` と `range` の両方を持つ層 1 の述語のちょうど 1 つに収まるもの。精緻化の候補を示す。
+- INFO: `related-to` のエッジの件数。分類の負債量として報告する。
+
+`kb doctor` は `related-to` でも標準述語でもなく `broader` も持たない述語を `doctor.predicate.nonstandard`（WARNING）で示す。導入先が独自に層 1 を増やした状態の可視化であり、止めはしない。
+
+`query` ビューの `where.relation.predicate` に親を書くと、子孫の述語で書かれたエッジも一致とみなす（汎化）。書かれたエッジ 1 本を祖先の列に写すだけで新しい事実は生まない。推移閉包（`part-of` の多段）はこの機構では導かない。
+
+`kb graph build` は、語彙のいずれかの述語が `broader` か `maps_to` を持つときだけ、`graph.json` に `predicates` オブジェクト（述語名 → `broader` / `maps_to`）を出す。汎化は消費側で行うため、階層をここで渡す。どちらも書かない語彙では `graph.json` は従来どおり `nodes` / `edges` / `claims`（と有効時の `views`）のみで変わらない。エッジの `predicate` は書かれた葉の述語のままである。
 
 ## references.yml
 
