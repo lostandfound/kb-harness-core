@@ -243,6 +243,10 @@ predicates:
 
 文献レジストリ。エンティティの `sources` と本文インラインの `（出典: ref-id）` は、ここに定義された ID を参照する。
 
+各エントリの必須キーは `type` と `title`。`type: web` は `url` も必須。`url` は `http://` / `https://` で始まる。
+
+各エントリは任意キー `lineage`（非空文字列。資料の系統・由来）を持てる。evidence-reviewer は `lineage` が同じ資料を独立源として数えない。未記載は「独立」ではなく「未判定」を意味し、`scripts/refs_health.py --lineage` が未判定の文献を列挙する。系統に属さないと判定済みの資料には予約値 `系統外` を書く。
+
 各エントリは任意キー `pending`（非空文字列の待ち理由）を持てる。付与すると未参照 WARNING が個別に出ず件数集計の INFO 1 行にまとまり、参照済みなのに `pending` が残っていると WARNING で警告される。
 
 登録用 YAML は `ndl_search.py` / `cinii_search.py` が出力する。
