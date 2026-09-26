@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 — 2026-09-27
 
 ### Added
 - `kb reference show ID...` / `kb reference show --for ENTITY` と `kb reference search TERM... [--field] [--url] [--doi] [--limit] [--full]` を追加。エージェントが `references.yml` を丸ごと文脈に読み込まず、ID・エンティティ・語句・URL・DOI で必要な書誌だけを引ける。`--url` / `--doi` は正規化後の完全一致で、登録前の重複確認に使う

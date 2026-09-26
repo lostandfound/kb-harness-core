@@ -10,7 +10,7 @@
 
 ## 未着手
 
-- [ ] `Unreleased` をタグ付きリリースにし、omnibus-kb の `apm.yml` の固定コミットを上げて `apm install` で `.claude/agents/evidence-reviewer.md` を再生成する。`kb reference show` を前提とする evidence-reviewer は、これが済むまで導入先で効かない。（出所: 2026-09-27 ディスカッション）
+- [x] `Unreleased` をタグ付きリリース v0.8.0 にし、omnibus-kb の `apm.yml` の固定コミットを上げて `apm install` で `.claude/agents/evidence-reviewer.md` を再生成する。（出所: 2026-09-27 ディスカッション。ハーネス側: v0.8.0、omnibus-kb 側は同日のピン更新コミット）
 - [ ] `scripts/refs_health.py`（`lineage` 未判定・`pending` 滞留・到達確認の記録）を `kb reference` に統合するか決める。`kb reference health` は構造検査だけで、`lineage` の運用を促す入口が `docs/scripts.md` の 1 行しかない。この周知不足が `lineage` を 2 週間以上孤児にした。（出所: 2026-09-27 ディスカッション）
 - [ ] evidence-reviewer が「`lineage` の付与を提案」した後、それを `references.yml` に反映する担い手と手順を決める。既存エントリへの `lineage` 追記は `kb reference create` の範囲外で、今は手編集しかない。（出所: 2026-09-27 ディスカッション）
 - [ ] 導入先の `references.yml` が数千件に達したときの分割方針を決める。現状は単一ファイル前提（`kb reference create` の追記、`validation.reference.unreferenced`）で、`kb reference show / search` により文脈消費の問題は解消済みなので急がない。（出所: 2026-09-27 ディスカッション）
