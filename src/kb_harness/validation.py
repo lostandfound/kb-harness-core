@@ -684,23 +684,55 @@ def _doi_from_url(url: str) -> str | None:
     return urllib.parse.unquote(parsed.path.lstrip("/")) or None
 
 
-def _doi_registered(doi: str) -> bool:
-    """Check a DOI in the Handle registry without following it to a publisher."""
+def _doi_registered(doi: str) -> bool | None:
+    """Check a DOI in the Handle registry without following it to a publisher.
+
+    Returns True when the registry resolves the handle, False when the registry
+    answers that it is not registered, and None when the registry could not be
+    consulted (network failure, timeout, 5xx, unreadable response).
+    """
     handle_url = f"https://doi.org/api/handles/{urllib.parse.quote(doi, safe='/')}"
     req = urllib.request.Request(handle_url, headers={**_UA, "Accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             record = json.load(resp)
-            return (
-                record.get("responseCode") == 1
-                and record.get("handle", "").casefold() == doi.casefold()
-            )
+    except urllib.error.HTTPError as e:
+        # Handle API は未登録のハンドルに 404（responseCode 100）を返す。それ以外の
+        # HTTP エラー（429・5xx 等）はレジストリ側の都合で、登録の有無は分からない
+        if e.code == 404:
+            return False
+        return None
     except Exception:
-        return False
+        return None
+    if not isinstance(record, dict):
+        return None
+    return (
+        record.get("responseCode") == 1
+        and record.get("handle", "").casefold() == doi.casefold()
+    )
 
 
-def check_urls(root: Path) -> list[str]:
+def check_urls(root: Path, warnings: list[str] | None = None) -> list[str]:
+    """出典 URL と DOI の到達性を確かめ、ERROR の一覧を返す。
+
+    DOI（`references.yml` の `doi` と doi.org の URL）は出版社へ辿らず、DOI レジストリで
+    登録の有無だけを見る。レジストリに届かなかった DOI は登録の有無が分からないため
+    ERROR にせず、``warnings`` を渡されていればそこへ WARNING として加える。
+    """
     errors: list[str] = []
+
+    def check_doi(doi: str, where: str, suffix: str = "") -> None:
+        registered = _doi_registered(doi)
+        if registered is False:
+            errors.append(f"ERROR {where}: DOI unregistered {doi}{suffix}")
+        elif registered is None and warnings is not None:
+            warnings.append(
+                ValidationWarning(
+                    f"{where}: DOI レジストリに届かず登録を確認できない {doi}{suffix}",
+                    code="validation.url.doi_registry_unreachable",
+                )
+            )
+
     for path in _iter_entity_files(root):
         if path.name == "vocabulary.yml":
             continue
@@ -713,8 +745,7 @@ def check_urls(root: Path) -> list[str]:
                 continue
             doi = _doi_from_url(source)
             if doi:
-                if not _doi_registered(doi):
-                    errors.append(f"ERROR {rel}: DOI unregistered or registry unreachable {doi}")
+                check_doi(doi, rel)
             elif not _url_reachable(source):
                 errors.append(f"ERROR {rel}: unreachable URL {source}")
 
@@ -724,14 +755,13 @@ def check_urls(root: Path) -> list[str]:
             continue
         url = entry.get("url")
         doi = entry.get("doi")
+        suffix = f" ({ref_id})"
         if doi:
-            if not _doi_registered(doi):
-                errors.append(f"ERROR /references.yml: DOI unregistered or registry unreachable {doi} ({ref_id})")
+            check_doi(doi, "/references.yml", suffix)
         elif url:
             doi = _doi_from_url(url)
             if doi:
-                if not _doi_registered(doi):
-                    errors.append(f"ERROR /references.yml: DOI unregistered or registry unreachable {doi} ({ref_id})")
+                check_doi(doi, "/references.yml", suffix)
             elif not _url_reachable(url):
                 errors.append(f"ERROR /references.yml: unreachable URL {url} ({ref_id})")
     return errors
@@ -818,7 +848,7 @@ def main():
     warnings: list[str] = []
     errors = validate(root, warnings=warnings, repo_root=repo_root)
     if args.check_urls:
-        errors += check_urls(root)
+        errors += check_urls(root, warnings=warnings)
     for w in warnings:
         print(w, file=sys.stderr)
     if not errors:

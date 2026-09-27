@@ -422,7 +422,7 @@ def _validate(project: Project, output_format: str, *, urls: bool = False) -> in
         if project.views_root is not None:
             errors.extend(validate_views(project.content_root, project.views_root))
         if urls:
-            errors += check_urls(project.content_root)
+            errors += check_urls(project.content_root, warnings=warnings)
         checks = run_extra_checks(project.extra_checks, project.repo_root)
     except Exception as error:
         return _internal_error(error, output_format)

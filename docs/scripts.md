@@ -19,7 +19,7 @@ python3 scripts/validate.py [--root DIR] [--fix-timestamps] [--check-urls]
 | オプション | 内容 |
 |---|---|
 | `--fix-timestamps` | frontmatter の `timestamp` を現在時刻で補正する |
-| `--check-urls` | `references.yml` の URL に到達可能か HTTP で確認する |
+| `--check-urls` | エンティティの `sources` と `references.yml` の出典に到達できるか確認する。DOI は DOI レジストリで登録の有無を確かめ、レジストリに届かないときは ERROR にせず WARNING にする（詳細は [CLI リファレンス](cli.md) の `kb validate`） |
 
 ### new_entity.py
 
