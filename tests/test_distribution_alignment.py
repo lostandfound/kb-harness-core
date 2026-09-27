@@ -99,6 +99,8 @@ def test_doctor_checks_installed_core_api_and_declared_tag(tmp_path, monkeypatch
     import kb_harness.doctor as doctor
 
     project = _doctor_project(tmp_path)
+    # コアの有無は import_module / metadata の monkeypatch で模すので、実環境の解決可否に依らせない
+    monkeypatch.setattr(doctor, "ontology_core_available", lambda: True)
     core = SimpleNamespace(
         Diagnostic=type("Diagnostic", (), {}),
         Ontology=type("Ontology", (), {}),
@@ -131,6 +133,8 @@ def test_doctor_reports_missing_core_api_as_structured_incompatibility(tmp_path,
     import kb_harness.doctor as doctor
 
     project = _doctor_project(tmp_path)
+    # コアの有無は import_module / metadata の monkeypatch で模すので、実環境の解決可否に依らせない
+    monkeypatch.setattr(doctor, "ontology_core_available", lambda: True)
     core = SimpleNamespace(Diagnostic=type("Diagnostic", (), {}))
     monkeypatch.setattr(doctor.importlib, "import_module", lambda name: core)
     monkeypatch.setattr(doctor.importlib.metadata, "version", lambda name: "0.2.0")
@@ -154,6 +158,8 @@ def test_doctor_reports_installed_core_version_mismatch(tmp_path, monkeypatch):
     import kb_harness.doctor as doctor
 
     project = _doctor_project(tmp_path)
+    # コアの有無は import_module / metadata の monkeypatch で模すので、実環境の解決可否に依らせない
+    monkeypatch.setattr(doctor, "ontology_core_available", lambda: True)
     core = SimpleNamespace(
         Diagnostic=type("Diagnostic", (), {}),
         Ontology=type("Ontology", (), {}),
@@ -182,6 +188,8 @@ def test_doctor_reports_core_import_failure(tmp_path, monkeypatch):
     import kb_harness.doctor as doctor
 
     project = _doctor_project(tmp_path)
+    # コアの有無は import_module / metadata の monkeypatch で模すので、実環境の解決可否に依らせない
+    monkeypatch.setattr(doctor, "ontology_core_available", lambda: True)
 
     def fail_import(name):
         raise ModuleNotFoundError("no module named kb_ontology_core", name="kb_ontology_core")
@@ -206,6 +214,8 @@ def test_doctor_parses_direct_reference_tag(tmp_path, monkeypatch):
     import kb_harness.doctor as doctor
 
     project = _doctor_project(tmp_path)
+    # コアの有無は import_module / metadata の monkeypatch で模すので、実環境の解決可否に依らせない
+    monkeypatch.setattr(doctor, "ontology_core_available", lambda: True)
     core = SimpleNamespace(
         Diagnostic=type("Diagnostic", (), {}),
         Ontology=type("Ontology", (), {}),
