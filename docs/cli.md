@@ -127,13 +127,15 @@ spec を `references.yml` に原子的に追加する。既存レジストリの
 
 ## 評価
 
+評価データセットはリポジトリルートの `evals/rag-eval.yml` に固定（トップレベルはエントリの list か `entries` キーを持つ mapping）。無ければ `eval.assets.missing` で exit 1。スキーマの検査は `kb validate` が行う。実装は `kb_harness.evaluation` にあり、`scripts/rag_smoke.py` / `scripts/eval_summary.py` も同じ関数を呼ぶ。
+
 ### `kb eval summary`
 
-`evals/rag-eval.yml` の評価履歴を集計し、退行（過去 OK → 最新非 OK）を検出する。
+`evals/rag-eval.yml` の評価履歴を集計し、退行（過去 OK → 最新非 OK）を検出する。json は `summary`（`evaluated` / `total` / `by_verdict` / `by_kind`）・`regressions`・`open_gaps`（最新が非 OK で `gap: by-design` でないもの）を返す。退行があれば `eval.regression` の診断を出して exit 1。
 
-### `kb eval smoke`
+### `kb eval smoke [--limit N]`
 
-各クエリの期待根拠が字面検索の上位に入るかを検査する。回答品質ではなく検索可能性の回帰を検出する。
+各クエリの期待根拠（`evidence`）が字面検索の上位 `--limit` 件（既定 5）に入るかを検査する。回答品質ではなく検索可能性の回帰を検出する。`history` が空のエントリは計画のみとみなして対象外。外れがあれば `eval.smoke.miss` の診断と `failures`（`id` / `evidence` / `retrieved`）を返して exit 1。
 
 ## OKF
 
@@ -158,6 +160,7 @@ spec を `references.yml` に原子的に追加する。既存レジストリの
 | `kb_harness.markdown` | frontmatter 付き Markdown の解析・シリアライズ |
 | `kb_harness.entity` / `kb_harness.actions.entity` | エンティティ spec の検証と作成計画 |
 | `kb_harness.claim` | Claim の作成・照会・遷移 |
+| `kb_harness.evaluation` | `evals/rag-eval.yml` の集計・退行検出と字面検索スモーク |
 | `kb_harness.references` | `references.yml` の点検・追記・照会（show / search） |
 | `kb_harness.index` / `kb_harness.graph` / `kb_harness.sync` | 生成物の計画と適用 |
 | `kb_harness.okf` | OKF v0.2 の export と検証 |

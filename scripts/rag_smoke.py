@@ -2,78 +2,23 @@
 """固定クエリの期待根拠が字面検索の上位に入るかを検査する。"""
 
 import argparse
-import re
 from pathlib import Path
 
 import yaml
 
 from kb_config import default_content_root
-
-
-def _ngrams(text: str, size: int = 2) -> set[str]:
-    normalized = re.sub(r"[^0-9a-zA-Z一-龥ぁ-んァ-ヶ]+", "", text).lower()
-    if len(normalized) < size:
-        return {normalized} if normalized else set()
-    return {normalized[i : i + size] for i in range(len(normalized) - size + 1)}
-
-
-def _title(text: str) -> str:
-    match = re.search(r"(?m)^title:\s*(.+)$", text)
-    return match.group(1).strip() if match else ""
-
-
-def rank_documents(query: str, documents: dict[str, str], limit: int = 5) -> list[str]:
-    query_grams = _ngrams(query)
-    scored = []
-    for path, text in documents.items():
-        body_overlap = len(query_grams & _ngrams(text))
-        title_overlap = len(query_grams & _ngrams(_title(text)))
-        # A generic domain word in a title should not outrank a document whose
-        # body matches most of the query.
-        score = body_overlap + title_overlap * 2
-        if score:
-            scored.append((score, path))
-    scored.sort(key=lambda item: (-item[0], item[1]))
-    return [path for _score, path in scored[:limit]]
-
-
-def evaluate(
-    entries: list[dict], documents: dict[str, str], limit: int = 5
-) -> list[dict]:
-    failures = []
-    for entry in entries:
-        retrieved = rank_documents(str(entry.get("query", "")), documents, limit)
-        evidence = entry.get("evidence") or []
-        if not any(path in retrieved for path in evidence):
-            failures.append(
-                {
-                    "id": entry.get("id"),
-                    "evidence": evidence,
-                    "retrieved": retrieved,
-                }
-            )
-    return failures
-
-
-def load_documents(root: Path) -> dict[str, str]:
-    documents = {}
-    for path in sorted(root.rglob("*.md")):
-        if path.name == "index.md":
-            continue
-        rel = "/" + str(path.relative_to(root))
-        documents[rel] = path.read_text(encoding="utf-8")
-    return documents
+from kb_harness.evaluation import evaluate, load_documents, load_entries, rank_documents  # noqa: F401  互換のため再公開
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", default=default_content_root())
+    parser.add_argument("--root", default=None, help="コンテンツルート（省略時は kb-domain.yml から解決）")
     parser.add_argument("--eval-file", default="evals/rag-eval.yml")
     parser.add_argument("--limit", type=int, default=5)
     args = parser.parse_args(argv)
 
-    entries = yaml.safe_load(Path(args.eval_file).read_text(encoding="utf-8")) or []
-    documents = load_documents(Path(args.root))
+    entries = load_entries(Path(args.eval_file))
+    documents = load_documents(Path(args.root) if args.root else Path(default_content_root()))
     # Empty history marks a planned, unevaluated case; it is not a smoke failure.
     failures = evaluate([entry for entry in entries if entry.get("history")], documents, args.limit)
     if failures:

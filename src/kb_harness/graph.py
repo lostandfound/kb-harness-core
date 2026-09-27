@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .markdown import field_text
 from .ontology import export_claim
 from .predicates import export_predicates, load_predicates
 from .validation import _load_types, _parse_frontmatter
@@ -42,8 +43,8 @@ def export_graph(root: Path, warnings: list[str] | None = None) -> dict[str, obj
             {
                 "path": relative_path,
                 "type": entity_type,
-                "title": frontmatter.get("title"),
-                "description": frontmatter.get("description"),
+                "title": _text_or_none(frontmatter.get("title")),
+                "description": _text_or_none(frontmatter.get("description")),
                 "tags": frontmatter.get("tags") or [],
             }
         )
@@ -107,3 +108,10 @@ def plan_graph(root: Path, output_path: Path, views_root: Path | None = None) ->
     if current == rendered:
         return {}
     return {output: rendered}
+
+
+def _text_or_none(value: object) -> str | None:
+    """graph.json は JSON 化できる値しか持てない。文字列以外は field_text で写し、写せなければ None。"""
+    if isinstance(value, str):
+        return value
+    return field_text(value)

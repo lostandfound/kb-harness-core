@@ -54,7 +54,7 @@ python3 scripts/export_graph.py [--root DIR] [--out FILE] [--force]
 
 ### rag_smoke.py
 
-`evals/rag-eval.yml` の各クエリについて、期待根拠が字面検索の上位へ入るかを検査する。回答品質ではなく検索可能性の回帰を検出する。失敗があれば exit 1。
+`evals/rag-eval.yml` の各クエリについて、期待根拠が字面検索の上位へ入るかを検査する。回答品質ではなく検索可能性の回帰を検出する。失敗があれば exit 1。`kb eval smoke` の互換入口で、実装は `kb_harness.evaluation`。`--root` 省略時は cwd から上へ `kb-domain.yml` を探して解決する。
 
 ```bash
 python3 scripts/rag_smoke.py [--root DIR] [--eval-file FILE] [--limit N]
@@ -62,7 +62,7 @@ python3 scripts/rag_smoke.py [--root DIR] [--eval-file FILE] [--limit N]
 
 ### eval_summary.py
 
-`evals/rag-eval.yml` の最新判定を集計し、退行（過去 OK → 最新非 OK）を検出する。退行検出時は exit 1。
+`evals/rag-eval.yml` の最新判定を集計し、退行（過去 OK → 最新非 OK）を検出する。退行検出時は exit 1。`kb eval summary` の互換入口で、実装は `kb_harness.evaluation`（`--since` / `--stale-days` / `--open` と `INVALID` のスキーマ報告はスクリプト側だけが持つ）。
 
 ```bash
 python3 scripts/eval_summary.py [--eval-file FILE] [--since YYYY-MM-DD] [--stale-days N]

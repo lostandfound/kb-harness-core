@@ -67,7 +67,10 @@ def run_kb_without_ontology_core(root: Path, *args: str) -> tuple[int, dict]:
 
 class DependencyDeclarationTest(unittest.TestCase):
     def test_core_is_an_extra_not_a_base_dependency(self):
-        import tomllib
+        try:
+            import tomllib
+        except ModuleNotFoundError:  # Python 3.10
+            import tomli as tomllib
 
         data = tomllib.loads((SRC.parent / "pyproject.toml").read_text(encoding="utf-8"))
         base = data["project"]["dependencies"]
