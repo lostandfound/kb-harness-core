@@ -167,6 +167,22 @@ class ServerTest(unittest.TestCase):
         self.assertIn('"__KB_DESC__"', text)
         self.assertEqual(text.count("説明。"), 1)
 
+    def test_graph_jsonが壊れていれば例外を出さず500を返す(self):
+        (self.root / "graph.json").write_text("{not json", encoding="utf-8")
+        status, ctype, body = self._get("/")
+        self.assertEqual(status, 500)
+        self.assertTrue(ctype.startswith("text/plain"))
+        self.assertTrue(body)
+        # 接続自体は生きている。同じコネクションで次のリクエストも返る
+        status, _, _ = self._get("/api/graph")
+        self.assertEqual(status, 200)
+
+    def test_vocabulary_ymlが壊れていれば例外を出さず500を返す(self):
+        (self.root / "knowledge" / "vocabulary.yml").write_text("types: [not, a, mapping", encoding="utf-8")
+        status, _, body = self._get("/")
+        self.assertEqual(status, 500)
+        self.assertTrue(body)
+
     def test_同名ファイルが別ノードとして配られる(self):
         graph = {
             "nodes": [

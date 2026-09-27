@@ -9,6 +9,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import sys
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -87,6 +88,19 @@ def _page(project: Project) -> bytes:
 def make_handler(project: Project, view: str = "graph") -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802 （BaseHTTPRequestHandler の命名規約）
+            try:
+                self._do_GET()
+            except Exception as error:
+                # graph.json / vocabulary.yml が壊れているなど、ハンドラ内の例外を
+                # 素通りさせると接続が切れて応答が返らない（クライアントはハングか
+                # 接続リセットを見るだけになる）。500 を返し、詳細は stderr に残す。
+                print(f"kb serve: {self.path}: {type(error).__name__}: {error}", file=sys.stderr)
+                try:
+                    self._send_text(500, "内部エラー。詳細はサーバのログを確認する。")
+                except Exception:
+                    pass
+
+        def _do_GET(self) -> None:
             path = urlparse(self.path).path
             graph_json = project.repo_root / "graph.json"
 

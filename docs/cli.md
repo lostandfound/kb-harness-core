@@ -31,11 +31,11 @@ KB 全体を検証する。frontmatter・リンク・relations の型制約・�
 
 ### `kb doctor`
 
-設定、`kb-ontology-core` のインストール状態（無ければ `doctor.ontology.not_installed` の WARNING。Claim を使わない限り不要）と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在、述語が標準述語の体系に沿っているか（`related-to` でも[標準述語](configuration.md#標準述語)でもなく `broader` も持たない述語を `doctor.predicate.nonstandard` の WARNING で示す）を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。
+設定、`kb-ontology-core` のインストール状態（無ければ `doctor.ontology.not_installed` の WARNING。Claim を使わない限り不要）と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在、述語が標準述語の体系に沿っているか（`related-to` でも[標準述語](configuration.md#標準述語)でもなく `broader` も持たない述語を `doctor.predicate.nonstandard` の WARNING で示す）を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。生成物の同期状態の確認（`plan_sync`）が壊れたビュー YAML などで失敗した場合も、内部エラーで落ちずに `doctor.sync_failed`（ERROR）として報告する。
 
 ### `kb serve`
 
-グラフの閲覧画面をローカルで起動する。`graph.json` を読むので、事前に `kb sync` で同期させておくこと。待ち受けは `127.0.0.1` に限定される。型の色は `vocabulary.yml` の型の定義順に固定のパレットから割り当てる。画面の資産はすべて同梱しており、ネットワークのない環境でも表示できる。
+グラフの閲覧画面をローカルで起動する。`graph.json` を読むので、事前に `kb sync` で同期させておくこと。待ち受けは `127.0.0.1` に限定される。型の色は `vocabulary.yml` の型の定義順に固定のパレットから割り当てる。画面の資産はすべて同梱しており、ネットワークのない環境でも表示できる。`graph.json` / `vocabulary.yml` が壊れているなどリクエスト処理中に例外が起きた場合は、接続を切らず 500 を返す（詳細はサーバの標準エラーに出す）。
 
 | オプション | 内容 |
 |---|---|

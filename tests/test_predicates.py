@@ -312,6 +312,17 @@ class DoctorTest(unittest.TestCase):
             self.assertEqual(hits[0]["severity"], "warning")
             self.assertEqual(hits[0]["context"]["standard"], sorted(STANDARD_PREDICATES))
 
+    def test_broken_view_yaml_becomes_a_diagnostic_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            project = build_kb(root, with_views=True)
+            (project.views_root / "broken.yml").write_text("name: 壊れた\nkind: list\n", encoding="utf-8")
+            details, diagnostics = diagnose(project)
+            self.assertTrue(details)
+            codes = [d["code"] for d in diagnostics]
+            self.assertIn("doctor.sync_failed", codes)
+            self.assertNotIn("internal.error", codes)
+
     def test_standard_and_refined_predicates_pass(self):
         with tempfile.TemporaryDirectory() as tempdir:
             vocabulary = BASE_VOCABULARY.replace(

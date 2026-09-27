@@ -236,7 +236,20 @@ def diagnose(project: Project) -> tuple[dict[str, str], list[dict[str, Any]]]:
         )
         return details, diagnostics
     diagnostics.extend(_predicate_diagnostics(project))
-    for path in plan_sync(project):
+    try:
+        stale = plan_sync(project)
+    except Exception as error:
+        # ビュー YAML の形式不備（ViewError）などを含め、plan_sync が投げうる例外は
+        # ここで診断に変換する。ここで止めると kb doctor 自体が動かない環境診断に
+        # なってしまい、他の診断も含めて何も分からなくなる
+        diagnostics.append(
+            _diagnostic(
+                "doctor.sync_failed",
+                f"generated-file sync check failed: {type(error).__name__}: {error}",
+            )
+        )
+        return details, diagnostics
+    for path in stale:
         relative = str(path.relative_to(project.repo_root))
         diagnostics.append(
             {

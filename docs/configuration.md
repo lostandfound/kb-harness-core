@@ -345,13 +345,14 @@ where:
 | `name` / `description` | 必須。`name` は全ビューで一意 |
 | `kind` | `list`（割り当て）または `query`（導出） |
 | `basis` | `list` で必須。`interpretation`（書き手の見方。`sources` を持てない）または `source`（出典に基づく。`sources` 必須） |
-| `members` | `list` で必須。ルート相対パスの文字列、または `{path, note}`。Claim は指定できない |
+| `members` | `list` で必須。ルート相対パスの文字列、または `{path, note}`。Claim / Index / `graph: false` の型（グラフの `nodes` に現れない型）は指定できない |
 | `sources` | `basis: source` のときのみ。`ref: <id>` は `references.yml` に存在すること |
 | `where` | `query` で必須。`type` / `tags`（すべて含む）/ `relation: {predicate, target}` の AND 条件。語彙と実在エンティティに照らして検証する |
 
 - `list` に `where`、`query` に `members` / `basis` / `sources` を書くとエラー。上記以外のキーもエラー。同じ stem を `.yml` と `.yaml` の両方で置く（ID の重複）のもエラー。
 - `basis: source` を書きたくなったビューは、Claim かエンティティへ昇格する候補である。ビューは出典を持たないのが原則で、`source` は昇格前の一時的な状態として許す。
 - `kb graph build` はビューを `nodes` / `edges` に混ぜず、独立した `views` 配列へ出力する（`id` / `name` / `description` / `kind` / `basis` / `where` / 解決済み `members`）。
+- `list` の `members` に Claim / Index / `graph: false` の型を書くと `kb validate` が ERROR にする。`query` の解決が対象からこれらの型をあらかじめ除くのと同じ扱いを `list` にも適用しており、`graph.json` の `views[].members` は常に `nodes` に含まれるパスだけを指す。
 
 ## evals/rag-eval.yml（任意）
 
