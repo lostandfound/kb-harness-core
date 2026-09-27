@@ -68,6 +68,21 @@ class OkfCliTest(unittest.TestCase):
             # Then a non-directory is an argument/path error.
             self.assertEqual(main(["okf", "validate", str(bundle / "missing"), "--format", "json"]), 2)
 
+    def test_validate_okf_accepts_start_for_relative_path(self):
+        # `kb okf validate` resolves a relative PATH against --start, like
+        # every other command's common options (docs/cli.md 共通仕様).
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            bundle = root / "bundle"
+            bundle.mkdir()
+            (bundle / "note.md").write_text("---\ntype: Note\n---\n", encoding="utf-8")
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                code = main(["okf", "validate", "bundle", "--start", str(root), "--format", "json"])
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(code, 0)
+            self.assertTrue(result["ok"])
+
     def test_export_okf_dry_run_is_write_free(self):
         # Given a minimal KB and an output path
         with tempfile.TemporaryDirectory() as tempdir:

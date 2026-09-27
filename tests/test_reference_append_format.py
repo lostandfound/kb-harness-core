@@ -198,9 +198,9 @@ def test_reference_create_duplicate_fails_without_modifying_registry(tmp_path: P
                 "json",
             ]
         )
-        == 2
+        == 1
     )
-    assert json.loads(capsys.readouterr().err)["diagnostics"][0]["code"] == (
+    assert json.loads(capsys.readouterr().out)["diagnostics"][0]["code"] == (
         "reference.duplicate.id"
     )
     assert references.read_text(encoding="utf-8") == original

@@ -66,7 +66,7 @@ def test_reference_spec_rejects_existing_output_without_force(tmp_path: Path, ca
         ]
     )
 
-    result = json.loads(capsys.readouterr().err)
+    result = json.loads(capsys.readouterr().out)
     assert code == 2
     assert result["diagnostics"][0]["code"] == "reference.output.exists"
     assert output.read_text(encoding="utf-8") == "original\n"
@@ -143,7 +143,7 @@ def test_reference_spec_rejects_output_outside_project(tmp_path: Path, capsys):
         ]
     )
 
-    result = json.loads(capsys.readouterr().err)
+    result = json.loads(capsys.readouterr().out)
     assert code == 2
     assert result["diagnostics"][0]["code"] == "reference.output.outside_project"
     assert not outside.exists()
@@ -170,7 +170,7 @@ def test_reference_spec_rejects_symlink_escape(tmp_path: Path, capsys):
         ]
     )
 
-    result = json.loads(capsys.readouterr().err)
+    result = json.loads(capsys.readouterr().out)
     assert code == 2
     assert result["diagnostics"][0]["code"] == "reference.output.outside_project"
     assert not (outside / "out.yml").exists()

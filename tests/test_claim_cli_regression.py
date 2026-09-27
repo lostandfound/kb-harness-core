@@ -1,6 +1,6 @@
 import pytest
 import json
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
@@ -49,7 +49,7 @@ def test_claim_inspect_accepts_start_and_emits_json(tmp_path: Path):
 def test_claim_inspect_missing_path_is_diagnostic(tmp_path: Path):
     (tmp_path / "kb-domain.yml").write_text("domain:\n  content_root: knowledge\n", encoding="utf-8")
     output = StringIO()
-    with redirect_stderr(output):
+    with redirect_stdout(output):
         code = main(["claim", "inspect", "missing.md", "--start", str(tmp_path), "--format", "json"])
     assert code == 2
     assert json.loads(output.getvalue())["diagnostics"][0]["code"] == "claim.path.not_found"
@@ -88,7 +88,7 @@ def test_claim_validate_reports_invalid_claim(tmp_path: Path):
     claim.parent.mkdir(parents=True)
     claim.write_text("---\ntype: Claim\nsubject: /people/a.md\nstatus: nope\n---\n", encoding="utf-8")
     output = StringIO()
-    with redirect_stderr(output):
+    with redirect_stdout(output):
         code = main(["claim", "validate", "claims/bad.md", "--start", str(tmp_path), "--format", "json"])
     assert code == 1
 
@@ -103,7 +103,7 @@ def test_claim_validate_uses_ontology_context(tmp_path: Path):
     claim = content / "claims" / "bad.md"
     claim.write_text("---\ntype: Claim\nsubject: /people/a.md\npredicate: unknown\nobject: /people/b.md\nstatus: proposed\nconfidence: C\nsources: [x]\n---\n", encoding="utf-8")
     output = StringIO()
-    with redirect_stderr(output):
+    with redirect_stdout(output):
         code = main(["claim", "validate", "claims/bad.md", "--start", str(tmp_path), "--format", "json"])
     result = json.loads(output.getvalue())
     assert code == 1 and result["diagnostics"][0]["code"] == "claim.validation"
@@ -118,7 +118,7 @@ def test_claim_transition_validates_and_is_atomic(tmp_path: Path):
     original = "---\ntype: Claim\nsubject: /people/missing.md\npredicate: taught\nobject: /people/b.md\nstatus: proposed\nconfidence: C\nsources: [x]\n---\n"
     claim.write_text(original, encoding="utf-8")
     output = StringIO()
-    with redirect_stderr(output):
+    with redirect_stdout(output):
         code = main(["claim", "transition", "claims/bad.md", "--to", "accepted", "--start", str(tmp_path), "--format", "json"])
     result = json.loads(output.getvalue())
     assert code == 1
@@ -139,7 +139,7 @@ def test_claim_transition_rejects_path_outside_content_root_without_changes(tmp_
     }
 
     output = StringIO()
-    with redirect_stderr(output):
+    with redirect_stdout(output):
         code = main(
             [
                 "claim",

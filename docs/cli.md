@@ -6,9 +6,9 @@
 
 | 項目 | 内容 |
 |---|---|
-| `--start DIR` | プロジェクト探索の起点。省略時はカレントディレクトリから上へ `kb-domain.yml` を探す |
-| `--format text\|json` | 出力形式。`json` は `ok` / `changed` / `diagnostics` を基本フィールドとし、CI やエージェントから機械的に扱える |
-| `--dry-run` | 書き込み系コマンドで、変更を適用せず統一 diff のみを返す |
+| `--start DIR` | プロジェクト探索の起点。省略時はカレントディレクトリから上へ `kb-domain.yml` を探す。`kb okf validate` の `PATH` 相対解決にも使う |
+| `--format text\|json` | 出力形式。`json` は `ok` / `changed` / `diagnostics` を基本フィールドとし、CI やエージェントから機械的に扱える。成功・失敗によらず常に stdout に出るので、消費側は 1 本のストリームだけ読めばよい |
+| `--dry-run` | 書き込み系コマンドで、変更を適用せず統一 diff のみを返す。text 出力では対象パスを `would update: <path>` と表示し、実際に書き込んだ `updated: <path>` とは書き分ける |
 
 終了コード:
 
@@ -18,6 +18,8 @@
 | `1` | 検証不合格・差分あり |
 | `2` | 引数または設定の不備 |
 | `3` | 予期しない内部エラー |
+
+書き込み系（`entity create` / `reference create` など）の spec エラーは、コマンドの起動そのものが不正（spec が読めない・必須項目が欠けている・出力先が不正）なら `2`、spec は読めたが内容が検証を通らない（重複 ID、書式不正など）なら `1` を返す。両コマンドで揃えてある。
 
 ## 読み取り・検証
 
@@ -147,7 +149,7 @@ spec を `references.yml` に原子的に追加する。既存レジストリの
 
 ### `kb okf validate PATH [--strict]`
 
-既存の OKF bundle の適合性を検証する。適合性の違反は `diagnostics`、推奨事項の逸脱は `warnings` に入る。本文リンクは相対リンクなら文書の位置から、ルート相対リンクなら bundle ルートから解決し、bundle 内に無いものを `okf.link.broken` の警告にする。`--strict` を付けると警告も失敗扱いにする。
+既存の OKF bundle の適合性を検証する。`PATH` が相対パスなら `--start`（省略時はカレントディレクトリ）を起点に解決する。適合性の違反は `diagnostics`、推奨事項の逸脱は `warnings` に入る。本文リンクは相対リンクなら文書の位置から、ルート相対リンクなら bundle ルートから解決し、bundle 内に無いものを `okf.link.broken` の警告にする。`--strict` を付けると警告も失敗扱いにする。
 
 ## Python API
 

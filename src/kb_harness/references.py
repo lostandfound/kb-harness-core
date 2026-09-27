@@ -11,9 +11,18 @@ from .sync import unified_diff
 
 
 class ReferenceSpecError(ValueError):
-    def __init__(self, code: str, message: str):
+    """A reference spec/registry error.
+
+    ``argument`` marks a problem with how the command was invoked or with the
+    surrounding configuration (unreadable spec/registry, malformed registry
+    root) as opposed to a content problem in the reference itself (missing
+    field, bad URL, duplicate id), mirroring ``EntitySpecError``.
+    """
+
+    def __init__(self, code: str, message: str, *, argument: bool = False):
         super().__init__(message)
         self.code = code
+        self.argument = argument
 
 
 def _reference_id(item: dict[str, Any], authors: list[str], year: str) -> str:
@@ -67,9 +76,9 @@ def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
     try:
         spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
-        raise ReferenceSpecError("reference.spec.read", str(exc)) from exc
+        raise ReferenceSpecError("reference.spec.read", str(exc), argument=True) from exc
     if not isinstance(spec, dict):
-        raise ReferenceSpecError("reference.spec.mapping", "reference spec must be a mapping")
+        raise ReferenceSpecError("reference.spec.mapping", "reference spec must be a mapping", argument=True)
     ref_id = spec.pop("id", None)
     if not isinstance(ref_id, str) or not ref_id.strip():
         raise ReferenceSpecError("reference.missing.id", "reference spec requires id")
@@ -85,9 +94,9 @@ def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
         existing_text = path.read_bytes().decode("utf-8") if path.exists() else ""
         data = yaml.safe_load(existing_text) if path.exists() else {}
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
-        raise ReferenceSpecError("reference.read", str(exc)) from exc
+        raise ReferenceSpecError("reference.read", str(exc), argument=True) from exc
     if not isinstance(data, dict):
-        raise ReferenceSpecError("reference.root.mapping", "references.yml must be a mapping")
+        raise ReferenceSpecError("reference.root.mapping", "references.yml must be a mapping", argument=True)
     if ref_id in data:
         raise ReferenceSpecError("reference.duplicate.id", f"{ref_id}: duplicate reference id")
 
@@ -120,7 +129,7 @@ def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
     try:
         validated = yaml.safe_load(new_text)
     except yaml.YAMLError as exc:
-        raise ReferenceSpecError("reference.write.invalid", str(exc)) from exc
+        raise ReferenceSpecError("reference.write.invalid", str(exc), argument=True) from exc
     if (
         not isinstance(validated, dict)
         or ref_id not in validated
@@ -129,6 +138,7 @@ def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
         raise ReferenceSpecError(
             "reference.write.invalid",
             f"{ref_id}: appended reference could not be validated",
+            argument=True,
         )
 
     changes = {path: new_text}
