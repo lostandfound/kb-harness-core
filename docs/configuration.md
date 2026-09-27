@@ -9,6 +9,8 @@
 | `references.yml` | `<content_root>/` | `kb validate` / `kb reference *`, `find-book` / `find-paper` スキル |
 | `evals/rag-eval.yml` | リポジトリルート（任意） | `kb validate` / `kb eval *`, `rag-tester` |
 
+`evals/rag-eval.yml` は `content_root` の親ではなくリポジトリルート（`kb-domain.yml` のある場所）直下を見る。`domain.content_root: kb/entities` のように `content_root` がリポジトリルート直下に無い配置でも、`kb validate` / `kb sync` / `kb entity create` は `kb-domain.yml` から解決した `repo_root` を使うので取りこぼさない。
+
 ## kb-domain.yml
 
 ```yaml
@@ -60,7 +62,7 @@ validate:
 ```yaml
 types:
   <型名>:
-    directory: <対応ディレクトリ名>     # 必須。frontmatter の type とディレクトリの対応検査に使う
+    directory: <対応ディレクトリ名>     # 必須。frontmatter の type とディレクトリの対応検査に使う。欠くと `kb validate` が ERROR にする
     description: <説明>                  # 任意。型の意味。ハーネスは検査にも表示にも使わない
     extra_fields: [born]                 # 任意。この型で追加必須になる frontmatter フィールド
     optional_fields: [died, same_as]     # 任意。書いてもよい frontmatter フィールド。無くても検査は通る
@@ -87,6 +89,7 @@ tags:
 - `types.<型>.graph: false` を指定した型のエンティティは `relations` を持てない。索引・付録的なエンティティ型に使う。
 - `predicates.<述語>.domain` / `range` は、frontmatter の `relations` に書かれた `predicate` と `target` エンティティの型が一致するかを検査する型制約である。
 - `tags` は frontmatter の `tags` に使える語の全量である。一覧にない語は validate エラーになる。
+- エンティティ Markdown は必ずいずれかの型の `directory` の下に置く。`content_root` 直下に置ける `.md` は `index.md` だけで、それ以外（例: `<content_root>/stray.md`）は `kb validate` が ERROR にする。
 
 ### 名前の文字種
 

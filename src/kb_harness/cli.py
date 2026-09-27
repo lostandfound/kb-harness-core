@@ -412,7 +412,7 @@ def _view_action(project: Project, args: Any) -> int:
 def _validate(project: Project, output_format: str, *, urls: bool = False) -> int:
     try:
         warnings: list[str] = []
-        errors = validate(project.content_root, warnings=warnings)
+        errors = validate(project.content_root, warnings=warnings, repo_root=project.repo_root)
         if project.views_root is not None:
             errors.extend(validate_views(project.content_root, project.views_root))
         if urls:

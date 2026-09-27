@@ -44,11 +44,12 @@ def main() -> None:
     root = Path(args.root) if args.root else Project.discover().content_root
     # views.root を設定した KB では graph.json に views 配列が入る。kb graph build と同じ出力にする
     try:
-        views_root = Project.discover(root).views_root
+        project = Project.discover(root)
     except Exception:
-        views_root = None
+        project = None
+    views_root = project.views_root if project is not None else None
     if not args.force:
-        errors = validate(root)
+        errors = validate(root, repo_root=project.repo_root if project is not None else None)
         if errors:
             for error in errors:
                 print(error, file=sys.stderr)

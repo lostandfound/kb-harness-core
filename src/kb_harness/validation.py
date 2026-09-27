@@ -144,9 +144,15 @@ def _load_references(root: Path):
     return data, errors
 
 
-def _validate_evals(root: Path, all_paths: set[str]) -> list[str]:
-    """evals/rag-eval.yml（リポジトリルート直下、root の外）を検証する。ファイルが無ければ空扱い。"""
-    evals_path = root.parent / "evals" / "rag-eval.yml"
+def _validate_evals(root: Path, all_paths: set[str], repo_root: Path | None = None) -> list[str]:
+    """evals/rag-eval.yml（リポジトリルート直下、content_root の外）を検証する。ファイルが無ければ空扱い。
+
+    `repo_root` を渡さない呼び出しは、旧来どおり `content_root` の親をリポジトリルートとみなす。
+    `content_root: kb/entities` のように content_root がリポジトリルート直下にない配置では
+    これが誤りで、`evals/` を静かに見失う（staging.py / cli.py は常に `project.repo_root` を渡す）。
+    """
+    base = repo_root if repo_root is not None else root.parent
+    evals_path = base / "evals" / "rag-eval.yml"
     if not evals_path.exists():
         return []
     rel = "/evals/rag-eval.yml"
@@ -250,7 +256,7 @@ def _common_suffix(a: str, b: str) -> str:
         n += 1
     return a[len(a) - n:] if n else ""
 
-def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
+def validate(root: Path, warnings: list[str] | None = None, repo_root: Path | None = None) -> list[str]:
     errors: list[str] = []
     if warnings is None:
         warnings = []
@@ -261,7 +267,14 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     types = _load_types(root)
     errors.extend(f"ERROR vocabulary.yml: {problem}" for problem in validate_type_fields(types))
     errors.extend(f"ERROR vocabulary.yml: {problem}" for problem in validate_vocabulary_names_at(root))
-    type_dir_map = {t["directory"]: name for name, t in types.items()}
+    # directory を欠く型（vocabulary.yml.directory が未設定）は validate_type_fields が
+    # 別途 ERROR にする。ここで拾うと None がディレクトリ名として type_dir_map に入り、
+    # ルート index が存在しない '/None/index.md' を要求してしまう。
+    type_dir_map = {
+        t["directory"]: name
+        for name, t in types.items()
+        if isinstance(t.get("directory"), str) and t["directory"].strip()
+    }
     references, ref_errors = _load_references(root)
     errors.extend(ref_errors)
     used_references: set[str] = set()
@@ -290,7 +303,17 @@ def validate(root: Path, warnings: list[str] | None = None) -> list[str]:
     for dirname in sorted(unknown_dirs):
         errors.append(f"ERROR /{dirname}: 未知のトップレベルディレクトリに .md ファイルが存在する")
 
-    errors.extend(_validate_evals(root, all_paths))
+    # content_root 直下は index.md 専用である。型ディレクトリを介さない .md
+    # （例: /stray.md）は「/」を含まないので unknown_dirs の対象にならず、
+    # type_dir_map.get(dirname) も None のまま黙って通ってしまう（後段の型検査を素通りし graph.json に載る）。
+    stray_root_files = {
+        rel for rel in all_paths
+        if "/" not in rel.lstrip("/") and rel != "/index.md"
+    }
+    for rel in sorted(stray_root_files):
+        errors.append(f"ERROR {rel}: content_root 直下には index.md 以外の .md ファイルを置けない（型ディレクトリの下に置く）")
+
+    errors.extend(_validate_evals(root, all_paths, repo_root))
 
     for rel, (path, fm, body) in entities.items():
         dirname = path.relative_to(root).parts[0]
@@ -770,8 +793,15 @@ def main():
         for path in fixed:
             print(f"fixed timestamp: {path}")
 
+    # evals/ はリポジトリルート直下にあり、kb-domain.yml から辿れればそれを使う。
+    # 辿れない（--root で content_root を直接指定した等）場合だけ従来どおり親で近似する。
+    try:
+        repo_root = Project.discover(root).repo_root
+    except ProjectError:
+        repo_root = root.parent
+
     warnings: list[str] = []
-    errors = validate(root, warnings=warnings)
+    errors = validate(root, warnings=warnings, repo_root=repo_root)
     if args.check_urls:
         errors += check_urls(root)
     for w in warnings:

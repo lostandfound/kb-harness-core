@@ -45,6 +45,9 @@ def validate_type_fields(types: dict[str, dict[str, Any]]) -> list[str]:
     """
     problems: list[str] = []
     for name, type_def in types.items():
+        directory = type_def.get("directory")
+        if not isinstance(directory, str) or not directory.strip():
+            problems.append(f"types.{name}.directory が未設定である（ルート index の必須リンクとディレクトリ対応検査を解決できない）")
         lists: dict[str, list[str]] = {}
         for key in ("extra_fields", "optional_fields"):
             value = type_def.get(key) or []
