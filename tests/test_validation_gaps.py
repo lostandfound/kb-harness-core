@@ -27,13 +27,13 @@ class ValidateEvalsTest(unittest.TestCase):
             root.mkdir()
             self.assertEqual(_validate_evals(root, set()), [])
 
-    def test_トップレベルがmappingならエラー(self):
+    def test_entriesがlist以外ならエラー(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp) / "knowledge"
             root.mkdir()
             evals = Path(tmp) / "evals"
             evals.mkdir()
-            (evals / "rag-eval.yml").write_text("entries: []\n", encoding="utf-8")
+            (evals / "rag-eval.yml").write_text("entries: {}\n", encoding="utf-8")
             errors = _validate_evals(root, set())
             self.assertEqual(len(errors), 1)
             self.assertIn("must be a list", errors[0])
@@ -106,7 +106,7 @@ class FixTimestampsTest(unittest.TestCase):
 
             fixed = fix_timestamps(repo)
 
-            self.assertEqual(fixed, [target])
+            self.assertEqual(fixed, [target.resolve()])
             self.assertNotIn("2000-01-01T00:00:00Z", target.read_text(encoding="utf-8"))
 
 

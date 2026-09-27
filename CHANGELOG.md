@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.9.1 — 2026-09-28
+
+### Fixed
+
+- `kb validate` が YAML の型変換後も `timestamp` の元の表記を検査する。マージキーで継承した値も扱い、`+00:00`・空白区切り・小数秒を規定外として報告する。
+- `kb validate` が `evals/rag-eval.yml` の `entries:` 形式を受け付ける。
+- `kb reference show` / `search --format json` が `references.yml` 内の YAML 日付を ISO 形式の文字列で出力する。
+- Claim の状態変更が非正典形式の時刻を丸めて保存せず、変更前に拒否する。
+
 ## 0.9.0 — 2026-09-27
 
 互換性に影響する変更を含む。導入先は固定コミットを上げる前に `kb validate` を回し、新たな ERROR を確認する。
