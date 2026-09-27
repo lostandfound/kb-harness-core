@@ -27,13 +27,23 @@
 
 `kb-domain.yml` の解決結果（ドメイン名、content_root など）を表示する。
 
-### `kb validate [--check-urls]`
+### `kb validate [--check-urls [--for ENTITY]... [--ref ID]...]`
 
 KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml`・述語の階層（`vocabulary.yml` の `broader` / `maps_to`、[設定リファレンス](configuration.md#述語の階層と標準対応)）を対象とする。ERROR にならない指摘は `warnings` に入れる。text では `<SEVERITY> <message>` の形で stderr に、json では `diagnostics` と同じ構造の `{severity, code, message}` の配列で返す（`severity` は `warning` か `info`、`message` は text と同じ文字列）。コードは `validation.description.same_as_title` / `validation.description.long` / `validation.reference.unreferenced` / `validation.reference.pending_referenced` / `validation.reference.pending_unreferenced`（info）/ `validation.relation.refinable` / `validation.relation.unclassified`（info）/ `validation.link.root_relative` / `validation.url.doi_registry_unreachable`（`--check-urls` のときだけ）。本文リンクはリンク元ファイルからの相対パスで解決し、存在しないリンク先を ERROR にする（[設定リファレンス](configuration.md#本文リンク)）。旧形式のルート相対リンク（`/people/example.md`）は解決するが、件数をまとめて `validation.link.root_relative` の WARNING で示す。`related-to` のエッジは未分類として件数を INFO で報告し、始点と終点の型が層 1 のちょうど 1 つの述語に収まるものは精緻化の余地として WARNING を出す。`kb-domain.yml` に `views.root` があればビュー定義も検査する（[設定リファレンス](configuration.md#ビュー任意)）。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。 `--check-urls` を付けると、エンティティの `sources` と `references.yml` の出典に到達できるかも確認する。ネットワークに依存するため既定では行わない。確かめ方は出典の種類で分かれる。
 
 - DOI（`references.yml` の `doi`、および `doi.org` / `www.doi.org` / `dx.doi.org` の URL）は出版社のページへ辿らず、DOI レジストリ（`https://doi.org/api/handles/<doi>`）で登録の有無だけを確かめる。出版社のボット遮断で登録済みの DOI が失敗扱いになるのを避けるためである。レジストリが未登録と答えたものは `DOI unregistered` の ERROR にする。レジストリに届かなかったもの（ネットワーク障害・タイムアウト・429 や 5xx）は登録の有無が分からないため ERROR にせず、`validation.url.doi_registry_unreachable` の WARNING にする。
 - `references.yml` のエントリが `doi` と `url` の両方を持つときは `doi` だけを確かめ、`url` には HTTP でアクセスしない。
-- それ以外の URL は HTTP で確かめる。HEAD を送り、405 とボット対策の 403 には GET でもう一度試す。届かなければ `unreachable URL` の ERROR にする。出版社の URL に DOI が含まれていても（`https://link.springer.com/article/10.xxxx/...` など）DOI とはみなさず、この HTTP の確認になる。ボット遮断で失敗する出版社の論文は、`doi` か `doi.org` の URL で登録するとレジストリでの確認に切り替わる。
+- それ以外の URL は HTTP で確かめる。HEAD を送り、405・ボット対策の 403・HEAD にだけ返す 404 には GET でもう一度試す。届かなければ `unreachable URL` の ERROR にする。出版社の URL に DOI が含まれていても（`https://link.springer.com/article/10.xxxx/...` など）DOI とはみなさず、この HTTP の確認になる。ボット遮断で失敗する出版社の論文は、`doi` か `doi.org` の URL で登録するとレジストリでの確認に切り替わる。
+
+確認は並列に行い、同じホストへの同時接続は 2 本までに抑える。1 回の実行の中で同じ URL・同じ DOI は 1 回だけ確かめる。ERROR と WARNING の並びは並列化の影響を受けず、エンティティ、`references.yml` の順の走査順になる。
+
+`--for ENTITY` と `--ref ID` は確かめる対象を絞る。どちらも繰り返し指定でき、`--check-urls` と一緒に使う（単独で渡すと `validation.arguments` で exit 2）。検証本体は指定にかかわらず KB 全体に行う。
+
+- `--for ENTITY` は、そのエンティティの `sources` に直接書かれた URL と、`sources` の `ref:` と本文の「（出典: id）」が引く出典を確かめる。出典の集め方は `kb reference show --for` と同じである。相対パスは現在のディレクトリから解決する。
+- `--ref ID` は、`references.yml` の指定した出典を確かめる。
+- 見つからないエンティティは `entity not found`、見つからない出典 ID は `reference id not found` の ERROR にする。
+
+出典を足した直後は、足したエンティティや出典に絞って確かめる（`kb validate --check-urls --for knowledge/people/example.md`）。KB 全体の確認は定期的な点検で行う。判断の経緯は [考察メモ](notes/url-kakunin-memo.md) にある。
 
 ### `kb doctor`
 

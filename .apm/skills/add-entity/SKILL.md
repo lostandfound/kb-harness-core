@@ -20,6 +20,6 @@ description: KB に新規エンティティを追加する確定的手順。「�
 
 6. `kb entity create --from entity.yml --dry-run` で生成される差分（エンティティ本体・index.md・graph.json）を確認し、問題がなければ `kb entity create --from entity.yml` で反映する。既存 slug と衝突する場合は上書きせず停止するので、slug を見直す。旧手順で雛形を手編集した場合は、代わりに `kb sync` を実行して index と graph を更新する（index の一覧は手で編集しない）。
 
-7. `kb validate` を実行し、エラーがゼロであることを確認する。`sources` に URL を含めた場合は `kb validate --check-urls` も実行する。エラーが出たら、その内容が現行規約の正であり、本スキルや自分の記憶と食い違う場合は検証側に従う。続けて `kb sync --check` が差分なし（終了コード 0）であることを確認する。
+7. `kb validate` を実行し、エラーがゼロであることを確認する。`sources` に URL を含めた場合は `kb validate --check-urls --for <追加したエンティティのパス>` も実行する（KB 全体の URL を確かめると時間がかかり、無関係な既存出典の ERROR が混ざる）。エラーが出たら、その内容が現行規約の正であり、本スキルや自分の記憶と食い違う場合は検証側に従う。続けて `kb sync --check` が差分なし（終了コード 0）であることを確認する。
 
 8. コミットする。最終検証は pre-commit hook が行う。spec ファイルはリポジトリに含めない。

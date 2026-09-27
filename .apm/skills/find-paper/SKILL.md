@@ -15,6 +15,6 @@ description: CiNii API で論文を検索し references.yml へ登録する確�
 
 5. 出典として使うエンティティの `sources` に `- "ref: <id>"` を追記する。本文の主張は必ず自分の言葉で書く。PDF 等の本文ファイルはリポジトリに保存しない。
 
-6. `kb validate` でエラーゼロ、URL を登録した場合は `--check-urls` も実行する。
+6. `kb validate` でエラーゼロ、URL を登録した場合は `kb validate --check-urls --ref <登録した ID>` も実行する（出典を追記したエンティティがあれば `--for <そのパス>` でもよい）。
 
 7. コミットする。pre-commit hook が最終検証を行う。

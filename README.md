@@ -93,7 +93,7 @@ kb sync --check                                                   # index.md や
 | `kb project show` | `kb-domain.yml` の設定解決結果を表示 |
 | `kb flashcards` | 任意の KB をローカルの学習カード画面で学ぶ |
 | `kb serve` | グラフの閲覧画面をローカルで起動 |
-| `kb validate` | KB 全体のスキーマ・リンク・リレーションを検証 |
+| `kb validate` | KB 全体のスキーマ・リンク・リレーションを検証。`--check-urls` で出典の到達も確かめ、`--for` / `--ref` でその対象を絞る |
 | `kb index build\|check` / `kb graph build\|check` / `kb sync` | `index.md` と `graph.json` の自動生成・差分検査 |
 | `kb link migrate [--check]` | 旧形式のルート相対の本文リンクを相対リンクへ書き換え |
 | `kb entity create --from spec.yml` | spec ファイルからエンティティを検証付きで原子的に作成 |

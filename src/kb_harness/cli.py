@@ -73,6 +73,8 @@ def _parser() -> argparse.ArgumentParser:
 
     validate_parser = subcommands.add_parser("validate", help="validate the KB")
     validate_parser.add_argument("--check-urls", action="store_true", help="also check that source URLs are reachable")
+    validate_parser.add_argument("--for", dest="url_entities", action="append", default=None, metavar="ENTITY", help="with --check-urls, check only the sources of this entity file (repeatable)")
+    validate_parser.add_argument("--ref", dest="url_refs", action="append", default=None, metavar="ID", help="with --check-urls, check only this reference id (repeatable)")
     _add_common_options(validate_parser)
 
     okf = subcommands.add_parser("okf", help="inspect OKF bundles")
@@ -415,14 +417,23 @@ def _view_action(project: Project, args: Any) -> int:
         return _internal_error(error, args.format)
 
 
-def _validate(project: Project, output_format: str, *, urls: bool = False) -> int:
+def _validate(
+    project: Project,
+    output_format: str,
+    *,
+    urls: bool = False,
+    url_entities: list[Path] | None = None,
+    url_refs: list[str] | None = None,
+) -> int:
     try:
         warnings: list[str] = []
         errors = validate(project.content_root, warnings=warnings, repo_root=project.repo_root)
         if project.views_root is not None:
             errors.extend(validate_views(project.content_root, project.views_root))
         if urls:
-            errors += check_urls(project.content_root, warnings=warnings)
+            errors += check_urls(
+                project.content_root, warnings=warnings, entities=url_entities, ref_ids=url_refs
+            )
         checks = run_extra_checks(project.extra_checks, project.repo_root)
     except Exception as error:
         return _internal_error(error, output_format)
@@ -848,7 +859,33 @@ def _main(argv: Sequence[str] | None = None) -> int:
         _emit(result, args.format, error=not result["ok"])
         return 0 if result["ok"] else 1
     if args.command == "validate":
-        return _validate(project, args.format, urls=args.check_urls)
+        if (args.url_entities or args.url_refs) and not args.check_urls:
+            _emit(
+                {
+                    "ok": False,
+                    "errors": [],
+                    "warnings": [],
+                    "diagnostics": [
+                        {"code": "validation.arguments", "message": "--for and --ref require --check-urls"}
+                    ],
+                },
+                args.format,
+                error=True,
+            )
+            return 2
+        url_entities = None
+        if args.url_entities:
+            url_entities = [
+                Path(entity) if Path(entity).is_absolute() else Path.cwd() / entity
+                for entity in args.url_entities
+            ]
+        return _validate(
+            project,
+            args.format,
+            urls=args.check_urls,
+            url_entities=url_entities,
+            url_refs=list(args.url_refs) if args.url_refs else None,
+        )
 
     if args.command == "entity" and args.entity_command == "create":
         return _entity_create(project, args)

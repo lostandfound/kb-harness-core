@@ -638,8 +638,9 @@ def _url_reachable(url: str) -> bool:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status < 400
     except urllib.error.HTTPError as e:
-        # HEAD 拒否サーバ（405、ボット対策の 403）には GET でフォールバック
-        if e.code in (403, 405):
+        # HEAD 拒否サーバ（405、ボット対策の 403）と、HEAD にだけ 404 を返すサーバには
+        # GET でフォールバック（docs/notes/url-kakunin-memo.md）
+        if e.code in (403, 404, 405):
             get_req = urllib.request.Request(url, method="GET", headers=_UA)
             try:
                 with urllib.request.urlopen(get_req, timeout=10) as resp:
@@ -712,58 +713,148 @@ def _doi_registered(doi: str) -> bool | None:
     )
 
 
-def check_urls(root: Path, warnings: list[str] | None = None) -> list[str]:
+_URL_CHECK_WORKERS = 8
+_URL_CHECK_PER_HOST = 2
+
+
+def _run_reachability(targets: list[tuple[str, str]]) -> dict[tuple[str, str], object]:
+    """(kind, value) の一覧を並列に確かめ、結果を返す。
+
+    kind は ``"url"``（``_url_reachable``）か ``"doi"``（``_doi_registered``）。同じ
+    (kind, value) は 1 回だけ確かめる。同じホストへの同時接続は ``_URL_CHECK_PER_HOST``
+    までに抑え、ボット対策を刺激しないようにする。
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    unique = list(dict.fromkeys(targets))
+    if not unique:
+        return {}
+    host_locks: dict[str, threading.BoundedSemaphore] = {}
+    guard = threading.Lock()
+
+    def _host(kind: str, value: str) -> str:
+        if kind == "doi":
+            return "doi.org"
+        return urllib.parse.urlsplit(value).netloc.lower()
+
+    def _check(target: tuple[str, str]) -> object:
+        kind, value = target
+        with guard:
+            semaphore = host_locks.setdefault(
+                _host(kind, value), threading.BoundedSemaphore(_URL_CHECK_PER_HOST)
+            )
+        with semaphore:
+            return _doi_registered(value) if kind == "doi" else _url_reachable(value)
+
+    with ThreadPoolExecutor(max_workers=min(_URL_CHECK_WORKERS, len(unique))) as pool:
+        return dict(zip(unique, pool.map(_check, unique)))
+
+
+def check_urls(
+    root: Path,
+    warnings: list[str] | None = None,
+    *,
+    entities: list[Path] | None = None,
+    ref_ids: list[str] | None = None,
+) -> list[str]:
     """出典 URL と DOI の到達性を確かめ、ERROR の一覧を返す。
 
     DOI（`references.yml` の `doi` と doi.org の URL）は出版社へ辿らず、DOI レジストリで
     登録の有無だけを見る。レジストリに届かなかった DOI は登録の有無が分からないため
     ERROR にせず、``warnings`` を渡されていればそこへ WARNING として加える。
+
+    ``entities`` と ``ref_ids`` のどちらも None なら KB 全体を確かめる。どちらかを
+    渡すと、指定したエンティティ（``sources`` の URL と、``sources`` の ``ref:`` と本文の
+    「（出典: id）」が引く出典）と指定した出典 ID だけを確かめる。見つからない
+    エンティティや出典 ID は ERROR にする。確認は並列に行うが、ERROR と WARNING の
+    並びは走査順で決まる。
     """
+    from .references import ReferenceSpecError, entity_reference_ids
+
     errors: list[str] = []
+    # (where, kind, value, suffix) を走査順に集め、まとめて確かめてから報告する
+    checks: list[tuple[str, str, str, str]] = []
+    scoped = entities is not None or ref_ids is not None
 
-    def check_doi(doi: str, where: str, suffix: str = "") -> None:
-        registered = _doi_registered(doi)
-        if registered is False:
-            errors.append(f"ERROR {where}: DOI unregistered {doi}{suffix}")
-        elif registered is None and warnings is not None:
-            warnings.append(
-                ValidationWarning(
-                    f"{where}: DOI レジストリに届かず登録を確認できない {doi}{suffix}",
-                    code="validation.url.doi_registry_unreachable",
-                )
-            )
+    def add_url(where: str, url: str, suffix: str = "") -> None:
+        doi = _doi_from_url(url)
+        if doi:
+            checks.append((where, "doi", doi, suffix))
+        else:
+            checks.append((where, "url", url, suffix))
 
-    for path in _iter_entity_files(root):
-        if path.name == "vocabulary.yml":
-            continue
-        rel = "/" + str(path.relative_to(root))
+    def add_entity_sources(path: Path, rel: str) -> None:
         fm, _body, err = _parse_frontmatter(path)
         if err or fm is None:
-            continue
+            return
         for source in fm.get("sources") or []:
-            if not isinstance(source, str) or not source.startswith(("http://", "https://")):
+            if isinstance(source, str) and source.startswith(("http://", "https://")):
+                add_url(rel, source)
+
+    def entity_rel(path: Path) -> str:
+        try:
+            return "/" + str(path.resolve().relative_to(root.resolve()))
+        except ValueError:
+            return str(path)
+
+    selected_refs: list[str] | None = None
+    if scoped:
+        selected_refs = []
+        for path in entities or []:
+            rel = entity_rel(path)
+            if not path.is_file():
+                errors.append(f"ERROR {rel}: entity not found")
                 continue
-            doi = _doi_from_url(source)
-            if doi:
-                check_doi(doi, rel)
-            elif not _url_reachable(source):
-                errors.append(f"ERROR {rel}: unreachable URL {source}")
+            add_entity_sources(path, rel)
+            try:
+                ids = entity_reference_ids(path)
+            except ReferenceSpecError as exc:
+                errors.append(f"ERROR {rel}: {exc}")
+                continue
+            selected_refs.extend(ref_id for ref_id in ids if ref_id not in selected_refs)
+        selected_refs.extend(ref_id for ref_id in ref_ids or [] if ref_id not in selected_refs)
+    else:
+        for path in _iter_entity_files(root):
+            if path.name == "vocabulary.yml":
+                continue
+            add_entity_sources(path, "/" + str(path.relative_to(root)))
 
     references, _ref_errors = _load_references(root)
-    for ref_id, entry in references.items():
+    if selected_refs is None:
+        ref_order = list(references)
+    else:
+        ref_order = selected_refs
+        for ref_id in selected_refs:
+            if ref_id not in references:
+                errors.append(f"ERROR /references.yml: reference id not found ({ref_id})")
+    for ref_id in ref_order:
+        entry = references.get(ref_id)
         if not isinstance(entry, dict):
             continue
         url = entry.get("url")
         doi = entry.get("doi")
         suffix = f" ({ref_id})"
         if doi:
-            check_doi(doi, "/references.yml", suffix)
+            checks.append(("/references.yml", "doi", str(doi), suffix))
         elif url:
-            doi = _doi_from_url(url)
-            if doi:
-                check_doi(doi, "/references.yml", suffix)
-            elif not _url_reachable(url):
-                errors.append(f"ERROR /references.yml: unreachable URL {url} ({ref_id})")
+            add_url("/references.yml", str(url), suffix)
+
+    results = _run_reachability([(kind, value) for _where, kind, value, _suffix in checks])
+    for where, kind, value, suffix in checks:
+        result = results[(kind, value)]
+        if kind == "doi":
+            if result is False:
+                errors.append(f"ERROR {where}: DOI unregistered {value}{suffix}")
+            elif result is None and warnings is not None:
+                warnings.append(
+                    ValidationWarning(
+                        f"{where}: DOI レジストリに届かず登録を確認できない {value}{suffix}",
+                        code="validation.url.doi_registry_unreachable",
+                    )
+                )
+        elif not result:
+            errors.append(f"ERROR {where}: unreachable URL {value}{suffix}")
     return errors
 
 
