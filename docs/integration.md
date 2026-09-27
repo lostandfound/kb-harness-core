@@ -88,7 +88,7 @@ apm は `.apm/hooks/*.json` を `.claude/settings.json` にマージする機能
 bash apm_modules/lostandfound/kb-harness-core/scripts/install-hooks.sh
 ```
 
-ステージに `.md` / `.yml` / `.py` が含まれるとき `kb validate` → テスト（`tests/` がある場合）→ `kb eval smoke`（`evals/rag-eval.yml` がある場合）→ `.kb/hooks/pre-commit.d/*`（ある場合）を順に実行する。テンプレートは `kb` CLI だけを呼び、導入先の `scripts/` には依存しない。導入先固有のチェックは `kb-domain.yml` の `validate.extra_checks` か `.kb/hooks/pre-commit.d/` に置き、テンプレート自体は編集しない。
+ステージに `.md` / `.yml` / `.py` が含まれるとき `kb validate` → `kb sync --check` → テスト（`tests/` がある場合）→ `kb eval smoke`（`evals/rag-eval.yml` がある場合）→ `.kb/hooks/pre-commit.d/*`（ある場合）を順に実行する。`kb validate` はエンティティ内容を、`kb sync --check` は index / graph / views の陳腐化を見る（[CLI リファレンス](cli.md#kb-sync--kb-sync---check)）。前者が通っても後者は独立に落ちうるので両方を通す。テンプレートは `kb` CLI だけを呼び、導入先の `scripts/` には依存しない。導入先固有のチェックは `kb-domain.yml` の `validate.extra_checks` か `.kb/hooks/pre-commit.d/` に置き、テンプレート自体は編集しない。
 
 ### 出典の消失を検出する（任意）
 
