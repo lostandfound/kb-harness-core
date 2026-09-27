@@ -72,6 +72,102 @@ class ReferencePlan:
     diff: str = ""
 
 
+def check_reference_entry(ref_id: str, entry: Any) -> list[dict[str, str]]:
+    """1 エントリを検査し、構造化診断（`code` / `message`）のリストを返す。
+
+    ``references.yml`` の per-entry 検査規則はここに 1 つだけ持ち、
+    ``validate`` / ``kb reference health`` / ``kb reference create`` の
+    3 つの入口が全てこの関数を呼ぶ。規則:
+
+    - `type` / `title` は必須。
+    - `url` があれば `http://` / `https://` で始まること。
+    - `type: web` は `url` が必須（書誌情報では代替できない）。
+    - それ以外の型は `url` か、書誌情報（`title` に加え `author` か
+      `publisher` のどちらか）のいずれかが必要。
+    - `lineage` / `pending` はキーがあれば非空文字列であること。
+    """
+    if not isinstance(entry, dict):
+        return [{"code": "reference.entry.mapping", "message": f"{ref_id}: entry must be a mapping"}]
+
+    diagnostics: list[dict[str, str]] = []
+    for field in ("type", "title"):
+        if not entry.get(field):
+            diagnostics.append({"code": f"reference.missing.{field}", "message": f"{ref_id}: missing required field '{field}'"})
+
+    url = entry.get("url")
+    if url and not str(url).startswith(("http://", "https://")):
+        diagnostics.append({"code": "reference.url.invalid", "message": f"{ref_id}: URL must start with http:// or https://"})
+
+    if entry.get("type") == "web":
+        if not url:
+            diagnostics.append({"code": "reference.missing.url", "message": f"{ref_id}: type 'web' requires 'url'"})
+    elif not url and not (entry.get("title") and (entry.get("author") or entry.get("publisher"))):
+        diagnostics.append({
+            "code": "reference.missing.url_or_bibliography",
+            "message": f"{ref_id}: requires 'url' or bibliography ('title' に加え 'author' か 'publisher')",
+        })
+
+    for field in ("lineage", "pending"):
+        if field in entry and (not isinstance(entry.get(field), str) or not entry.get(field).strip()):
+            diagnostics.append({
+                "code": f"reference.{field}.invalid",
+                "message": f"{ref_id}: '{field}' は空でない文字列である必要がある",
+            })
+
+    return diagnostics
+
+
+def _parse_registry(text: str) -> tuple[dict[str, Any], list[str]]:
+    """レジストリのテキストから (data, duplicate_ids) を得る。
+
+    重複検出はルート mapping 直下のキーだけを見る。1 エントリ内で
+    `author:` を 2 回書くような入れ子の mapping の重複は対象外
+    （PyYAML の SafeLoader は後勝ちで解決する）。
+    """
+    try:
+        loader = yaml.SafeLoader(text)
+    except yaml.YAMLError as exc:
+        raise ReferenceSpecError("reference.read", str(exc), argument=True) from exc
+    try:
+        root_node = loader.get_single_node()
+        duplicate_ids: list[str] = []
+        if isinstance(root_node, yaml.MappingNode):
+            seen: set[Any] = set()
+            for key_node, _value_node in root_node.value:
+                key = loader.construct_object(key_node, deep=True)
+                if key in seen:
+                    duplicate_ids.append(str(key))
+                seen.add(key)
+    except yaml.YAMLError as exc:
+        raise ReferenceSpecError("reference.read", str(exc), argument=True) from exc
+    finally:
+        loader.dispose()
+
+    try:
+        data = yaml.safe_load(text) or {}
+    except yaml.YAMLError as exc:
+        raise ReferenceSpecError("reference.read", str(exc), argument=True) from exc
+    if not isinstance(data, dict):
+        raise ReferenceSpecError("reference.root.mapping", "references.yml must be a mapping", argument=True)
+    return data, sorted(set(duplicate_ids), key=str)
+
+
+def load_registry(path: Path) -> tuple[dict[str, Any], list[str]]:
+    """``references.yml`` を読み込み (data, duplicate_ids) を返す。
+
+    ファイルが無ければ空のレジストリ ``({}, [])`` として扱う。読み込み・
+    構文エラーおよびルートが mapping でない場合は ``ReferenceSpecError``
+    を送出する（呼び出し側がそれぞれの契約に翻訳する）。
+    """
+    if not path.exists():
+        return {}, []
+    try:
+        text = path.read_bytes().decode("utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ReferenceSpecError("reference.read", str(exc), argument=True) from exc
+    return _parse_registry(text)
+
+
 def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
     try:
         spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
@@ -82,23 +178,24 @@ def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
     ref_id = spec.pop("id", None)
     if not isinstance(ref_id, str) or not ref_id.strip():
         raise ReferenceSpecError("reference.missing.id", "reference spec requires id")
-    if not spec.get("type"):
-        raise ReferenceSpecError("reference.missing.type", f"{ref_id}: missing type")
-    if not spec.get("title"):
-        raise ReferenceSpecError("reference.missing.title", f"{ref_id}: missing title")
-    if spec.get("url") and not str(spec["url"]).startswith(("http://", "https://")):
-        raise ReferenceSpecError("reference.url.invalid", f"{ref_id}: URL must start with http:// or https://")
+
+    # Preserve the registry's original bytes (including comments, quoting,
+    # ordering, line endings, and blank lines) instead of round-tripping it.
     try:
-        # Preserve the registry's original bytes (including comments, quoting,
-        # ordering, line endings, and blank lines) instead of round-tripping it.
         existing_text = path.read_bytes().decode("utf-8") if path.exists() else ""
-        data = yaml.safe_load(existing_text) if path.exists() else {}
-    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+    except (OSError, UnicodeError) as exc:
         raise ReferenceSpecError("reference.read", str(exc), argument=True) from exc
-    if not isinstance(data, dict):
-        raise ReferenceSpecError("reference.root.mapping", "references.yml must be a mapping", argument=True)
+    data, _existing_duplicate_ids = _parse_registry(existing_text)
     if ref_id in data:
         raise ReferenceSpecError("reference.duplicate.id", f"{ref_id}: duplicate reference id")
+
+    # 既存レジストリの重複は construct 済みの data からは分からないため、あくまで
+    # 新規 ID の衝突だけをここで見る。全エントリの検査規則（type/title/url/
+    # 書誌情報など）は validate / health と共通の check_reference_entry に譲る。
+    diagnostics = check_reference_entry(ref_id, spec)
+    if diagnostics:
+        first = diagnostics[0]
+        raise ReferenceSpecError(first["code"], first["message"])
 
     # Only the new top-level entry is canonicalized.  The sole normalization
     # permitted on existing content is adding one separator when a non-empty
@@ -144,41 +241,22 @@ def plan_reference_create(path: Path, spec_path: Path) -> ReferencePlan:
     changes = {path: new_text}
     return ReferencePlan(changes, diff=unified_diff(changes))
 
-class _Loader(yaml.SafeLoader):
-    pass
-
-_duplicate_ids: list[str] = []
-def _mapping(loader, node, deep=False):
-    seen = set()
-    for key_node, _ in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        if key in seen:
-            _duplicate_ids.append(str(key))
-        seen.add(key)
-    return yaml.SafeLoader.construct_mapping(loader, node, deep)
-_Loader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _mapping)
-
 def reference_health(path: Path) -> dict[str, Any]:
+    """``references.yml`` の構造を検査する。
+
+    per-entry の規則は ``check_reference_entry`` に、読み込みと重複検出
+    （ルート mapping 直下のキーのみ）は ``load_registry`` に委ねる。
+    """
     try:
-        _duplicate_ids.clear()
-        data = yaml.load(path.read_text(encoding="utf-8"), Loader=_Loader)
-    except (OSError, yaml.YAMLError) as exc:
-        return {"ok": False, "diagnostics": [{"code": "reference.read", "message": str(exc)}]}
-    if not isinstance(data, dict):
-        return {"ok": False, "diagnostics": [{"code": "reference.root.mapping", "message": "references.yml must be a mapping"}]}
-    diagnostics = []
-    for ref_id in sorted(set(_duplicate_ids)):
-        diagnostics.append({"code": "reference.duplicate.id", "message": f"{ref_id}: duplicate reference id"})
+        data, duplicate_ids = load_registry(path)
+    except ReferenceSpecError as error:
+        return {"ok": False, "diagnostics": [{"code": error.code, "message": str(error)}]}
+    diagnostics: list[dict[str, str]] = [
+        {"code": "reference.duplicate.id", "message": f"{ref_id}: duplicate reference id"}
+        for ref_id in duplicate_ids
+    ]
     for ref_id in sorted(data, key=str):
-        entry = data[ref_id]
-        if not isinstance(entry, dict):
-            diagnostics.append({"code": "reference.entry.mapping", "message": f"{ref_id}: entry must be a mapping"}); continue
-        if not entry.get("type"):
-            diagnostics.append({"code": "reference.missing.type", "message": f"{ref_id}: missing type"})
-        if not entry.get("url") and not (entry.get("title") and (entry.get("author") or entry.get("publisher"))):
-            diagnostics.append({"code": "reference.missing.url_or_bibliography", "message": f"{ref_id}: requires url or bibliography"})
-        if entry.get("url") and not str(entry["url"]).startswith(("http://", "https://")):
-            diagnostics.append({"code": "reference.url.invalid", "message": f"{ref_id}: URL must use http or https"})
+        diagnostics.extend(check_reference_entry(ref_id, data[ref_id]))
     return {"ok": not diagnostics, "diagnostics": diagnostics, "count": len(data)}
 
 
@@ -197,15 +275,8 @@ _CITATION_RE = re.compile(r"（出典:\s*([^（）]*)）")
 
 
 def load_references(path: Path) -> dict[str, dict[str, Any]]:
-    """references.yml を読み、ID → エントリの mapping を返す。"""
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else {}
-    except (OSError, UnicodeError, yaml.YAMLError) as exc:
-        raise ReferenceSpecError("reference.read", str(exc)) from exc
-    if data is None:
-        return {}
-    if not isinstance(data, dict):
-        raise ReferenceSpecError("reference.root.mapping", "references.yml must be a mapping")
+    """references.yml を読み、ID → エントリの mapping を返す。読み込みは ``load_registry`` に委ねる。"""
+    data, _duplicate_ids = load_registry(path)
     return {str(k): (v if isinstance(v, dict) else {}) for k, v in data.items()}
 
 

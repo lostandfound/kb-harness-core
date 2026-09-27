@@ -109,7 +109,7 @@ Claim の `status` を明示的に遷移させる。許容される遷移は `kb
 
 ### `kb reference health`
 
-`references.yml` の構造を検査する。
+`references.yml` の構造を検査する。エントリごとの規則は `kb validate` / `kb reference create` と共通（[設定リファレンス](configuration.md#referencesyml)）。
 
 ### `kb reference show ID...` / `kb reference show --for ENTITY`
 
@@ -125,7 +125,7 @@ Claim の `status` を明示的に遷移させる。許容される遷移は `kb
 
 ### `kb reference create --from reference.yml`
 
-spec を `references.yml` に原子的に追加する。既存レジストリのコメント・引用符・順序・空行・改行コードは再シリアライズせず保持し、末尾に新規エントリのみを canonical YAML で追記する。空 mapping（`{}`）の場合は新規エントリ全体に置換する。`--dry-run` に対応する。
+spec を `references.yml` に原子的に追加する。既存レジストリのコメント・引用符・順序・空行・改行コードは再シリアライズせず保持し、末尾に新規エントリのみを canonical YAML で追記する。空 mapping（`{}`）の場合は新規エントリ全体に置換する。`--dry-run` に対応する。spec は `kb validate` / `kb reference health` と同じ規則（[設定リファレンス](configuration.md#referencesyml)）で検査するため、ここを通った spec が直後の `kb validate` で弾かれることはない。
 
 ## 評価
 

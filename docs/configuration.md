@@ -244,13 +244,22 @@ predicates:
 
 ## references.yml
 
-文献レジストリ。エンティティの `sources` と本文インラインの `（出典: ref-id）` は、ここに定義された ID を参照する。
+文献レジストリ。エンティティの `sources` と本文インラインの `（出典: ref-id）` は、ここに定義された ID を参照する。ルート直下に `ID: {...}` の mapping を並べる。
 
-各エントリの必須キーは `type` と `title`。`type: web` は `url` も必須。`url` は `http://` / `https://` で始まる。
+エントリの検査規則は `kb_harness.references.check_reference_entry` に 1 つだけ持ち、`kb validate` / `kb reference health` / `kb reference create` の 3 つの入口が共通して使う（`kb reference create` で通った spec が直後の `kb validate` で弾かれることはない）。
+
+| フィールド | 必須 | 内容 |
+|---|---|---|
+| `type` | 必須 | 文献種別。値の語彙は自由（`web` / `book` / `journal-article` 等）。 |
+| `title` | 必須 | 表題。 |
+| `url` | 条件付き | `http://` または `https://` で始まること。`type: web` は必須。それ以外の型は `url` か「`title` に加え `author` か `publisher` のどちらか」（書誌情報）のいずれかが必要。 |
+| `author` / `publisher` | 条件付き | `url` を持たないエントリの書誌情報として使う。 |
+| `lineage` | 任意 | 同じ由来の資料群を束ねるラベル。非空文字列。下記参照。 |
+| `pending` | 任意 | 実見待ち等で先行登録した理由。非空文字列。付与すると未参照 WARNING が個別に出ず件数集計の INFO 1 行にまとまり、参照済みなのに `pending` が残っていると WARNING で警告される。 |
+
+ルート直下の ID の重複は `reference.duplicate.id` エラーになる。重複検出はルート mapping 直下のキーだけを見る。1 エントリ内で同じキー（例: `author:` を 2 回書く）を重複させても、それはこの検査の対象ではない（YAML パーサが後勝ちで解決する）。
 
 各エントリは任意キー `lineage`（非空文字列）を持てる。同じ由来の資料群につけるラベルで、evidence-reviewer は `lineage` が同じ資料を独立源として数えない（複数あっても 1 つの源として扱う）。由来の単位はドメインが決め、`kb-domain.yml` の `domain.lineage_example` に書く。流派・学派の伝承（`上地流系`）、同じ記事の別言語版・転載・要約（`wikipedia:三星堆`）、当事者や利害関係者の自己発信（`anthropic-official`）などが典型で、ラベルの綴りは KB 内で揃える。未記載は「独立」ではなく「未判定」を意味し、`scripts/refs_health.py --lineage` が未判定の文献を列挙する。他の資料と由来を共有しないと判定済みの資料には予約値 `系統外` を書く。`kb reference search --field lineage <ラベル>` で同じ由来の資料を引ける。
-
-各エントリは任意キー `pending`（非空文字列の待ち理由）を持てる。付与すると未参照 WARNING が個別に出ず件数集計の INFO 1 行にまとまり、参照済みなのに `pending` が残っていると WARNING で警告される。
 
 登録用 YAML は `ndl_search.py` / `cinii_search.py` が出力する。
 

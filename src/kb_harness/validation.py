@@ -122,25 +122,27 @@ def _load_types(root: Path) -> dict:
 
 
 def _load_references(root: Path):
-    """references.yml を読み込み、(refs, errors) を返す。ファイルが無ければ空扱い。"""
+    """references.yml を読み込み、(refs, errors) を返す。ファイルが無ければ空扱い。
+
+    読み込み・per-entry の検査規則は `kb_harness.references` の
+    `load_registry` / `check_reference_entry` に一本化されている
+    （`kb reference health` / `kb reference create` と共通）。
+    `references` はここから `sync` → `views` → `validation` と循環
+    import になるため、モジュール読み込み時ではなく呼び出し時に import する。
+    """
+    from .references import ReferenceSpecError, check_reference_entry, load_registry
+
     ref_path = root / "references.yml"
-    if not ref_path.exists():
-        return {}, []
-    data = yaml.safe_load(ref_path.read_text(encoding="utf-8")) or {}
-    errors: list[str] = []
-    for ref_id, entry in data.items():
-        if not isinstance(entry, dict):
-            errors.append(f"ERROR /references.yml: '{ref_id}' entry must be a mapping")
-            continue
-        for field in ("type", "title"):
-            if not entry.get(field):
-                errors.append(f"ERROR /references.yml: '{ref_id}' missing required field '{field}'")
-        if entry.get("type") == "web" and not entry.get("url"):
-            errors.append(f"ERROR /references.yml: '{ref_id}' type 'web' requires 'url' (type: web)")
-        if "lineage" in entry and (not isinstance(entry.get("lineage"), str) or not entry.get("lineage").strip()):
-            errors.append(f"ERROR /references.yml: '{ref_id}' の 'lineage' は空でない文字列である必要がある")
-        if "pending" in entry and (not isinstance(entry.get("pending"), str) or not entry.get("pending").strip()):
-            errors.append(f"ERROR /references.yml: '{ref_id}' の 'pending' は空でない文字列である必要がある")
+    try:
+        data, duplicate_ids = load_registry(ref_path)
+    except ReferenceSpecError as error:
+        return {}, [f"ERROR /references.yml: {error}"]
+    errors: list[str] = [
+        f"ERROR /references.yml: '{ref_id}' duplicate reference id" for ref_id in duplicate_ids
+    ]
+    for ref_id in sorted(data, key=str):
+        for diagnostic in check_reference_entry(ref_id, data[ref_id]):
+            errors.append(f"ERROR /references.yml: {diagnostic['message']}")
     return data, errors
 
 
