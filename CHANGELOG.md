@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.10.0 — 2026-09-28
+
+スキル（add-entity / find-book / find-paper）の手順を改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
+
 ### Added
 
 - `kb validate --check-urls` が `--for ENTITY` / `--ref ID`（繰り返し可）を受け、確かめる対象を指定したエンティティの出典と指定した出典 ID に絞る。見つからないエンティティ・出典 ID は ERROR。`--check-urls` なしで渡すと `validation.arguments` で exit 2。`check_urls()` も `entities` / `ref_ids` 引数を受ける（判断の経緯は docs/notes/url-kakunin-memo.md）
