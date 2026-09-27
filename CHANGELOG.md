@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- `kb validate --check-urls` が、DOI レジストリに届かなかった DOI を ERROR にせず `validation.url.doi_registry_unreachable` の WARNING にする。これまでは未登録とレジストリの障害を区別せず `DOI unregistered or registry unreachable` の ERROR にしていたため、一時的なネットワーク障害でも検証が落ちていた。レジストリが未登録と答えた DOI（404、または別のハンドル）は従来どおり ERROR で、メッセージは `DOI unregistered` に改めた。`scripts/validate.py --check-urls` も同じ
+- `check_urls()` が任意の `warnings` 引数を受け、WARNING をそこへ加える。省略したときは従来どおり ERROR だけを返す
+- docs/cli.md と docs/scripts.md に `--check-urls` の確かめ方（DOI はレジストリで確認、`doi` と `url` の両方があれば `doi` だけ、出版社 URL 中の DOI は認識しない）を記した
+
 ## 0.9.1 — 2026-09-28
 
 ### Fixed
