@@ -2,8 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- `kb validate --check-urls` が `--for ENTITY` / `--ref ID`（繰り返し可）を受け、確かめる対象を指定したエンティティの出典と指定した出典 ID に絞る。見つからないエンティティ・出典 ID は ERROR。`--check-urls` なしで渡すと `validation.arguments` で exit 2。`check_urls()` も `entities` / `ref_ids` 引数を受ける（判断の経緯は docs/notes/url-kakunin-memo.md）
+
 ### Changed
 
+- `kb validate --check-urls` が URL と DOI を並列に確かめ（同じホストへは同時 2 本まで）、1 回の実行の中で同じ URL・DOI を 1 回だけ確かめる。ERROR の並びは従来どおり走査順。omnibus-kb（出典約 380 件）で約 305 秒が約 42 秒になった
+- `--check-urls` が、HEAD に 404 を返した URL も GET で確かめ直す。これまでは 403 / 405 だけを確かめ直しており、HEAD にだけ 404 を返すサイト（tower.jp など）を到達不能と誤判定していた。`scripts/validate.py --check-urls` も同じ
+- add-entity / find-book / find-paper の手順が、足したエンティティや出典に絞って `--check-urls` を回すようにした
 - `kb validate --check-urls` が、DOI レジストリに届かなかった DOI を ERROR にせず `validation.url.doi_registry_unreachable` の WARNING にする。これまでは未登録とレジストリの障害を区別せず `DOI unregistered or registry unreachable` の ERROR にしていたため、一時的なネットワーク障害でも検証が落ちていた。レジストリが未登録と答えた DOI（404、または別のハンドル）は従来どおり ERROR で、メッセージは `DOI unregistered` に改めた。`scripts/validate.py --check-urls` も同じ
 - `check_urls()` が任意の `warnings` 引数を受け、WARNING をそこへ加える。省略したときは従来どおり ERROR だけを返す
 - docs/cli.md と docs/scripts.md に `--check-urls` の確かめ方（DOI はレジストリで確認、`doi` と `url` の両方があれば `doi` だけ、出版社 URL 中の DOI は認識しない）を記した

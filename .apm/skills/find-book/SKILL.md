@@ -15,6 +15,6 @@ description: NDL サーチ（国立国会図書館）API で書籍・資料を�
 
 5. 出典として使うエンティティの `sources` に `- "ref: <id>"` を追記する。本文の主張は必ず自分の言葉で書く。資料本文・スキャンのファイルは `content_root` 配下に保存しない。パブリックドメインが確認できた資料の翻刻テキストを別途保存する場合は、置き場所・可否とも導入先が独自に定める規約（CONTRIBUTING.md 等）に従う。ハーネスの `kb-domain.yml` はコーパスの置き場所を持たない。
 
-6. `kb validate` でエラーゼロ、URL を登録した場合は `--check-urls` も実行する。
+6. `kb validate` でエラーゼロ、URL を登録した場合は `kb validate --check-urls --ref <登録した ID>` も実行する（出典を追記したエンティティがあれば `--for <そのパス>` でもよい）。
 
 7. コミットする。pre-commit hook が最終検証を行う。
