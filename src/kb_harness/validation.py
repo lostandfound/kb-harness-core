@@ -12,7 +12,7 @@ from pathlib import Path
 
 import yaml
 
-from .diagnostics import HarnessError
+from .diagnostics import Diagnostic, HarnessError
 from .links import body_links, is_root_relative, resolve_link
 from .markdown import field_text, parse_document
 from .naming import validate_vocabulary_names_at
@@ -737,11 +737,22 @@ def check_urls(root: Path) -> list[str]:
 
 def fix_timestamps(root: Path) -> list[Path]:
     root = root.resolve()
-    toplevel = subprocess.run(
+    toplevel_result = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
-        capture_output=True, text=True, cwd=str(root), check=True,
-    ).stdout.strip()
-    repo_root = Path(toplevel).resolve()
+        capture_output=True, text=True, cwd=str(root),
+    )
+    if toplevel_result.returncode != 0:
+        raise HarnessError(
+            Diagnostic(
+                code="validation.timestamps.git_required",
+                message=(
+                    "fix_timestamps requires a git working tree "
+                    f"(git rev-parse --show-toplevel failed: {toplevel_result.stderr.strip()})"
+                ),
+                path=str(root),
+            )
+        )
+    repo_root = Path(toplevel_result.stdout.strip()).resolve()
 
     # -z: NUL-delimited, rename-safe (no ambiguous " -> " to parse).
     # --untracked-files=all: expand untracked directories so nested .md files aren't collapsed

@@ -49,14 +49,33 @@ class PreCommitHookTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("pytest", result.stdout + result.stderr)
         # 導入先の scripts/ に依存せず kb CLI だけを呼ぶ。evals が無いので eval smoke は呼ばれない
-        self.assertEqual(self.calls.read_text(encoding="utf-8"), "validate\n")
+        self.assertEqual(self.calls.read_text(encoding="utf-8"), "validate\nsync --check\n")
 
     def test_runs_eval_smoke_only_when_eval_file_exists(self):
         (self.root / "evals").mkdir()
         (self.root / "evals" / "rag-eval.yml").write_text("queries: []\n", encoding="utf-8")
         result = self._run_hook()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.calls.read_text(encoding="utf-8"), "validate\neval smoke\n")
+        self.assertEqual(
+            self.calls.read_text(encoding="utf-8"), "validate\nsync --check\neval smoke\n"
+        )
+
+    def test_stops_before_tests_when_sync_check_fails(self):
+        kb = self.bin / "kb"
+        kb.write_text(
+            "#!/bin/bash\n"
+            f"echo \"$*\" >> {self.calls}\n"
+            "if [ \"$1 $2\" = \"sync --check\" ]; then exit 1; fi\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        kb.chmod(kb.stat().st_mode | stat.S_IXUSR)
+
+        result = self._run_hook()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("kb sync --check", result.stderr)
+        self.assertEqual(self.calls.read_text(encoding="utf-8"), "validate\nsync --check\n")
 
     def test_runs_pre_commit_d_scripts_in_order_and_stops_on_failure(self):
         hooks_dir = self.root / ".kb" / "hooks" / "pre-commit.d"

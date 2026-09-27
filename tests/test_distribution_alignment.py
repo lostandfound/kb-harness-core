@@ -12,45 +12,53 @@ from kb_harness.doctor import diagnose
 from kb_harness.project import Project
 from kb_harness.index import plan_index
 from kb_harness.graph import plan_graph
+from kb_harness.sync import plan_sync
 
-_SIBLING = Path(__file__).parents[2] / "kb-ontology-core"
-pytestmark = pytest.mark.skipif(
+# このチェックアウト（`tests/../`）は clone レイアウトでは `kb-harness-core` と
+# 名付けられているが、worktree では別名になる。ディレクトリ名をハードコードせず、
+# 実際のチェックアウトパスと、宣言タグは pyproject.toml から都度導出する。
+_HARNESS_ROOT = Path(__file__).parents[1]
+_SIBLING = _HARNESS_ROOT.parent / "kb-ontology-core"
+_requires_sibling = pytest.mark.skipif(
     not (_SIBLING / "pyproject.toml").is_file(),
     reason="兄弟ディレクトリ ../kb-ontology-core（ソース checkout）が無い",
 )
 
+_TAG_RE = re.compile(
+    r'kb-ontology-core @ git\+https://github\.com/lostandfound/kb-ontology-core\.git@(?P<tag>[^\s"]+)'
+)
 
+
+def _declared_ontology_tag(harness_pyproject_text: str) -> str:
+    """harness の pyproject.toml が宣言する kb-ontology-core の固定タグを取り出す。"""
+    match = _TAG_RE.search(harness_pyproject_text)
+    assert match, "pyproject.toml に kb-ontology-core の git 依存ピンが見つからない"
+    return match.group("tag")
+
+
+@_requires_sibling
 def test_distributed_ontology_dependency_provides_transition_api():
     """The published harness pin must contain the API used by claim transition."""
-    harness_pyproject = (
-        Path(__file__).parents[1] / "pyproject.toml"
-    ).read_text(encoding="utf-8")
-    ontology_pyproject = (
-        Path(__file__).parents[2] / "kb-ontology-core" / "pyproject.toml"
-    ).read_text(encoding="utf-8")
+    harness_pyproject = (_HARNESS_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    ontology_pyproject = (_SIBLING / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "kb-ontology-core @ git+https://github.com/lostandfound/kb-ontology-core.git@v0.2.0" in harness_pyproject
-    assert re.search(r'version = "0\.2\.0"', ontology_pyproject)
+    tag = _declared_ontology_tag(harness_pyproject)
+    assert re.search(rf'version = "{re.escape(tag.lstrip("v"))}"', ontology_pyproject)
     ontology_api = (
-        Path(__file__).parents[2]
-        / "kb-ontology-core"
-        / "src"
-        / "kb_ontology_core"
-        / "__init__.py"
+        _SIBLING / "src" / "kb_ontology_core" / "__init__.py"
     ).read_text(encoding="utf-8")
     assert "plan_transition" in ontology_api
 
 
+@_requires_sibling
 def test_local_wheels_expose_transition_api(tmp_path):
     """Build and install both distributions, then exercise their public imports."""
-    root = Path(__file__).parents[2]
-    ontology = root / "kb-ontology-core"
     target = tmp_path / "site"
     target.mkdir()
     ontology_copy = tmp_path / "kb-ontology-core"
     harness_copy = tmp_path / "kb-harness-core"
-    shutil.copytree(ontology, ontology_copy, ignore=shutil.ignore_patterns(".git", "__pycache__", "*.egg-info"))
-    shutil.copytree(root / "kb-harness-core", harness_copy, ignore=shutil.ignore_patterns(".git", "__pycache__", "*.egg-info", "build"))
+    shutil.copytree(_SIBLING, ontology_copy, ignore=shutil.ignore_patterns(".git", "__pycache__", "*.egg-info"))
+    shutil.copytree(_HARNESS_ROOT, harness_copy, ignore=shutil.ignore_patterns(".git", "__pycache__", "*.egg-info", "build"))
     subprocess.run(
         [sys.executable, "-m", "pip", "install", "--no-build-isolation", "--no-deps", "--target", str(target), str(ontology_copy), str(harness_copy)],
         check=True,
@@ -221,9 +229,9 @@ def test_doctor_parses_direct_reference_tag(tmp_path, monkeypatch):
     assert mismatch["context"]["declared"] == "0.2.0"
 
 
+@_requires_sibling
 def test_installed_wheels_run_every_cli_family_from_isolated_directory(tmp_path):
     """Build both wheels, then exercise each top-level CLI family outside source."""
-    root = Path(__file__).parents[2]
     wheel_dir = tmp_path / "wheels"
     target = tmp_path / "site"
     project = tmp_path / "fixture"
@@ -236,12 +244,12 @@ def test_installed_wheels_run_every_cli_family_from_isolated_directory(tmp_path)
     ontology_copy = tmp_path / "kb-ontology-core"
     harness_copy = tmp_path / "kb-harness-core"
     shutil.copytree(
-        root / "kb-ontology-core",
+        _SIBLING,
         ontology_copy,
         ignore=shutil.ignore_patterns(".git", "__pycache__", "*.egg-info"),
     )
     shutil.copytree(
-        root / "kb-harness-core",
+        _HARNESS_ROOT,
         harness_copy,
         ignore=shutil.ignore_patterns(
             ".git", "__pycache__", "*.egg-info", "build", "dist"
@@ -291,23 +299,63 @@ def test_installed_wheels_run_every_cli_family_from_isolated_directory(tmp_path)
     (project / "views").mkdir()
     (content / "vocabulary.yml").write_text(
         "types:\n  Note:\n    directory: notes\n    graph: false\n"
-        "predicates: {}\ntags: []\n",
+        "    sources_required: false\n"
+        "predicates: {}\ntags: [example]\n",
         encoding="utf-8",
     )
     (content / "references.yml").write_text("{}\n", encoding="utf-8")
     (content / "index.md").write_text(
-        "---\ntitle: Fixture KB\n---\n# Fixture KB\n", encoding="utf-8"
+        "---\n"
+        "type: Index\n"
+        "title: Fixture KB\n"
+        "description: Root index for the fixture KB.\n"
+        "tags: [example]\n"
+        "timestamp: 2024-01-01T00:00:00Z\n"
+        "---\n"
+        "# Fixture KB\n\n"
+        "[Notes](notes/index.md)\n",
+        encoding="utf-8",
+    )
+    (content / "notes" / "index.md").write_text(
+        "---\n"
+        "type: Index\n"
+        "title: Notes\n"
+        "description: Notes index for the fixture KB.\n"
+        "tags: [example]\n"
+        "timestamp: 2024-01-01T00:00:00Z\n"
+        "---\n"
+        "# Notes\n",
+        encoding="utf-8",
     )
     (content / "notes" / "sample.md").write_text(
-        "---\ntype: Note\ntitle: Sample\nsources: []\n---\nBody\n",
+        "---\n"
+        "type: Note\n"
+        "title: Sample\n"
+        "description: A sample note.\n"
+        "tags: [example]\n"
+        "timestamp: 2024-01-01T00:00:00Z\n"
+        "sources: []\n"
+        "---\n"
+        "Body\n",
         encoding="utf-8",
     )
     (project / "evals").mkdir()
-    (project / "evals" / "rag-eval.yml").write_text("entries: []\n", encoding="utf-8")
+    # validation._validate_evals はトップレベルが list であることを要求する（`entries:` マッピングは
+    # 「must be a list」エラーになり、以前は緩い returncode 判定に隠れて気づけなかった）。
+    (project / "evals" / "rag-eval.yml").write_text("[]\n", encoding="utf-8")
+
+    # index / graph / views の一覧は生成物なので、手で書くと `kb sync --check` /
+    # `kb index check` / `kb graph check` の期待値とずれる。ソースの kb_harness で
+    # 実際に計画・適用して、フィクスチャそのものを「同期済み」にする。
+    dev_project = Project.from_config(project / "kb-domain.yml")
+    for out_path, text in plan_sync(dev_project).items():
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(text, encoding="utf-8")
     spec = project / "entity.yml"
     spec.write_text(
-        "type: Note\nslug: sample\ntitle: Sample\ndescription: A sample.\n"
-        "tags: []\nsources: []\nsections:\n  Overview: Body\n",
+        "type: Note\nslug: another\ntitle: Another\ndescription: Another sample.\n"
+        "tags: [example]\nsources: []\n"
+        "sections:\n  概要: Body\n  詳細: Body\n  関連項目: Body\n",
         encoding="utf-8",
     )
 
@@ -334,12 +382,21 @@ def test_installed_wheels_run_every_cli_family_from_isolated_directory(tmp_path)
             capture_output=True,
             text=True,
         )
-        assert result.returncode in {0, 1}, (command, result.stdout, result.stderr)
+        # フィクスチャは自己整合しているので、どのコマンドも診断ゼロの成功で終わるはず。
+        assert result.returncode == 0, (command, result.stdout, result.stderr)
         payload = result.stdout or result.stderr
         assert payload, command
         assert "ModuleNotFoundError" not in payload, (command, payload)
-    parsed = json.loads(payload)
-    assert "diagnostics" in parsed or command[0] == "project", (command, parsed)
+        parsed = json.loads(payload)
+        if command == ["project", "show"]:
+            assert {"content_root", "repo_root"} <= parsed.keys(), (command, parsed)
+        elif command == ["view", "list"]:
+            # `kb view list` の JSON 出力に diagnostics は無く、views の配列だけを持つ。
+            assert parsed == {"ok": True, "views": []}, (command, parsed)
+        else:
+            assert "diagnostics" in parsed, (command, parsed)
+            assert parsed["diagnostics"] == [], (command, parsed)
+            assert parsed.get("ok") is True, (command, parsed)
 
     okf_output = tmp_path / "okf-v0.2"
     result = subprocess.run(

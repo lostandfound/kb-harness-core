@@ -153,9 +153,10 @@ python3 scripts/concerns_summary.py [--ledger FILE]
 導入先リポジトリ向けの pre-commit テンプレート。ステージに `.md` / `.yml` / `.py` が含まれるとき次を順に実行し、いずれかが失敗すればコミットを中止する。`install-hooks.sh` が自身と同じ場所の `hooks/pre-commit` を `.git/hooks/pre-commit` へ冪等にコピーする（`bash apm_modules/lostandfound/kb-harness-core/scripts/install-hooks.sh`）。テンプレートは `kb` CLI だけを呼び、導入先の `scripts/` には依存しない。
 
 1. `kb validate`（`kb-domain.yml` の `validate.extra_checks` もここで走る）
-2. `tests/` が存在すれば `python3 -m pytest tests -q`
-3. `evals/rag-eval.yml` が存在すれば `kb eval smoke`
-4. `.kb/hooks/pre-commit.d/` が存在すれば、その中の実行可能ファイルを名前順に実行する
+2. `kb sync --check`（index / graph / views の陳腐化。`kb validate` が通っても独立に失敗しうる）
+3. `tests/` が存在すれば `python3 -m pytest tests -q`
+4. `evals/rag-eval.yml` が存在すれば `kb eval smoke`
+5. `.kb/hooks/pre-commit.d/` が存在すれば、その中の実行可能ファイルを名前順に実行する
 
 導入先固有のチェックはテンプレートを編集せず `.kb/hooks/pre-commit.d/` に置く。`kb-domain.yml` の `validate.extra_checks` に登録すれば `kb validate` 側で実行されるので、通常はそちらを使う。
 
