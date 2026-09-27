@@ -30,15 +30,14 @@ def load_claim_spec(path: Path) -> dict:
     required = ("subject", "status", "confidence", "sources")
     missing = [k for k in required if not data.get(k)]
     if missing: raise ClaimSpecError("missing required field(s): " + ", ".join(missing))
-    relation = any(k in data for k in ("predicate", "object"))
-    value = any(k in data for k in ("property", "value"))
-    if relation == value or (relation and not data.get("predicate")) or (relation and not data.get("object")) or (value and (not data.get("property") or not data.get("value"))):
-        raise ClaimSpecError("claim must use exactly one complete form: predicate/object or property/value")
+    # status / confidence の許容値と "predicate/object か property/value のどちらか"
+    # という形式規則は kb-ontology-core が正本（claim.status.unknown / claim.confidence.unknown /
+    # claim.form.invalid）。ここでは事前検査せず、_validate_proposed_claim がコアへ委ねる。
     return data
 
 def plan_claim_create(project, spec_path: Path) -> ClaimPlan:
     spec = load_claim_spec(spec_path)
-    title = spec.get("title") or f"{spec['subject']} {spec.get('predicate', spec.get('property'))}"
+    title = spec.get("title") or f"{spec.get('subject')} {spec.get('predicate', spec.get('property'))}"
     path = project.content_root / "claims" / (_slug(title) + ".md")
     if path.exists(): raise ClaimSpecError(f"claim already exists: {path}", "claim.duplicate")
     fields = dict(spec)
@@ -103,8 +102,8 @@ def validate_claim_file(path: Path, content_root: Path | None = None) -> list[st
     if fm.get("type") != "Claim": errors.append("type must be Claim")
     for field in ("subject", "status", "confidence", "sources"):
         if not fm.get(field): errors.append("missing field " + field)
-    if fm.get("status") not in {"proposed", "accepted", "disputed", "rejected"}: errors.append("unknown status")
-    if fm.get("confidence") not in {"A", "B", "C", "D"}: errors.append("unknown confidence")
+    # 許容値の検査（status / confidence）は kb-ontology-core の
+    # claim.status.unknown / claim.confidence.unknown に委ねる。ここでは再実装しない。
     if errors:
         return errors
     try:

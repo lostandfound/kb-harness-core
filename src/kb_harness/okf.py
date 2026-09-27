@@ -23,7 +23,6 @@ class OkfExportError(ValueError):
         super().__init__(message)
 
 
-_CLAIM_STATUSES = {"proposed", "accepted", "disputed", "rejected"}
 _LIFECYCLE_STATUSES = {"draft", "stable", "deprecated"}
 _ISO_OFFSET = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 _DATE_HEADING = re.compile(r"^##\s+(\d{4}-\d{2}-\d{2})(?:\s|$)")
@@ -82,7 +81,11 @@ def render_okf_concept(path: str, text: str) -> str:
         if "claim_status" in values:
             raise OkfExportError("okf.claim_status.conflict", "claim_status already exists", path=path)
         status = values.get("status")
-        if status not in _CLAIM_STATUSES:
+        # 許容 status は kb-ontology-core が正本。okf 写像でだけ、Claim を
+        # 扱うこの分岐に入った時点で遅延解決する（モジュール読み込み時には import しない）。
+        from .ontology import claim_statuses
+
+        if status not in claim_statuses():
             raise OkfExportError("okf.claim_status.invalid", "invalid Claim status", path=path)
         values["claim_status"] = status
         values["status"] = "stable"
