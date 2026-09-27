@@ -231,7 +231,14 @@ def resolve_view(
     省略時は述語名の完全一致だけを見る。
     """
     if view.kind == "list":
-        return list(view.members)
+        # 未知パス（validate_views が別途 ERROR にする）はそのまま通す。既知だが
+        # excluded な型（Claim / Index / graph: false）だけをここで落とす。これを
+        # しないと graph.json の views[].members が nodes に無いパスを指す。
+        return [
+            member
+            for member in view.members
+            if member.path not in entities or entities[member.path].get("type") not in excluded
+        ]
     wanted_type = view.where.get("type")
     wanted_tags = set(view.where.get("tags") or [])
     relation = view.where.get("relation")
@@ -273,6 +280,7 @@ def validate_views(content_root: Path, views_root: Path) -> list[str]:
     predicates, vocab_tags = _load_vocabulary(content_root)
     types = _load_types(content_root)
     references, _ref_errors = _load_references(content_root)
+    excluded_types = query_excluded_types(content_root)
     seen_names: dict[str, str] = {}
     paths = _view_files(views_root)
     for view_id, names in sorted(_duplicate_ids(paths).items()):
@@ -292,8 +300,12 @@ def validate_views(content_root: Path, views_root: Path) -> list[str]:
         for member in view.members:
             if member.path not in entities:
                 errors.append(f"ERROR {rel}: member '{member.path}' does not exist")
-            elif entities[member.path].get("type") == "Claim":
-                errors.append(f"ERROR {rel}: member '{member.path}' は Claim であり、ビューのメンバーにできない")
+            elif entities[member.path].get("type") in excluded_types:
+                member_type = entities[member.path].get("type")
+                errors.append(
+                    f"ERROR {rel}: member '{member.path}' は type '{member_type}' であり、"
+                    "ビューのメンバーにできない（Claim / Index / graph: false の型はグラフに現れない）"
+                )
         for source in view.sources:
             if source.startswith("ref:"):
                 ref_id = source[len("ref:"):].strip()

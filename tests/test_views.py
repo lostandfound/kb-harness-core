@@ -282,6 +282,67 @@ class ValidateViewsTest(unittest.TestCase):
             self.assertTrue(set(members) <= nodes)
 
 
+class ListViewExcludedTypeTest(unittest.TestCase):
+    """kind: list の member に graph: false の型や Index を書くと、graph.json の
+    views[].members が nodes に無いパスを指してしまう（R4-c）。query と同じ
+    query_excluded_types で落とす。"""
+
+    def _kb_with_excluded_member(self, root: Path) -> Project:
+        project = build_kb(root)
+        vocabulary = project.content_root / "vocabulary.yml"
+        vocabulary.write_text(
+            VOCABULARY.replace("predicates:", "  Memo:\n    directory: memos\n    graph: false\npredicates:"),
+            encoding="utf-8",
+        )
+        (project.content_root / "memos").mkdir()
+        (project.content_root / "memos" / "note.md").write_text(
+            _entity("memos", "note", "Memo", "メモ", "[cs]")[1], encoding="utf-8"
+        )
+        # index.md という名前のファイルは load_entities が常に除くので、graph.json の
+        # nodes から Index 型を除く経路（type による除外）を突くには別名のファイルがいる
+        (project.content_root / "concepts" / "toc.md").write_text(
+            _entity("concepts", "toc", "Index", "目次", "[cs]")[1], encoding="utf-8"
+        )
+        (project.views_root / "with-memo.yml").write_text(
+            "name: メモも混ぜた一覧\ndescription: d\nkind: list\nbasis: interpretation\n"
+            "members:\n  - /concepts/dry.md\n  - /memos/note.md\n  - /concepts/toc.md\n",
+            encoding="utf-8",
+        )
+        return project
+
+    def test_resolve_view_drops_excluded_types_from_list_members(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = self._kb_with_excluded_member(Path(tempdir))
+            entities = load_entities(project.content_root)
+            from kb_harness.views import query_excluded_types
+
+            excluded = query_excluded_types(project.content_root)
+            view = {v.id: v for v in load_views(project.views_root)}["with-memo"]
+            self.assertEqual(
+                [m.path for m in resolve_view(view, entities, excluded)],
+                ["/concepts/dry.md"],
+            )
+
+    def test_graph_json_views_members_stay_inside_nodes(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = self._kb_with_excluded_member(Path(tempdir))
+            graph = json.loads(render_graph(project.content_root, project.views_root))
+            nodes = {node["path"] for node in graph["nodes"]}
+            members = {v["id"]: v["members"] for v in graph["views"]}["with-memo"]
+            self.assertEqual(members, ["/concepts/dry.md"])
+            self.assertTrue(set(members) <= nodes)
+
+    def test_validate_views_reports_excluded_type_member(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            project = self._kb_with_excluded_member(Path(tempdir))
+            errors = validate_views(project.content_root, project.views_root)
+            joined = "\n".join(errors)
+            self.assertIn("member '/memos/note.md'", joined)
+            self.assertIn("type 'Memo'", joined)
+            self.assertIn("member '/concepts/toc.md'", joined)
+            self.assertIn("type 'Index'", joined)
+
+
 class SyncAndGraphTest(unittest.TestCase):
     def test_graph_carries_views_only_when_configured(self):
         with tempfile.TemporaryDirectory() as tempdir:
