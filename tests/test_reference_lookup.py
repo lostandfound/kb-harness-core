@@ -139,6 +139,16 @@ def test_cli_show_by_id_text_and_json(tmp_path: Path):
     assert code == 0 and out.startswith("smith-2001:\n") and "Karate History" in out
 
 
+def test_cli_reference_json_serializes_yaml_dates(tmp_path: Path):
+    root = _project(tmp_path)
+    registry = root / "content" / "references.yml"
+    registry.write_text(REGISTRY.replace("year: 2001", "year: 2001\n  accessed: 2024-01-01"), encoding="utf-8")
+    for command in (("show", "smith-2001"), ("search", "Karate History")):
+        code, out, _ = _run(root, "reference", *command)
+        assert code == 0
+        assert json.loads(out)["entries"][0]["accessed"] == "2024-01-01"
+
+
 def test_cli_show_missing_id_exits_1(tmp_path: Path):
     root = _project(tmp_path)
     code, out, err = _run(root, "reference", "show", "smith-2001", "nope")

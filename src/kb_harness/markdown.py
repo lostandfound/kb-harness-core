@@ -53,6 +53,18 @@ def parse_document(path: str, text: str) -> Document:
     return Document(path=path, frontmatter=frontmatter, body=match.group(2))
 
 
+def frontmatter_scalar_text(text: str, key: str) -> str | None:
+    """マージキーで継承した値も含め、YAML スカラーの元の表記を返す。"""
+    frontmatter = FRONTMATTER_RE.match(text).group(1)
+    loader = yaml.SafeLoader(frontmatter)
+    try:
+        node = loader.get_single_node()
+        loader.flatten_mapping(node)
+        return next((value.value for name, value in reversed(node.value) if name.value == key), None)
+    finally:
+        loader.dispose()
+
+
 def field_text(value: object) -> str | None:
     """型固有フィールドの値を検査用の文字列にする。
 

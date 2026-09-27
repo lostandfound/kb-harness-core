@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import date
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
@@ -710,7 +711,7 @@ def _reference_lookup(project: Project, args: Any) -> int:
     except Exception as error:
         return _internal_error(error, args.format)
     if args.format == "json":
-        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True, default=_json_date))
     else:
         for entry in result["entries"]:
             print(format_reference_block(entry) if full else format_reference_line(entry), end="" if full else "\n")
@@ -719,6 +720,12 @@ def _reference_lookup(project: Project, args: Any) -> int:
         for diagnostic in result.get("diagnostics", []):
             print(diagnostic["message"], file=sys.stderr)
     return 0 if result["ok"] else 1
+
+
+def _json_date(value: object) -> str:
+    if not isinstance(value, date):
+        raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+    return value.isoformat()
 
 
 def _emit_okf_export(result: Result, output_format: str) -> None:

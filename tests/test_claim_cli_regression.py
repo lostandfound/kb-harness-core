@@ -5,9 +5,20 @@ from io import StringIO
 from pathlib import Path
 
 from kb_harness.cli import _parser, main
+from kb_harness.claim import ClaimSpecError, plan_claim_transition
 from kb_harness.ontology import ontology_core_available
 
 pytestmark = pytest.mark.skipif(not ontology_core_available(), reason="kb-ontology-core が入っていない（Claim を使うテスト）")
+
+
+@pytest.mark.parametrize("timestamp", ["2024-01-01T00:00:00.5Z", "2024-01-01T00:00:00+00:00"])
+def test_claim_transition_rejects_noncanonical_timestamp(tmp_path: Path, timestamp: str):
+    path = tmp_path / "claim.md"
+    original = f"---\ntype: Claim\nstatus: proposed\ntimestamp: {timestamp}\n---\n"
+    path.write_text(original, encoding="utf-8")
+    with pytest.raises(ClaimSpecError, match="timestamp"):
+        plan_claim_transition(path, "accepted")
+    assert path.read_text(encoding="utf-8") == original
 
 
 def test_claim_parser_preserves_command_surface_and_options():

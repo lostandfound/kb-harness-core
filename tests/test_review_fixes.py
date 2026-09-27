@@ -59,11 +59,22 @@ def test_unquoted_canonical_timestamp_passes(tmp_path: Path):
     assert code == 0
 
 
-@pytest.mark.parametrize("timestamp", ["2024-01-01 09:00:00", "2024-01-01T00:00:00+09:00", "2024-01-01T00:00:00.5Z", "'2024-01-01'"])
+@pytest.mark.parametrize("timestamp", ["2024-01-01 09:00:00", "2024-01-01 00:00:00Z", "2024-01-01T00:00:00+00:00", "2024-01-01T00:00:00+09:00", "2024-01-01T00:00:00.5Z", "'2024-01-01'"])
 def test_unquoted_non_utc_or_malformed_timestamp_is_rejected(tmp_path: Path, timestamp: str):
     code, result = _kb(_project(tmp_path, timestamp=timestamp), "validate")
     assert code == 1
     assert any("timestamp" in m for m in _messages(result)), _messages(result)
+
+
+@pytest.mark.parametrize("timestamp, expected_code", [("2024-01-01T00:00:00Z", 0), ("2024-01-01T00:00:00+00:00", 1)])
+def test_merged_timestamp_is_checked_without_internal_error(tmp_path: Path, timestamp: str, expected_code: int):
+    root = _project(tmp_path)
+    entity = root / "content" / "people" / "taro.md"
+    text = entity.read_text(encoding="utf-8")
+    entity.write_text(text.replace("timestamp: 2024-01-01T00:00:00Z", f"defaults: &defaults\n  timestamp: {timestamp}\n<<: *defaults"), encoding="utf-8")
+    code, result = _kb(root, "validate")
+    assert code == expected_code, _messages(result)
+    assert not any(d["code"] == "internal.error" for d in result["diagnostics"])
 
 
 # --- H2 title / description -----------------------------------------------------
@@ -88,6 +99,21 @@ def _eval_project(tmp_path: Path, entries: str) -> Path:
     (root / "evals").mkdir()
     (root / "evals" / "rag-eval.yml").write_text(entries, encoding="utf-8")
     return root
+
+
+def test_validate_accepts_entries_mapping(tmp_path: Path):
+    root = _eval_project(
+        tmp_path,
+        "entries:\n"
+        "  - id: example\n"
+        "    kind: fact\n"
+        "    query: q\n"
+        "    expected: a\n"
+        "    evidence: [/people/taro.md]\n"
+        "    history: [{date: '2026-09-01', verdict: OK}]\n",
+    )
+    code, result = _kb(root, "validate")
+    assert code == 0, _messages(result)
 
 
 def test_eval_smoke_reports_miss_and_hit(tmp_path: Path):

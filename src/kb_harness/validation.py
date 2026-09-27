@@ -7,14 +7,14 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
 
 from .diagnostics import Diagnostic, HarnessError
 from .links import body_links, is_root_relative, resolve_link
-from .markdown import field_text, parse_document
+from .markdown import field_text, frontmatter_scalar_text, parse_document
 from .naming import validate_vocabulary_names_at
 from .ontology import build_ontology, validate_claim
 from .predicates import (
@@ -160,6 +160,8 @@ def _validate_evals(root: Path, all_paths: set[str], repo_root: Path | None = No
     rel = "/evals/rag-eval.yml"
     data = yaml.safe_load(evals_path.read_text(encoding="utf-8")) or []
     errors: list[str] = []
+    if isinstance(data, dict):
+        data = data.get("entries")
     if not isinstance(data, list):
         return [f"ERROR {rel}: must be a list"]
 
@@ -351,15 +353,15 @@ def validate(root: Path, warnings: list[str] | None = None, repo_root: Path | No
         if not FILENAME_RE.match(path.name):
             errors.append(f"ERROR {rel}: ファイル名がケバブケース規約に反する '{path.name}'")
 
-        # YAML は無引用の 2024-01-01T00:00:00Z を datetime に解決する。文字列でも datetime でも
-        # 「UTC・秒精度・Z 表記」の契約に合うかを見る（field_text の isoformat は +00:00 になるので使わない）
+        # YAML が datetime に変換すると元の表記が失われるため、スカラーの元値も検査する。
         timestamp = fm.get("timestamp")
         if timestamp is not None:
             if isinstance(timestamp, str):
-                if not TIMESTAMP_RE.match(timestamp):
+                if not TIMESTAMP_RE.fullmatch(timestamp):
                     errors.append(f"ERROR {rel}: timestamp の形式が不正 '{timestamp}'")
             elif isinstance(timestamp, datetime):
-                if timestamp.tzinfo is None or timestamp.utcoffset() != timedelta(0) or timestamp.microsecond:
+                original = frontmatter_scalar_text(path.read_text(encoding="utf-8"), "timestamp")
+                if original is None or not TIMESTAMP_RE.fullmatch(original):
                     errors.append(f"ERROR {rel}: timestamp は UTC 秒精度の 'YYYY-MM-DDTHH:MM:SSZ' である必要がある '{timestamp}'")
             else:
                 errors.append(f"ERROR {rel}: timestamp は文字列である必要がある")

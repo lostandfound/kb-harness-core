@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 import re
 import yaml
 
-from .markdown import parse_document
+from .markdown import frontmatter_scalar_text, parse_document
 from .ontology import build_ontology, export_claim, validate_claim, load_ontology_core
 
 class ClaimSpecError(ValueError):
@@ -115,10 +116,16 @@ def validate_claim_file(path: Path, content_root: Path | None = None) -> list[st
 def plan_claim_transition(path: Path, status: str, project=None) -> ClaimPlan:
     # コアの解決は ontology.load_ontology_core に委ねる（pip 導入か兄弟ディレクトリへのフォールバック）
     plan_transition = load_ontology_core().plan_transition
-    doc = parse_document(str(path), path.read_text(encoding="utf-8"))
+    source = path.read_text(encoding="utf-8")
+    doc = parse_document(str(path), source)
     errors = plan_transition(doc.frontmatter.get("status"), status)
     if errors: raise ClaimSpecError(errors[0], "claim.transition.invalid")
     fm = dict(doc.frontmatter); fm["status"] = status
+    if isinstance(fm.get("timestamp"), datetime):
+        canonical = fm["timestamp"].strftime("%Y-%m-%dT%H:%M:%SZ")
+        if frontmatter_scalar_text(source, "timestamp") != canonical:
+            raise ClaimSpecError("timestamp must be YYYY-MM-DDTHH:MM:SSZ", "claim.transition.invalid")
+        fm["timestamp"] = canonical
     text = "---\n" + yaml.safe_dump(fm, allow_unicode=True, sort_keys=False).rstrip() + "\n---\n" + doc.body
     if project is None:
         from .sync import unified_diff
