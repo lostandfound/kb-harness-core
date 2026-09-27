@@ -78,6 +78,16 @@ def export_claim(path: str, frontmatter: Mapping[str, object]) -> Any:
     return load_ontology_core().export_claim(path, frontmatter)
 
 
+def claim_statuses() -> frozenset[str]:
+    """Claim の許容 status 集合（オントロジーコアが正本）。okf の写像専用。
+
+    kb_ontology_core.__init__ の ``__all__`` には無いが、``kb_ontology_core.claims``
+    が公開するモジュールレベル定数として存在する。パッケージの公開 API として
+    ``__all__`` に足すのが望ましい（本リポジトリでは変更できない）。
+    """
+    return load_ontology_core().claims.CLAIM_STATUSES
+
+
 def __getattr__(name: str) -> Any:
     # 互換: `ontology.Ontology` / `ontology.Diagnostic` / `ontology._core` はオントロジーコアを遅延解決して返す
     if name in ("Ontology", "Diagnostic"):
