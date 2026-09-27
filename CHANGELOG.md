@@ -2,16 +2,38 @@
 
 ## Unreleased
 
+## 0.9.0 — 2026-09-27
+
+互換性に影響する変更を含む。導入先は固定コミットを上げる前に `kb validate` を回し、新たな ERROR を確認する。
+
+### Changed
+- `--format json` の出力は成否にかかわらず常に stdout に出す。これまで `entity create` / `project show` / `view` / `reference show|search|health` / `eval` / `okf validate` は失敗時に stderr へ出していた。stderr から JSON を読んでいた消費側は stdout に切り替える（R2）
+- `--dry-run` の text 出力は `would update: <path>` と書く。これまで書き込み済みと同じ `updated:` を出していた（R2）
+- `kb reference create` は重複 ID・必須キー欠落などの内容エラーで exit 1 を返す（`kb entity create` と揃えた）。spec やレジストリが読めない等の構成の問題は従来どおり exit 2（R2）
+- `references.yml` の検査規則を `kb_harness.references.check_reference_entry` に一本化し、`kb validate` / `kb reference health` / `kb reference create` / `show` / `search` が同じローダと規則を使う。`kb validate` も web 以外の型に「`url` か書誌（`author` / `publisher`）」を要求するようになり、既存 KB でこれを欠くエントリは新たに ERROR になる。`kb reference create` で通った spec が直後の `kb validate` で弾かれることはなくなった（R1）
+- Claim の status / confidence / 形式の事前検査をハーネスから撤去し、オントロジーコアの診断（`claim.status.unknown` / `claim.form.invalid` 等）に委ねた。okf の `claim_status` 写像もコアの許容集合を参照するため、オントロジーコアなしで Claim を含む KB を `kb export okf` すると `ontology.core.missing` で止まる（R5）
+- list ビューの member に `graph: false` の型や `Index` を置くと ERROR にし、graph.json の `views[].members` が `nodes` に無いパスを指さないようにした（R4）
+- `scripts/hooks/pre-commit` が `kb validate` に続けて `kb sync --check` を実行する（R6）
+- AGENTS.md の `scripts/` 配線の記述を現行（`apm_modules/` の固定コミットを直接実行、symlink は 0.3.0 で廃止）に合わせた
+- docs/scripts.md・configuration.md・cli.md・README・スキル（`.apm/`）の実装との食い違いを直した。実装済みで未記載だった検査（title の括弧禁止、TODO プレースホルダ、生成物混入、aliases 重複、timestamp 形式、未知ディレクトリ、`type: Index` 必須、relations の `confidence: C`）と `references.yml` のエントリ規則を設定リファレンスに記した（R7）
+
+### Added
+- `kb okf validate` が `--start` を受ける。相対の `PATH` はそこを起点に解決する（R2）
+
 ### Fixed
+- `kb validate` が list / 文字列ルートの `references.yml` で内部エラー（exit 3）にならず `reference.root.mapping` を報告する。1 エントリ内の重複キー（`author:` を 2 回など）を `reference.duplicate.id` と誤報告しなくなった（R1）
+- `kb validate` が `content_root` 直下の `index.md` 以外の `.md` を ERROR にする。これまで検査を素通りして graph.json に載っていた（R3）
+- `directory` を欠く型を `types.<Name>.directory` の未設定として報告する。これまでルート index に `/None/index.md` へのリンクを要求していた（R3）
+- `evals/rag-eval.yml` をリポジトリルートから探す。`content_root: kb/entities` のような配置で evals の検査が黙って飛ばされていた（R3）
+- `kb serve` が壊れた `graph.json` / `vocabulary.yml` でトレースバックを出して接続を切らず、HTTP 500 を返す（R4）
+- `kb doctor` がビュー YAML の不備で内部エラー（exit 3）にならず、`doctor.sync_failed` 診断を返す（R4）
+- `validation.fix_timestamps` が git 管理外で `CalledProcessError` を漏らさず、`validation.timestamps.git_required` を返す（R6）
 - `kb validate` が `timestamp` を、YAML が datetime に解決した値（無引用の `2024-01-01T00:00:00Z` など）でも検査するようになった。これまで文字列のときだけ検査していたため、`kb entity create` が書く無引用の正典形式は素通りし、UTC でない時刻や日付だけの値も通っていた。`title` / `description` が文字列でない（`description: 2020-01-01` が date に解決される等）場合も ERROR にする。これまでは validate が通るのに `kb sync` が内部エラーで落ちていた。既存 KB でこれらの値を持つファイルは新たに ERROR になる
 - `kb eval smoke` が文書どおり「期待根拠が字面検索の上位に入るか」を検査するようになった（`--limit`、`eval.smoke.miss`）。これまで `summary` と同一の集計を返し、pre-commit の 3 段目は実質何も検査していなかった。`kb eval summary` は退行（過去 OK → 最新非 OK）を `eval.regression` として報告し exit 1 を返す。評価ファイルは `evals/rag-eval.yml` 固定になり、`evals/` に別ファイルがあっても落ちない
 - 集計と字面検索の実装を `kb_harness.evaluation` に移し、`scripts/rag_smoke.py` / `scripts/eval_summary.py` はそれを呼ぶ互換入口にした（AGENTS.md の「scripts にロジックを二重に持たない」を回復）
 - `kb claim transition` がオントロジーコアの解決を `ontology.load_ontology_core` に委ねるようになった。これまで `kb_ontology_core` を直接 import していたため、兄弟ディレクトリへのフォールバックが効かず、コア不在時に `ontology.core.missing` ではなく内部エラーになっていた
 - `scripts/kb_config.default_content_root()` が絶対パスを返し、探索起点をカレントディレクトリにした。これまでリポジトリ相対の文字列を返していたため、cwd がリポジトリ直下でないと別の場所を読んでいた。`new_entity.py` / `validate.py` / `rag_smoke.py` の `--root` 既定値は遅延評価になり、`--help` や `--root` 指定が KB 探索で落ちなくなった
 - Python 3.10 でテストが通るようにした（`tomllib` のフォールバック）。CI は 3.10 と 3.12 の両方で回す
-
-### Changed
-- AGENTS.md の `scripts/` 配線の記述を現行（`apm_modules/` の固定コミットを直接実行、symlink は 0.3.0 で廃止）に合わせた
 
 ## 0.8.0 — 2026-09-27
 
