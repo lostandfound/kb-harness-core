@@ -79,7 +79,7 @@ def _parser() -> argparse.ArgumentParser:
     okf_validate = okf_commands.add_parser("validate", help="validate an OKF v0.2 bundle")
     okf_validate.add_argument("path")
     okf_validate.add_argument("--strict", action="store_true")
-    okf_validate.add_argument("--format", choices=("text", "json"), default="text")
+    _add_common_options(okf_validate)
 
     export_parser = subcommands.add_parser("export", help="export KB artifacts")
     export_commands = export_parser.add_subparsers(dest="export_command", required=True)
@@ -206,19 +206,24 @@ def _configure_claim_commands(parent: argparse.ArgumentParser) -> None:
 
 
 def _emit(result: Result, output_format: str, *, error: bool = False) -> None:
-    """Render one command result with stable JSON and human text output."""
-    stream = sys.stderr if error else sys.stdout
+    """Render one command result with stable JSON and human text output.
+
+    ``--format json`` always writes to stdout so downstream consumers can rely
+    on a single stream; ``error`` only selects the stream for ``text`` output.
+    """
     if output_format == "json":
-        print(json.dumps(result, ensure_ascii=False, sort_keys=True), file=stream)
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True), file=sys.stdout)
         return
+    stream = sys.stderr if error else sys.stdout
     details = result.get("details")
     if isinstance(details, dict):
         for key, value in details.items():
             print(f"{key}: {value}", file=stream)
     diagnostics = result.get("diagnostics", [])
     if result.get("changed"):
+        verb = "would update" if result.get("dry_run") else "updated"
         for path in result["changed"]:
-            print(f"updated: {path}", file=stream)
+            print(f"{verb}: {path}", file=stream)
     if result.get("diff") and output_format != "json":
         print(result["diff"], end="", file=stream)
     elif result.get("ok") and not diagnostics and not details:
@@ -253,7 +258,7 @@ def _internal_error(error: Exception, output_format: str) -> int:
             {"code": "internal.error", "message": f"{type(error).__name__}: {error}"}
         ],
     }
-    _emit(result, output_format, error=output_format != "json")
+    _emit(result, output_format, error=True)
     return 3
 
 
@@ -307,7 +312,7 @@ def _run_derived(
         _emit(
             {"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]},
             output_format,
-            error=output_format != "json",
+            error=True,
         )
         return 1
     except Exception as error:
@@ -412,7 +417,7 @@ def _view_action(project: Project, args: Any) -> int:
 def _validate(project: Project, output_format: str, *, urls: bool = False) -> int:
     try:
         warnings: list[str] = []
-        errors = validate(project.content_root, warnings=warnings)
+        errors = validate(project.content_root, warnings=warnings, repo_root=project.repo_root)
         if project.views_root is not None:
             errors.extend(validate_views(project.content_root, project.views_root))
         if urls:
@@ -727,7 +732,10 @@ def _okf_validate(args: Any) -> int:
     try:
         root = Path(args.path).expanduser()
         if not root.is_absolute():
-            root = Path.cwd() / root
+            base = Path(args.start).expanduser() if args.start else Path.cwd()
+            if not base.is_absolute():
+                base = Path.cwd() / base
+            root = base / root
         result = audit_okf_bundle(root)
     except Exception as error:
         return _internal_error(error, args.format)
@@ -785,7 +793,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             plan = plan_reference_create(project.content_root / "references.yml", Path(args.spec))
         except ReferenceSpecError as error:
             _emit({"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]}, args.format, error=True)
-            return 2
+            return 2 if error.argument else 1
         except Exception as error:
             return _internal_error(error, args.format)
         return _run_write_plan(

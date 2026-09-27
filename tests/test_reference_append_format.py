@@ -9,7 +9,10 @@ from kb_harness.cli import main
 from kb_harness.references import plan_reference_create
 
 
-def _spec(tmp_path: Path, text: str = "id: new-ref\ntype: book\ntitle: New\n") -> Path:
+def _spec(
+    tmp_path: Path,
+    text: str = "id: new-ref\ntype: book\ntitle: New\nurl: https://example.com/new-ref\n",
+) -> Path:
     path = tmp_path / "reference.yml"
     path.write_text(text, encoding="utf-8")
     return path
@@ -28,7 +31,7 @@ def test_reference_create_appends_without_reserializing_existing_yaml(tmp_path: 
 
     plan = plan_reference_create(references, _spec(tmp_path))
     expected_entry = yaml.safe_dump(
-        {"new-ref": {"type": "book", "title": "New"}},
+        {"new-ref": {"type": "book", "title": "New", "url": "https://example.com/new-ref"}},
         allow_unicode=True,
         sort_keys=False,
     )
@@ -38,6 +41,7 @@ def test_reference_create_appends_without_reserializing_existing_yaml(tmp_path: 
     assert yaml.safe_load(plan.changes[references])["new-ref"] == {
         "type": "book",
         "title": "New",
+        "url": "https://example.com/new-ref",
     }
 
 
@@ -61,11 +65,15 @@ def test_reference_create_replaces_empty_mapping(tmp_path: Path):
     output = plan.changes[references]
 
     assert output == yaml.safe_dump(
-        {"new-ref": {"type": "book", "title": "New"}},
+        {"new-ref": {"type": "book", "title": "New", "url": "https://example.com/new-ref"}},
         allow_unicode=True,
         sort_keys=False,
     )
-    assert yaml.safe_load(output)["new-ref"] == {"type": "book", "title": "New"}
+    assert yaml.safe_load(output)["new-ref"] == {
+        "type": "book",
+        "title": "New",
+        "url": "https://example.com/new-ref",
+    }
 
 
 def test_reference_create_supports_missing_registry(tmp_path: Path):
@@ -74,7 +82,11 @@ def test_reference_create_supports_missing_registry(tmp_path: Path):
     plan = plan_reference_create(references, _spec(tmp_path))
     output = plan.changes[references]
 
-    assert yaml.safe_load(output)["new-ref"] == {"type": "book", "title": "New"}
+    assert yaml.safe_load(output)["new-ref"] == {
+        "type": "book",
+        "title": "New",
+        "url": "https://example.com/new-ref",
+    }
     assert output.startswith("new-ref:\n")
 
 
@@ -134,6 +146,7 @@ def test_reference_create_preserves_crlf_and_uses_it_for_new_entry(tmp_path: Pat
     assert yaml.safe_load(output.decode("utf-8"))["new-ref"] == {
         "type": "book",
         "title": "New",
+        "url": "https://example.com/new-ref",
     }
     assert "+new-ref:" in plan.diff
 
@@ -198,9 +211,9 @@ def test_reference_create_duplicate_fails_without_modifying_registry(tmp_path: P
                 "json",
             ]
         )
-        == 2
+        == 1
     )
-    assert json.loads(capsys.readouterr().err)["diagnostics"][0]["code"] == (
+    assert json.loads(capsys.readouterr().out)["diagnostics"][0]["code"] == (
         "reference.duplicate.id"
     )
     assert references.read_text(encoding="utf-8") == original

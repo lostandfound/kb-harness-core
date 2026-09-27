@@ -6,9 +6,9 @@
 
 | 項目 | 内容 |
 |---|---|
-| `--start DIR` | プロジェクト探索の起点。省略時はカレントディレクトリから上へ `kb-domain.yml` を探す |
-| `--format text\|json` | 出力形式。`json` は `ok` / `changed` / `diagnostics` を基本フィールドとし、CI やエージェントから機械的に扱える |
-| `--dry-run` | 書き込み系コマンドで、変更を適用せず統一 diff のみを返す |
+| `--start DIR` | プロジェクト探索の起点。省略時はカレントディレクトリから上へ `kb-domain.yml` を探す。`kb okf validate` の `PATH` 相対解決にも使う |
+| `--format text\|json` | 出力形式。`json` は `ok` / `changed` / `diagnostics` を基本フィールドとし、CI やエージェントから機械的に扱える。成功・失敗によらず常に stdout に出るので、消費側は 1 本のストリームだけ読めばよい |
+| `--dry-run` | 書き込み系コマンドで、変更を適用せず統一 diff のみを返す。text 出力では対象パスを `would update: <path>` と表示し、実際に書き込んだ `updated: <path>` とは書き分ける |
 
 終了コード:
 
@@ -18,6 +18,8 @@
 | `1` | 検証不合格・差分あり |
 | `2` | 引数または設定の不備 |
 | `3` | 予期しない内部エラー |
+
+書き込み系（`entity create` / `reference create` など）の spec エラーは、コマンドの起動そのものが不正（spec が読めない・必須項目が欠けている・出力先が不正）なら `2`、spec は読めたが内容が検証を通らない（重複 ID、書式不正など）なら `1` を返す。両コマンドで揃えてある。
 
 ## 読み取り・検証
 
@@ -31,11 +33,11 @@ KB 全体を検証する。frontmatter・リンク・relations の型制約・�
 
 ### `kb doctor`
 
-設定、`kb-ontology-core` のインストール状態（無ければ `doctor.ontology.not_installed` の WARNING。Claim を使わない限り不要）と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在、述語が標準述語の体系に沿っているか（`related-to` でも[標準述語](configuration.md#標準述語)でもなく `broader` も持たない述語を `doctor.predicate.nonstandard` の WARNING で示す）を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。
+設定、`kb-ontology-core` のインストール状態（無ければ `doctor.ontology.not_installed` の WARNING。Claim を使わない限り不要）と宣言タグとの一致、生成物の同期状態、`validate.extra_checks` のコマンド存在、述語が標準述語の体系に沿っているか（`related-to` でも[標準述語](configuration.md#標準述語)でもなく `broader` も持たない述語を `doctor.predicate.nonstandard` の WARNING で示す）を診断する。導入直後や依存更新後の確認に使う。`severity: warning` の診断だけなら終了コードは 0。生成物の同期状態の確認（`plan_sync`）が壊れたビュー YAML などで失敗した場合も、内部エラーで落ちずに `doctor.sync_failed`（ERROR）として報告する。
 
 ### `kb serve`
 
-グラフの閲覧画面をローカルで起動する。`graph.json` を読むので、事前に `kb sync` で同期させておくこと。待ち受けは `127.0.0.1` に限定される。型の色は `vocabulary.yml` の型の定義順に固定のパレットから割り当てる。画面の資産はすべて同梱しており、ネットワークのない環境でも表示できる。
+グラフの閲覧画面をローカルで起動する。`graph.json` を読むので、事前に `kb sync` で同期させておくこと。待ち受けは `127.0.0.1` に限定される。型の色は `vocabulary.yml` の型の定義順に固定のパレットから割り当てる。画面の資産はすべて同梱しており、ネットワークのない環境でも表示できる。`graph.json` / `vocabulary.yml` が壊れているなどリクエスト処理中に例外が起きた場合は、接続を切らず 500 を返す（詳細はサーバの標準エラーに出す）。
 
 | オプション | 内容 |
 |---|---|
@@ -107,7 +109,7 @@ Claim の `status` を明示的に遷移させる。許容される遷移は `kb
 
 ### `kb reference health`
 
-`references.yml` の構造を検査する。
+`references.yml` の構造を検査する。エントリごとの規則は `kb validate` / `kb reference create` と共通（[設定リファレンス](configuration.md#referencesyml)）。
 
 ### `kb reference show ID...` / `kb reference show --for ENTITY`
 
@@ -123,11 +125,11 @@ Claim の `status` を明示的に遷移させる。許容される遷移は `kb
 
 ### `kb reference create --from reference.yml`
 
-spec を `references.yml` に原子的に追加する。既存レジストリのコメント・引用符・順序・空行・改行コードは再シリアライズせず保持し、末尾に新規エントリのみを canonical YAML で追記する。空 mapping（`{}`）の場合は新規エントリ全体に置換する。`--dry-run` に対応する。
+spec を `references.yml` に原子的に追加する。既存レジストリのコメント・引用符・順序・空行・改行コードは再シリアライズせず保持し、末尾に新規エントリのみを canonical YAML で追記する。空 mapping（`{}`）の場合は新規エントリ全体に置換する。`--dry-run` に対応する。spec は `kb validate` / `kb reference health` と同じ規則（[設定リファレンス](configuration.md#referencesyml)）で検査するため、ここを通った spec が直後の `kb validate` で弾かれることはない。
 
 ## 評価
 
-評価データセットはリポジトリルートの `evals/rag-eval.yml` に固定（トップレベルはエントリの list か `entries` キーを持つ mapping）。無ければ `eval.assets.missing` で exit 1。スキーマの検査は `kb validate` が行う。実装は `kb_harness.evaluation` にあり、`scripts/rag_smoke.py` / `scripts/eval_summary.py` も同じ関数を呼ぶ。
+評価データセットはリポジトリルートの `evals/rag-eval.yml` に固定（トップレベルはエントリの list か `entries` キーを持つ mapping）。無ければ `eval.assets.missing` で exit 1。`id` / `query` / `expected` / `evidence` の必須と `evidence` の実在は `kb validate` が検査する。`kind` の必須、`history` の日付・verdict 形式、`gap` の語彙は `scripts/eval_summary.py` だけが検査する（[設定リファレンス](configuration.md#evalsrag-evalyml任意)）。実装は `kb_harness.evaluation` にあり、`scripts/rag_smoke.py` / `scripts/eval_summary.py` も同じ関数を呼ぶ。
 
 ### `kb eval summary`
 
@@ -147,7 +149,7 @@ spec を `references.yml` に原子的に追加する。既存レジストリの
 
 ### `kb okf validate PATH [--strict]`
 
-既存の OKF bundle の適合性を検証する。適合性の違反は `diagnostics`、推奨事項の逸脱は `warnings` に入る。本文リンクは相対リンクなら文書の位置から、ルート相対リンクなら bundle ルートから解決し、bundle 内に無いものを `okf.link.broken` の警告にする。`--strict` を付けると警告も失敗扱いにする。
+既存の OKF bundle の適合性を検証する。`PATH` が相対パスなら `--start`（省略時はカレントディレクトリ）を起点に解決する。適合性の違反は `diagnostics`、推奨事項の逸脱は `warnings` に入る。本文リンクは相対リンクなら文書の位置から、ルート相対リンクなら bundle ルートから解決し、bundle 内に無いものを `okf.link.broken` の警告にする。`--strict` を付けると警告も失敗扱いにする。
 
 ## Python API
 

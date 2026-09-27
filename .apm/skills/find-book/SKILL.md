@@ -11,9 +11,9 @@ description: NDL サーチ（国立国会図書館）API で書籍・資料を�
 
 3. 登録前に `kb reference search --url <URL>`（DOI があれば `--doi <DOI>`、書籍はタイトルや著者名の語句）で既存エントリを確認する。同じ資料が既にあればその ID を使い、新規登録はしない。
 
-4. JSON 出力は `kb reference spec --from search-result.json --output reference.yml --dry-run`（いずれも作業用ディレクトリ内のパス）で決定論的な spec に変換し、内容を確認してから `kb reference create --from reference.yml --dry-run` で登録差分を確認する。登録 ID は規約に沿って編集する（著者ローマ字姓-年、例: `miyagi-1934`。仮 ID は必ず直す）。他の資料と由来を共有する資料（同じ流派・学派の伝承、同じ記事の別言語版や転載、当事者の自己発信など）には任意キー `lineage` を付ける。単位の例は `kb-domain.yml` の `domain.lineage_example`、既存ラベルは `kb reference search --field lineage <ラベル>` で確認し綴りを揃える。由来を共有しないと判断できたら `lineage: 系統外`、判断がつかなければ省略する（未記載は未判定の意味）。`<content_root>/references.yml`（content_root は `kb-domain.yml` の `domain.content_root`）への反映は `kb reference create --from reference.yml` を使う。フィールドは確認できた値のみ書く。特定系統内の資料と判断できる場合は optional key `lineage`（系統名の文字列。単位の例は `kb-domain.yml` の `domain.lineage_example`）を付与する（判断がつかない場合は省略）。
+4. JSON 出力は `kb reference spec --from search-result.json --output reference.yml --dry-run`（いずれも作業用ディレクトリ内のパス）で決定論的な spec に変換し、内容を確認してから `kb reference create --from reference.yml --dry-run` で登録差分を確認する。登録 ID は規約に沿って編集する（著者ローマ字姓-年、例: `miyagi-1934`。仮 ID は必ず直す）。他の資料と由来を共有する資料（同じ流派・学派の伝承、同じ記事の別言語版や転載、当事者の自己発信など）には任意キー `lineage` を付ける。単位の例は `kb-domain.yml` の `domain.lineage_example`、既存ラベルは `kb reference search --field lineage <ラベル>` で確認し綴りを揃える。由来を共有しないと判断できたら `lineage: 系統外`、判断がつかなければ省略する（未記載は未判定の意味）。フィールドは確認できた値のみ書く。`<content_root>/references.yml`（content_root は `kb-domain.yml` の `domain.content_root`）への反映は `kb reference create --from reference.yml` を使う。
 
-5. 出典として使うエンティティの `sources` に `- "ref: <id>"` を追記する。本文の主張は必ず自分の言葉で書く。資料本文・スキャンのファイルは `content_root` 配下に保存しない。パブリックドメインが確認できた資料の翻刻テキストのみ、`kb-domain.yml` の `corpus_root` が指すコーパス（規約は CONTRIBUTING.md のコーパス規定とコーパスの README）へ置ける。
+5. 出典として使うエンティティの `sources` に `- "ref: <id>"` を追記する。本文の主張は必ず自分の言葉で書く。資料本文・スキャンのファイルは `content_root` 配下に保存しない。パブリックドメインが確認できた資料の翻刻テキストを別途保存する場合は、置き場所・可否とも導入先が独自に定める規約（CONTRIBUTING.md 等）に従う。ハーネスの `kb-domain.yml` はコーパスの置き場所を持たない。
 
 6. `kb validate` でエラーゼロ、URL を登録した場合は `--check-urls` も実行する。
 

@@ -18,6 +18,12 @@ if ! kb validate; then
     exit 1
 fi
 
+# index / graph / views の陳腐化は kb validate では検出できない。sync --check で別に確かめる。
+if ! kb sync --check; then
+    echo "pre-commit: kb sync --check が失敗しました。コミットを中止します。" >&2
+    exit 1
+fi
+
 if [ -d tests ]; then
     if ! python3 -m pytest tests -q; then
         echo "pre-commit: テストが失敗しました。コミットを中止します。" >&2

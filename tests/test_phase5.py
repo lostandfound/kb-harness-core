@@ -27,14 +27,16 @@ def test_reference_create_from_spec_is_deterministic(tmp_path, capsys):
 
 
 def test_reference_create_rejects_duplicate_and_invalid_spec(tmp_path, capsys):
+    # content errors (duplicate id, bad URL) exit 1, matching `entity create`;
+    # json is always written to stdout regardless of success/failure.
     root = _reference_project(tmp_path)
     spec = root / "ref.yml"
     spec.write_text("id: existing\ntype: book\ntitle: New\n", encoding="utf-8")
-    assert main(["reference", "create", "--from", str(spec), "--start", str(root), "--format", "json"]) == 2
-    assert json.loads(capsys.readouterr().err)["diagnostics"][0]["code"] == "reference.duplicate.id"
+    assert main(["reference", "create", "--from", str(spec), "--start", str(root), "--format", "json"]) == 1
+    assert json.loads(capsys.readouterr().out)["diagnostics"][0]["code"] == "reference.duplicate.id"
     spec.write_text("id: bad\ntype: book\ntitle: New\nurl: ftp://example.com\n", encoding="utf-8")
-    assert main(["reference", "create", "--from", str(spec), "--start", str(root), "--format", "json"]) == 2
-    assert json.loads(capsys.readouterr().err)["diagnostics"][0]["code"] == "reference.url.invalid"
+    assert main(["reference", "create", "--from", str(spec), "--start", str(root), "--format", "json"]) == 1
+    assert json.loads(capsys.readouterr().out)["diagnostics"][0]["code"] == "reference.url.invalid"
 
 
 def test_reference_health_reports_missing_and_duplicate_ids(tmp_path):
@@ -73,7 +75,7 @@ def test_eval_commands_report_missing_assets(tmp_path, capsys):
     (tmp_path / "content" / "references.yml").write_text("{}", encoding="utf-8")
     (tmp_path / "kb-domain.yml").write_text("domain:\n  content_root: content\n", encoding="utf-8")
     assert main(["eval", "summary", "--start", str(tmp_path), "--format", "json"]) == 1
-    output = json.loads(capsys.readouterr().err)
+    output = json.loads(capsys.readouterr().out)
     assert output["diagnostics"][0]["code"] == "eval.assets.missing"
 
 

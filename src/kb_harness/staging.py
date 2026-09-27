@@ -91,7 +91,7 @@ def stage_and_validate(
             **plan_views_index(stage_content, staged_views_root, staged_views_index),
         }
         execute_write_plan(plan_write(derived))
-        errors = validate(stage_content)
+        errors = validate(stage_content, repo_root=stage_root)
         if errors:
             raise validation_error("; ".join(errors))
         if plan_sync(staged_project):

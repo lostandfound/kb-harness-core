@@ -9,6 +9,8 @@
 | `references.yml` | `<content_root>/` | `kb validate` / `kb reference *`, `find-book` / `find-paper` スキル |
 | `evals/rag-eval.yml` | リポジトリルート（任意） | `kb validate` / `kb eval *`, `rag-tester` |
 
+`evals/rag-eval.yml` は `content_root` の親ではなくリポジトリルート（`kb-domain.yml` のある場所）直下を見る。`domain.content_root: kb/entities` のように `content_root` がリポジトリルート直下に無い配置でも、`kb validate` / `kb sync` / `kb entity create` は `kb-domain.yml` から解決した `repo_root` を使うので取りこぼさない。
+
 ## kb-domain.yml
 
 ```yaml
@@ -60,7 +62,7 @@ validate:
 ```yaml
 types:
   <型名>:
-    directory: <対応ディレクトリ名>     # 必須。frontmatter の type とディレクトリの対応検査に使う
+    directory: <対応ディレクトリ名>     # 必須。frontmatter の type とディレクトリの対応検査に使う。欠くと `kb validate` が ERROR にする
     description: <説明>                  # 任意。型の意味。ハーネスは検査にも表示にも使わない
     extra_fields: [born]                 # 任意。この型で追加必須になる frontmatter フィールド
     optional_fields: [died, same_as]     # 任意。書いてもよい frontmatter フィールド。無くても検査は通る
@@ -87,6 +89,8 @@ tags:
 - `types.<型>.graph: false` を指定した型のエンティティは `relations` を持てない。索引・付録的なエンティティ型に使う。
 - `predicates.<述語>.domain` / `range` は、frontmatter の `relations` に書かれた `predicate` と `target` エンティティの型が一致するかを検査する型制約である。
 - `tags` は frontmatter の `tags` に使える語の全量である。一覧にない語は validate エラーになる。
+- エンティティ Markdown は必ずいずれかの型の `directory` の下に置く。`content_root` 直下に置ける `.md` は `index.md` だけで、それ以外（例: `<content_root>/stray.md`）は `kb validate` が ERROR にする。トップレベルに、どの型の `directory` にも対応しないディレクトリ（例: `<content_root>/misc/`）を置き `.md` を入れても同様に ERROR にする。
+- frontmatter の `relations` の各エントリは `predicate` / `target` に加え、任意で `confidence: C` だけを持てる（それ以外の値は ERROR）。出典と確度を伴う主張を `A` / `B` / `D` で表したい場合は relation ではなく `Claim` にする（[Claim 型](#claim-型任意)を参照）。
 
 ### 名前の文字種
 
@@ -241,13 +245,22 @@ predicates:
 
 ## references.yml
 
-文献レジストリ。エンティティの `sources` と本文インラインの `（出典: ref-id）` は、ここに定義された ID を参照する。
+文献レジストリ。エンティティの `sources` と本文インラインの `（出典: ref-id）` は、ここに定義された ID を参照する。ルート直下に `ID: {...}` の mapping を並べる。
 
-各エントリの必須キーは `type` と `title`。`type: web` は `url` も必須。`url` は `http://` / `https://` で始まる。
+エントリの検査規則は `kb_harness.references.check_reference_entry` に 1 つだけ持ち、`kb validate` / `kb reference health` / `kb reference create` の 3 つの入口が共通して使う（`kb reference create` で通った spec が直後の `kb validate` で弾かれることはない）。
+
+| フィールド | 必須 | 内容 |
+|---|---|---|
+| `type` | 必須 | 文献種別。値の語彙は自由（`web` / `book` / `journal-article` 等）。 |
+| `title` | 必須 | 表題。 |
+| `url` | 条件付き | `http://` または `https://` で始まること。`type: web` は必須。それ以外の型は `url` か「`title` に加え `author` か `publisher` のどちらか」（書誌情報）のいずれかが必要。 |
+| `author` / `publisher` | 条件付き | `url` を持たないエントリの書誌情報として使う。 |
+| `lineage` | 任意 | 同じ由来の資料群を束ねるラベル。非空文字列。下記参照。 |
+| `pending` | 任意 | 実見待ち等で先行登録した理由。非空文字列。付与すると未参照 WARNING が個別に出ず件数集計の INFO 1 行にまとまり、参照済みなのに `pending` が残っていると WARNING で警告される。 |
+
+ルート直下の ID の重複は `reference.duplicate.id` エラーになる。重複検出はルート mapping 直下のキーだけを見る。1 エントリ内で同じキー（例: `author:` を 2 回書く）を重複させても、それはこの検査の対象ではない（YAML パーサが後勝ちで解決する）。
 
 各エントリは任意キー `lineage`（非空文字列）を持てる。同じ由来の資料群につけるラベルで、evidence-reviewer は `lineage` が同じ資料を独立源として数えない（複数あっても 1 つの源として扱う）。由来の単位はドメインが決め、`kb-domain.yml` の `domain.lineage_example` に書く。流派・学派の伝承（`上地流系`）、同じ記事の別言語版・転載・要約（`wikipedia:三星堆`）、当事者や利害関係者の自己発信（`anthropic-official`）などが典型で、ラベルの綴りは KB 内で揃える。未記載は「独立」ではなく「未判定」を意味し、`scripts/refs_health.py --lineage` が未判定の文献を列挙する。他の資料と由来を共有しないと判定済みの資料には予約値 `系統外` を書く。`kb reference search --field lineage <ラベル>` で同じ由来の資料を引ける。
-
-各エントリは任意キー `pending`（非空文字列の待ち理由）を持てる。付与すると未参照 WARNING が個別に出ず件数集計の INFO 1 行にまとまり、参照済みなのに `pending` が残っていると WARNING で警告される。
 
 登録用 YAML は `ndl_search.py` / `cinii_search.py` が出力する。
 
@@ -277,6 +290,15 @@ timestamp: 2026-01-01T00:00:00Z # 任意。省略時は SOURCE_DATE_EPOCH → cl
 `type` / `slug` / `title` / `description` / `tags` / `sections` が必須。`sources` は型の `sources_required` が `false` でない限り必須。型ごとの章構成と `extra_fields` / `optional_fields` は `vocabulary.yml` を正本とする。`fields` には必須のフィールドをすべて、任意のフィールドは値があるものだけ書く。数値で書いた年（`born: 1900`）は文字列として書き出される。
 
 `description` は有無だけでなく内容も検査する。空文字はエラー、同じ文が二度出るものもエラーとする（改版で前の版の断片が残ると、形式は正しいまま検索結果と index に重複が出続けるため）。`title` と同一のもの、240 文字を超えるものは警告にとどめる。
+
+`kb validate` はほかに次を検査する。
+
+- `title` に括弧（`(` / `（`）を含めない。曖昧さ回避や読み仮名を title に押し込まず、別途フィールドか本文に書く。
+- frontmatter・本文のいずれにも文字列 `TODO` を残さない。下書きの置き残しを検出する。
+- 本文に生成物のラッパータグ（`<content>` / `<document>` / `<file>` / `<output>` / `<text>` とその閉じタグ、大小無視）を含めない。LLM 生成時に取り込み漏れで混入することがある。
+- `aliases` は空文字を含めず、自身の `title` と重複させない。他エンティティの `title` や、別エンティティの `aliases` と重複する語も ERROR にする（どちらを指すか曖昧になるため）。
+- `timestamp` は UTC・秒精度の `YYYY-MM-DDTHH:MM:SSZ` 形式のみ許容する（YAML が datetime として解決した場合も同じ制約を課す）。
+- `index.md` の `type` は必ず `Index` にする。型ディレクトリ配下の他ファイルは、対応する型でなければ ERROR にする。
 
 ## Claim 型（任意）
 
@@ -342,13 +364,14 @@ where:
 | `name` / `description` | 必須。`name` は全ビューで一意 |
 | `kind` | `list`（割り当て）または `query`（導出） |
 | `basis` | `list` で必須。`interpretation`（書き手の見方。`sources` を持てない）または `source`（出典に基づく。`sources` 必須） |
-| `members` | `list` で必須。ルート相対パスの文字列、または `{path, note}`。Claim は指定できない |
+| `members` | `list` で必須。ルート相対パスの文字列、または `{path, note}`。Claim / Index / `graph: false` の型（グラフの `nodes` に現れない型）は指定できない |
 | `sources` | `basis: source` のときのみ。`ref: <id>` は `references.yml` に存在すること |
 | `where` | `query` で必須。`type` / `tags`（すべて含む）/ `relation: {predicate, target}` の AND 条件。語彙と実在エンティティに照らして検証する |
 
 - `list` に `where`、`query` に `members` / `basis` / `sources` を書くとエラー。上記以外のキーもエラー。同じ stem を `.yml` と `.yaml` の両方で置く（ID の重複）のもエラー。
 - `basis: source` を書きたくなったビューは、Claim かエンティティへ昇格する候補である。ビューは出典を持たないのが原則で、`source` は昇格前の一時的な状態として許す。
 - `kb graph build` はビューを `nodes` / `edges` に混ぜず、独立した `views` 配列へ出力する（`id` / `name` / `description` / `kind` / `basis` / `where` / 解決済み `members`）。
+- `list` の `members` に Claim / Index / `graph: false` の型を書くと `kb validate` が ERROR にする。`query` の解決が対象からこれらの型をあらかじめ除くのと同じ扱いを `list` にも適用しており、`graph.json` の `views[].members` は常に `nodes` に含まれるパスだけを指す。
 
 ## evals/rag-eval.yml（任意）
 
@@ -356,15 +379,20 @@ RAG 評価データセット。リポジトリルート直下の `evals/` に置
 
 ```yaml
 - id: q-001
+  kind: fact-lookup                # 分類。summary の kind 別集計に使う
   query: 想定クエリ
   expected: 期待する回答の要旨
   evidence:
     - /people/example.md          # 根拠となるエンティティのルート相対パス
+  gap: missing-relation            # 任意。最新 verdict が非 OK のときの原因分類
   history:                        # rag-tester が追記する
     - date: 2026-01-01
       verdict: OK
 ```
 
-- `id` / `query` / `expected` / `evidence` は必須。`evidence` の各パスは実在するエンティティでなければならない（`kb validate` が検査）。
-- `kb eval smoke` は `query` に対する字面検索の上位 `--limit` 件に `evidence` が入るかを検査する。
+- `id` / `query` / `expected` / `evidence` は必須。`evidence` の各パスは実在するエンティティでなければならない。`kb validate` が検査するのはこの 4 つと `evidence` の実在だけである。
+- `kind` は自由な分類ラベルで、`kb eval summary` が `by_kind` 集計に使う（未設定は `(不明)` にまとまる）。`scripts/eval_summary.py` はこれを必須フィールドとして検査する（`kb validate` にこの必須制約はない）ので、両方の入口を使う場合は書いておく。
+- `gap` は最新 verdict が `OK` でないときの原因分類。`missing-entity` / `missing-relation` / `missing-text` / `retrieval` / `by-design` のいずれか（`kb eval summary` の `open_gaps` が使う正本は `kb_harness.evaluation.GAP_KINDS`）。`by-design`（争点ゆえ断定しないのが正しい挙動）は `open_gaps` から除かれる。未設定・語彙外の値は未分類として `open_gaps` に残り、分類を促す。
+- `history` の各要素は `date`（`YYYY-MM-DD`）と `verdict`（`OK` / `曖昧` / `回答不能` / `誤答誘発`）。`kb validate` はこの形式までは検査しない（`scripts/eval_summary.py` が検査する）。
+- `kb eval smoke` は `query` に対する字面検索の上位 `--limit` 件に `evidence` が入るかを検査する（`history` が空のエントリは計画のみとみなし対象外）。
 - `kb eval summary` は `history` を集計し、過去 OK → 最新非 OK の退行を検出する。

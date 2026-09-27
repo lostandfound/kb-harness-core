@@ -13,7 +13,10 @@ from kb_harness.okf import (
     validate_okf_bundle,
     audit_okf_bundle,
 )
+from kb_harness.ontology import OntologyCoreMissing, ontology_core_available
 from kb_harness.project import Project
+
+_requires_core = pytest.mark.skipif(not ontology_core_available(), reason="kb-ontology-core が入っていない（Claim を使うテスト）")
 
 
 def _project(tmp_path: Path, files: dict[str, str], registry: object = None) -> Project:
@@ -256,6 +259,7 @@ def test_render_okf_concept_preserves_frontmatter_and_body_deterministically():
     assert rendered == "---\nalpha: 1\ntitle: 拳\ntype: Concept\nzeta: 2\n---\n本文です。\n"
 
 
+@_requires_core
 def test_render_okf_claim_maps_internal_status():
     # Given a Claim using the internal status vocabulary.
     source = "---\ntype: Claim\nstatus: accepted\ntitle: 命題\n---\n本文です。\n"
@@ -280,6 +284,7 @@ def test_render_okf_claim_rejects_existing_claim_status():
     assert raised.value.code == "okf.claim_status.conflict"
 
 
+@_requires_core
 def test_render_okf_claim_rejects_unknown_internal_status():
     # Given a Claim with an unsupported internal status.
     source = "---\ntype: Claim\nstatus: unknown\n---\n本文\n"
@@ -335,6 +340,7 @@ def test_plan_okf_export_moves_timestamp_for_concept_output(tmp_path):
     assert "internal_timestamp: '2024-01-02'" in rendered
 
 
+@_requires_core
 def test_plan_okf_export_moves_timestamp_for_claim_output(tmp_path):
     project = _project(
         tmp_path,
@@ -513,3 +519,10 @@ def test_audit_warns_on_links_unresolvable_in_bundle(tmp_path):
         {"code": "okf.link.broken", "path": "notes/memo.md", "message": "link target is not in the bundle: ../../README.md"},
         {"code": "okf.link.broken", "path": "notes/memo.md", "message": "link target is not in the bundle: ../people/nobody.md"},
     ]
+
+
+@pytest.mark.skipif(ontology_core_available(), reason="kb-ontology-core が入っている")
+def test_render_okf_claim_without_core_stops_with_core_missing():
+    """Claim の status 写像はオントロジーコアが正本なので、コアなしでは ontology.core.missing で止まる。"""
+    with pytest.raises(OntologyCoreMissing):
+        render_okf_concept("claim.md", "---\ntype: Claim\nstatus: proposed\n---\n主張\n")

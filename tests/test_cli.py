@@ -87,15 +87,16 @@ class CliTest(unittest.TestCase):
             )
 
     def test_project_error_uses_stable_json_diagnostic_and_exit_two(self):
+        # json is always written to stdout, even on failure.
         with tempfile.TemporaryDirectory() as tempdir:
-            error_output = io.StringIO()
+            output = io.StringIO()
 
-            with redirect_stderr(error_output):
+            with redirect_stdout(output):
                 exit_code = main(
                     ["project", "show", "--start", tempdir, "--format", "json"]
                 )
 
-            diagnostic = json.loads(error_output.getvalue())
+            diagnostic = json.loads(output.getvalue())
             self.assertEqual(exit_code, 2)
             self.assertEqual(diagnostic["diagnostics"][0]["code"], "project.not_found")
             self.assertFalse(diagnostic["ok"])

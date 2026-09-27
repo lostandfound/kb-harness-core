@@ -158,8 +158,8 @@ def test_cli_show_for_entity(tmp_path: Path):
 
 def test_cli_show_requires_ids_or_entity(tmp_path: Path):
     root = _project(tmp_path)
-    code, _, err = _run(root, "reference", "show")
-    assert code == 2 and json.loads(err)["diagnostics"][0]["code"] == "reference.show.arguments"
+    code, out, _ = _run(root, "reference", "show")
+    assert code == 2 and json.loads(out)["diagnostics"][0]["code"] == "reference.show.arguments"
     code, _, err = _run(root, "reference", "show", "smith-2001", "--for", "x.md")
     assert code == 2
 
@@ -177,8 +177,8 @@ def test_cli_search_url_dedupe_and_no_args(tmp_path: Path):
     root = _project(tmp_path)
     code, out, _ = _run(root, "reference", "search", "--url", "http://example.test/karate")
     assert code == 0 and [e["id"] for e in json.loads(out)["entries"]] == ["smith-2001"]
-    code, _, err = _run(root, "reference", "search")
-    assert code == 2 and json.loads(err)["diagnostics"][0]["code"] == "reference.search.arguments"
+    code, out, _ = _run(root, "reference", "search")
+    assert code == 2 and json.loads(out)["diagnostics"][0]["code"] == "reference.search.arguments"
 
 
 def test_cli_search_empty_registry(tmp_path: Path):

@@ -65,13 +65,14 @@ python3 scripts/rag_smoke.py [--root DIR] [--eval-file FILE] [--limit N]
 `evals/rag-eval.yml` の最新判定を集計し、退行（過去 OK → 最新非 OK）を検出する。退行検出時は exit 1。`kb eval summary` の互換入口で、実装は `kb_harness.evaluation`（`--since` / `--stale-days` / `--open` と `INVALID` のスキーマ報告はスクリプト側だけが持つ）。
 
 ```bash
-python3 scripts/eval_summary.py [--eval-file FILE] [--since YYYY-MM-DD] [--stale-days N]
+python3 scripts/eval_summary.py [--eval-file FILE] [--since YYYY-MM-DD] [--stale-days N] [--open]
 ```
 
 | オプション | 内容 |
 |---|---|
 | `--since` | 指定日以降の `history` のみ集計する |
 | `--stale-days` | 未評価とみなす経過日数の閾値（既定 30） |
+| `--open` | 未解決の欠落のみを BACKLOG 転記用の行形式で出力する（退行検出の exit code は据え置き） |
 
 ## 文献・外部情報
 
@@ -80,16 +81,20 @@ python3 scripts/eval_summary.py [--eval-file FILE] [--since YYYY-MM-DD] [--stale
 NDL サーチ API で書籍・資料を検索し、`references.yml` 登録用の YAML を出力する。
 
 ```bash
-python3 scripts/ndl_search.py <query> [--count N] [--title-only] [--mediatype books|periodicals]
+python3 scripts/ndl_search.py <query> [--count N] [--title-only] [--mediatype books|periodicals] [--format yaml|json]
 ```
+
+`--format` は出力形式を切り替える（既定 `yaml`）。`json` はスクリプトからのパース用。
 
 ### cinii_search.py
 
 CiNii Research API で論文を検索し、`references.yml` 登録用の YAML を出力する。環境変数 `CINII_APP_ID` が必要（リポジトリ直下の `.env` からも読む）。
 
 ```bash
-python3 scripts/cinii_search.py <query> [--count N]
+python3 scripts/cinii_search.py <query> [--count N] [--format yaml|json]
 ```
+
+`--format` は `ndl_search.py` と同じ（既定 `yaml`）。
 
 ### wiki_fetch.py
 
@@ -112,6 +117,9 @@ python3 scripts/explore_diff.py [category ...] [--depth N] [--root DIR] [--inclu
 軽量ブラウザ操作 CLI。CDP 経由で可視 Chromium を操作し、抽出テキストのみを出力する。`ndl-digicolle` スキルが使う。Playwright 相当の CDP 対応 Chromium 環境が別途必要。
 
 ```bash
+python3 scripts/browse.py open
+python3 scripts/browse.py close
+python3 scripts/browse.py url
 python3 scripts/browse.py goto <url>
 python3 scripts/browse.py text [--limit N]
 python3 scripts/browse.py find <word> [--ctx N]
@@ -119,6 +127,8 @@ python3 scripts/browse.py click <target>
 python3 scripts/browse.py fill <selector> <value>
 python3 scripts/browse.py press <key>
 ```
+
+`open` / `close` は CDP 対応 Chromium の起動・終了、`url` は現在タブの URL 取得。
 
 ## 点検
 
@@ -143,8 +153,13 @@ python3 scripts/refs_health.py [--refs FILE] [--stale-days N] [--lineage] [--pen
 懸念台帳（Markdown）の状態別集計と、着手可能な懸念の抽出。台帳の形式は導入先が定める。雛形と状態語彙は [導入ガイド](integration.md#8-運用ファイルを置く任意) を参照。
 
 ```bash
-python3 scripts/concerns_summary.py [--ledger FILE]
+python3 scripts/concerns_summary.py [--ledger FILE] [--actionable]
 ```
+
+| オプション | 内容 |
+|---|---|
+| `--ledger` | 台帳のパス |
+| `--actionable` | 着手可能な懸念のみを 1 行ずつ出力する |
 
 ## 補助
 
@@ -153,9 +168,10 @@ python3 scripts/concerns_summary.py [--ledger FILE]
 導入先リポジトリ向けの pre-commit テンプレート。ステージに `.md` / `.yml` / `.py` が含まれるとき次を順に実行し、いずれかが失敗すればコミットを中止する。`install-hooks.sh` が自身と同じ場所の `hooks/pre-commit` を `.git/hooks/pre-commit` へ冪等にコピーする（`bash apm_modules/lostandfound/kb-harness-core/scripts/install-hooks.sh`）。テンプレートは `kb` CLI だけを呼び、導入先の `scripts/` には依存しない。
 
 1. `kb validate`（`kb-domain.yml` の `validate.extra_checks` もここで走る）
-2. `tests/` が存在すれば `python3 -m pytest tests -q`
-3. `evals/rag-eval.yml` が存在すれば `kb eval smoke`
-4. `.kb/hooks/pre-commit.d/` が存在すれば、その中の実行可能ファイルを名前順に実行する
+2. `kb sync --check`（index / graph / views の陳腐化。`kb validate` が通っても独立に失敗しうる）
+3. `tests/` が存在すれば `python3 -m pytest tests -q`
+4. `evals/rag-eval.yml` が存在すれば `kb eval smoke`
+5. `.kb/hooks/pre-commit.d/` が存在すれば、その中の実行可能ファイルを名前順に実行する
 
 導入先固有のチェックはテンプレートを編集せず `.kb/hooks/pre-commit.d/` に置く。`kb-domain.yml` の `validate.extra_checks` に登録すれば `kb validate` 側で実行されるので、通常はそちらを使う。
 

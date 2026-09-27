@@ -74,6 +74,18 @@ class EntityCreatePhase3Test(unittest.TestCase):
         self.assertTrue(result.get("diff"))
         self.assertFalse((self.root / "knowledge/concepts/quantum-theory.md").exists())
 
+    def test_dry_run_text_reports_would_update_not_updated(self):
+        # `--dry-run` must not claim the path was written (docs/cli.md 共通仕様).
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = main(
+                ["entity", "create", "--from", str(self.root / "entity.yml"), "--dry-run", "--start", str(self.root)]
+            )
+        self.assertEqual(code, 0)
+        self.assertIn("would update: knowledge/concepts/quantum-theory.md", out.getvalue())
+        self.assertNotIn("updated: knowledge/concepts/quantum-theory.md", out.getvalue())
+        self.assertFalse((self.root / "knowledge/concepts/quantum-theory.md").exists())
+
     def test_missing_required_spec_is_rejected_without_change(self):
         spec = self.root / "bad.yml"
         spec.write_text("type: Concept\nslug: bad\n", encoding="utf-8")
