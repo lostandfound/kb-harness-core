@@ -129,7 +129,7 @@ spec を `references.yml` に原子的に追加する。既存レジストリの
 
 ## 評価
 
-評価データセットはリポジトリルートの `evals/rag-eval.yml` に固定（トップレベルはエントリの list か `entries` キーを持つ mapping）。無ければ `eval.assets.missing` で exit 1。スキーマの検査は `kb validate` が行う。実装は `kb_harness.evaluation` にあり、`scripts/rag_smoke.py` / `scripts/eval_summary.py` も同じ関数を呼ぶ。
+評価データセットはリポジトリルートの `evals/rag-eval.yml` に固定（トップレベルはエントリの list か `entries` キーを持つ mapping）。無ければ `eval.assets.missing` で exit 1。`id` / `query` / `expected` / `evidence` の必須と `evidence` の実在は `kb validate` が検査する。`kind` の必須、`history` の日付・verdict 形式、`gap` の語彙は `scripts/eval_summary.py` だけが検査する（[設定リファレンス](configuration.md#evalsrag-evalyml任意)）。実装は `kb_harness.evaluation` にあり、`scripts/rag_smoke.py` / `scripts/eval_summary.py` も同じ関数を呼ぶ。
 
 ### `kb eval summary`
 

@@ -23,7 +23,7 @@ python3 -m pytest tests/test_claim.py                # ファイル単位
 python3 -m pytest tests/test_claim.py -k test_xxx    # 単体テスト
 ```
 
-CI は Python 3.12 で `python3 -m pytest` を、`kb-ontology-core` あり・なしの 2 ジョブで回す。リンタは未導入。Claim を使うテストはオントロジーコアが無ければ skip され、`tests/test_distribution_alignment.py` は兄弟ディレクトリ `../kb-ontology-core`（`pyproject.toml` が宣言するタグと同じ版）が無ければ skip される。オントロジーコアなしの挙動は `tests/test_without_ontology_core.py` が固定する。
+CI は Python 3.10 / 3.12 の matrix で `python3 -m pytest` を、`kb-ontology-core` あり・なしの 2 ジョブ（計 4 通り）で回す。リンタは未導入。Claim を使うテストはオントロジーコアが無ければ skip され、`tests/test_distribution_alignment.py` は兄弟ディレクトリ `../kb-ontology-core`（`pyproject.toml` が宣言するタグと同じ版）が無ければ skip される。オントロジーコアなしの挙動は `tests/test_without_ontology_core.py` が固定する。
 
 ## アーキテクチャ
 

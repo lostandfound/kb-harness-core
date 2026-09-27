@@ -46,7 +46,7 @@
 ## 未決事項
 
 - 型の `maps_to` を足す時点。OKF 出力に IRI を併記する設計と一緒に決める。
-- `Organization` と `Place` を持つ KB がまだ無い。omnibus-kb は `worksFor` を落として本文に書いたが、組織をノードにしたくなった時点で `Organization` を足し、`part-of` の層 2 に `member-of` を吊るす形になる。
+- `Organization` と `Place` を持つ KB は既に現れている（omnibus-kb）。層 2 の吊るし方（`member-of` を `part-of` の下に置くかなど）が導入先ごとに揃うかは、複数の KB が実際に運用してから見直す。
 
 ## 参照
 

@@ -10,7 +10,7 @@ description: KB に新規エンティティを追加する確定的手順。「�
 
 1. 追加する型と slug を決める。`type` に使える値と各型の必須・任意フィールド（`extra_fields` / `optional_fields`）・本文セクション（`sections`）は `<content_root>/vocabulary.yml` の `types` 定義が正。`slug` はローマ字ケバブケース。
 
-2. 作業用ディレクトリ（リポジトリ外のスクラッチ領域）に spec ファイル `entity.yml` を書く。必須キーは `type` / `slug` / `title` / `description` / `tags` / `sources` / `sections`、任意キーは `aliases` / `relations` / `fields`（型固有フィールド。例: born / died / founded_year）/ `timestamp`。`sections` は「見出し → 本文」のマッピングで、その型に定義された見出しを過不足なく含める（`kb entity create --help` と失敗時の診断メッセージが正）。
+2. 作業用ディレクトリ（リポジトリ外のスクラッチ領域）に spec ファイル `entity.yml` を書く。必須キーは `type` / `slug` / `title` / `description` / `tags` / `sources` / `sections`、任意キーは `aliases` / `relations` / `fields`（型固有フィールド。例: born / died / founded_year）/ `timestamp`。`sections` は「見出し → 本文」のマッピングで、その型に定義された見出しを過不足なく含める。spec のキー・必須条件の契約は `apm_modules/lostandfound/kb-harness-core/docs/configuration.md` の「エンティティ spec」節が正。失敗時は診断メッセージが個々の違反を示す。
 
 3. spec の中身を埋める。`title` は日本語、`description` は 1〜2 文、`tags` は `<content_root>/vocabulary.yml` の一覧から選ぶ（新タグが必要なら一覧を先に更新）。本文の文体は CONTRIBUTING.md に従い、確定していない事実は諸説がある旨を明示する。日付・数値・帰属など事実データは WebSearch で裏取りし、情報源が食い違う場合は断定表記を避ける（表記方法は CONTRIBUTING.md 参照）。
 

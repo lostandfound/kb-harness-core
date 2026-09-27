@@ -7,7 +7,7 @@
 
 - 正データは Markdown ファイルの frontmatter と本文である。
 - `graph.json` はそこから決定論的に生成される派生物であり、手で編集しない。
-- 整合性（型・述語の domain/range・タグ語彙・リンク・出典）は `kb --check` と CI で検証する。
+- 整合性（型・述語の domain/range・タグ語彙・リンク・出典）は `kb validate` と CI で検証する。
 
 ## 2. 採用理由
 

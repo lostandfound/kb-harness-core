@@ -89,7 +89,8 @@ tags:
 - `types.<型>.graph: false` を指定した型のエンティティは `relations` を持てない。索引・付録的なエンティティ型に使う。
 - `predicates.<述語>.domain` / `range` は、frontmatter の `relations` に書かれた `predicate` と `target` エンティティの型が一致するかを検査する型制約である。
 - `tags` は frontmatter の `tags` に使える語の全量である。一覧にない語は validate エラーになる。
-- エンティティ Markdown は必ずいずれかの型の `directory` の下に置く。`content_root` 直下に置ける `.md` は `index.md` だけで、それ以外（例: `<content_root>/stray.md`）は `kb validate` が ERROR にする。
+- エンティティ Markdown は必ずいずれかの型の `directory` の下に置く。`content_root` 直下に置ける `.md` は `index.md` だけで、それ以外（例: `<content_root>/stray.md`）は `kb validate` が ERROR にする。トップレベルに、どの型の `directory` にも対応しないディレクトリ（例: `<content_root>/misc/`）を置き `.md` を入れても同様に ERROR にする。
+- frontmatter の `relations` の各エントリは `predicate` / `target` に加え、任意で `confidence: C` だけを持てる（それ以外の値は ERROR）。出典と確度を伴う主張を `A` / `B` / `D` で表したい場合は relation ではなく `Claim` にする（[Claim 型](#claim-型任意)を参照）。
 
 ### 名前の文字種
 
@@ -290,6 +291,15 @@ timestamp: 2026-01-01T00:00:00Z # 任意。省略時は SOURCE_DATE_EPOCH → cl
 
 `description` は有無だけでなく内容も検査する。空文字はエラー、同じ文が二度出るものもエラーとする（改版で前の版の断片が残ると、形式は正しいまま検索結果と index に重複が出続けるため）。`title` と同一のもの、240 文字を超えるものは警告にとどめる。
 
+`kb validate` はほかに次を検査する。
+
+- `title` に括弧（`(` / `（`）を含めない。曖昧さ回避や読み仮名を title に押し込まず、別途フィールドか本文に書く。
+- frontmatter・本文のいずれにも文字列 `TODO` を残さない。下書きの置き残しを検出する。
+- 本文に生成物のラッパータグ（`<content>` / `<document>` / `<file>` / `<output>` / `<text>` とその閉じタグ、大小無視）を含めない。LLM 生成時に取り込み漏れで混入することがある。
+- `aliases` は空文字を含めず、自身の `title` と重複させない。他エンティティの `title` や、別エンティティの `aliases` と重複する語も ERROR にする（どちらを指すか曖昧になるため）。
+- `timestamp` は UTC・秒精度の `YYYY-MM-DDTHH:MM:SSZ` 形式のみ許容する（YAML が datetime として解決した場合も同じ制約を課す）。
+- `index.md` の `type` は必ず `Index` にする。型ディレクトリ配下の他ファイルは、対応する型でなければ ERROR にする。
+
 ## Claim 型（任意）
 
 `Claim` という型を `vocabulary.yml` に定義すると、確定した relation と区別して、出典と評価を伴う関係主張を記録できる。
@@ -369,15 +379,20 @@ RAG 評価データセット。リポジトリルート直下の `evals/` に置
 
 ```yaml
 - id: q-001
+  kind: fact-lookup                # 分類。summary の kind 別集計に使う
   query: 想定クエリ
   expected: 期待する回答の要旨
   evidence:
     - /people/example.md          # 根拠となるエンティティのルート相対パス
+  gap: missing-relation            # 任意。最新 verdict が非 OK のときの原因分類
   history:                        # rag-tester が追記する
     - date: 2026-01-01
       verdict: OK
 ```
 
-- `id` / `query` / `expected` / `evidence` は必須。`evidence` の各パスは実在するエンティティでなければならない（`kb validate` が検査）。
-- `kb eval smoke` は `query` に対する字面検索の上位 `--limit` 件に `evidence` が入るかを検査する。
+- `id` / `query` / `expected` / `evidence` は必須。`evidence` の各パスは実在するエンティティでなければならない。`kb validate` が検査するのはこの 4 つと `evidence` の実在だけである。
+- `kind` は自由な分類ラベルで、`kb eval summary` が `by_kind` 集計に使う（未設定は `(不明)` にまとまる）。`scripts/eval_summary.py` はこれを必須フィールドとして検査する（`kb validate` にこの必須制約はない）ので、両方の入口を使う場合は書いておく。
+- `gap` は最新 verdict が `OK` でないときの原因分類。`missing-entity` / `missing-relation` / `missing-text` / `retrieval` / `by-design` のいずれか（`kb eval summary` の `open_gaps` が使う正本は `kb_harness.evaluation.GAP_KINDS`）。`by-design`（争点ゆえ断定しないのが正しい挙動）は `open_gaps` から除かれる。未設定・語彙外の値は未分類として `open_gaps` に残り、分類を促す。
+- `history` の各要素は `date`（`YYYY-MM-DD`）と `verdict`（`OK` / `曖昧` / `回答不能` / `誤答誘発`）。`kb validate` はこの形式までは検査しない（`scripts/eval_summary.py` が検査する）。
+- `kb eval smoke` は `query` に対する字面検索の上位 `--limit` 件に `evidence` が入るかを検査する（`history` が空のエントリは計画のみとみなし対象外）。
 - `kb eval summary` は `history` を集計し、過去 OK → 最新非 OK の退行を検出する。
