@@ -135,12 +135,31 @@ class UrlReachableTest(unittest.TestCase):
             self.assertTrue(_url_reachable("https://example.com/head-404"))
         self.assertEqual(opened.call_count, 2)
 
-    def test_HEADが500ならGETにフォールバックせず到達不能(self):
+    def test_HEADが500ならGETでも確かめ両方500なら到達不能(self):
         def raise_500(req, timeout=None):
             raise urllib.error.HTTPError(req.full_url, 500, "Server Error", {}, None)
 
         with patch("urllib.request.urlopen", side_effect=raise_500) as opened:
             self.assertFalse(_url_reachable("https://example.com/broken"))
+        self.assertEqual([call.args[0].get_method() for call in opened.call_args_list], ["HEAD", "GET"])
+
+    def test_HEADにだけ500を返すサーバはGETで到達可能と判定する(self):
+        # e-taneya.com が実例（docs/notes/url-kakunin-memo.md）
+        def side_effect(req, timeout=None):
+            if req.get_method() == "HEAD":
+                raise urllib.error.HTTPError(req.full_url, 500, "Server Error", {}, None)
+            return _response(200)
+
+        with patch("urllib.request.urlopen", side_effect=side_effect) as opened:
+            self.assertTrue(_url_reachable("https://example.com/head-500"))
+        self.assertEqual(opened.call_count, 2)
+
+    def test_HEADが接続失敗ならGETを送らず到達不能(self):
+        def raise_urlerror(req, timeout=None):
+            raise urllib.error.URLError("connection refused")
+
+        with patch("urllib.request.urlopen", side_effect=raise_urlerror) as opened:
+            self.assertFalse(_url_reachable("https://example.com/down"))
         self.assertEqual(opened.call_count, 1)
 
     def test_HEADが403ならGETにフォールバックして到達可能を判定する(self):
