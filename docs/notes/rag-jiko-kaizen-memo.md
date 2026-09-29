@@ -2,7 +2,7 @@
 
 2026-09-29 のディスカッションの記録。omnibus-kb に SELF-INDEX（Lee ほか, "Self-Evolving Search Index", arXiv:2609.19656）を収録した際に、「kb-harness-core で RAG の自己改善を行うならどのような手法になるか」を考えた。
 
-結論は「**失敗した問いを診断し、検索用のキーを直し、一時 KB で検証してから反映する周回を、既存の評価部品の上に組む。決定的な部分はハーネス本体に、生成（問いを作る・キーを直す）はスキルに置く。最初の一歩は、字面検索スモークが別名をキーとして扱うことと、relations から問いを機械的に作ることである**」。このメモは判断の経緯を残す。契約はまだ変えていない。
+結論は「**失敗した問いを診断し、検索用のキーを直し、検証してから反映する周回にする。ただし検索・重みづけ・グラフ展開・評価・診断は kb-retrieval-core の責務であり、ハーネスには置かない。ハーネスが持つのは、LLM が生成したキーを KB のデータとして検査・出力する台帳と、relations から評価の問いの候補を作る仕組みと、生成を担うスキルである**」。当初は検索側の部品もハーネスに足す案だったが、同日のうちに kb-retrieval-core の存在を確かめて改めた（末尾の「再考」）。このメモは判断の経緯を残す。契約はまだ変えていない。
 
 ## SELF-INDEX の要点
 
@@ -93,6 +93,51 @@ omnibus-kb（be567f8、`content_root` 配下の Markdown 216 件）で、`kb eva
 - **周回の停止条件と費用。** 固定セットの成功率が目標に達したとき、改善が止まったとき、予算に達したときのどれで止めるか。
 - **固定セットの作り手。** 構造の問いを機械で作り、人が固定セットに選ぶ手順にするか。rag-tester が足す新規クエリとの関係。
 
+## 再考（同日）: kb-retrieval-core との分担
+
+上の判断は、兄弟パッケージ kb-retrieval-core（5fe691b、v0.2.0 以降の `main`）を見ないまま書いていた。その `docs/ARCHITECTURE.md` は、ハーネスの責務を「KB の作成・検証と graph.json の生成」、kb-retrieval-core の責務を「スナップショットの読み込み・分割・索引・検索・グラフ展開・Evidence Packet の組み立て・検索評価」と定め、LLM とプロンプトを入れず、索引を再生成可能な派生物とすることを不変条件にしている。ハーネスの `kb eval smoke` は検索可能性の退行を見る簡易なスモークであって、検索器ではない。
+
+**当初「欠けている」とした部品の多くは kb-retrieval-core にすでにある。**
+
+| 当初の案 | kb-retrieval-core の現状 |
+|---|---|
+| (g) 別名の重みづけ | 実装済み。entity 検索の重みは title 8、aliases 7、description 2、tags 2 |
+| (h) 検索器の差し替え | lexical / vector / hybrid と RRF |
+| (i) relations をたどる検索 | `--expand-graph`（1 段、既定は無効） |
+| (j) 失敗の診断 | Recall@k・MRR、失敗した問いごとの返却パス、`kind` 別集計。紛らわしい相手の明示はない |
+| (f) 修正用と判定用の分離 | vector の採用規則が、開発用と採用判定用のケースの分離を求めている |
+| (k) の Separation | `compare_evaluations` による前後比較 |
+
+**実測。** 観察の節と同じ機械生成の問い 565 件を `kb-retrieval eval`（lexical、k=5）で評価した。
+
+| 問いの種類 | `kb eval smoke` | kb-retrieval-core | 同 `--expand-graph` |
+|---|---|---|---|
+| 別名（517） | 357 | 386 | 377 |
+| 作り手（15） | 8 | 5 | 7 |
+| 所属（33） | 23 | 18 | 25 |
+
+グラフ展開は relations の先にある答えに効き、別名の問いはわずかに下がる。展開を既定で無効にし、問いの種類で選ぶという kb-retrieval-core の設計と整合する。
+
+**互換性の欠け。** この測定は、omnibus-kb をそのまま読み込めなかったため、一時的に直したコピーで行った。(1) ハーネスは契約どおり graph.json に `views`（有効時）と `predicates`（`broader` / `maps_to` があるとき）を出すが、kb-retrieval-core のローダーは nodes / edges / claims 以外のトップレベルを拒否する。(2) ハーネスは `references.yml` の `year` の型を制約せず、omnibus-kb の 494 件中 46 件が引用符つきの年だが、kb-retrieval-core は整数以外を拒否する。いずれも kb-retrieval-core の `docs/ISSUES.md` に Issue #16・#17 として記録した。
+
+**改めた分担。**
+
+- **kb-retrieval-core**: 検索・重みづけ・グラフ展開・評価・前後比較。自己改善のために足すのは、失敗した問いで根拠より上に来た「紛らわしい相手」を評価レポートに出すこと（Issue #18、範囲は未確定）。
+- **ハーネス**: 生成したキーを KB のデータとしてコミットする場合の台帳の検査と、graph.json など公開の交換形式への出力。relations から評価の問いの候補を作る仕組み。生成（本文からの問い、キーの修正案）を担うスキル（仮称 `tune-index`）。`kb eval smoke` はスモークにとどめ、第二の検索器に育てない。
+- **利用側の RAG アプリ**: 回答生成と回答の質の評価（kb-retrieval-core の規定どおり）。
+
+**判断の改訂。**
+
+- **取り下げる: (g)（`kb eval smoke` の別名の重みづけ）。** 本番の検索器では実装済みで、スモークを強くしても利用者の検索は良くならない。再開条件は、`kb eval smoke` の偽陽性・偽陰性が運用上の問題になったとき。
+- **移す: (h)(i)(j) は kb-retrieval-core の範囲。** (j) のうち紛らわしい相手の明示は、同パッケージの Issue #18 とする。
+- **維持する: (b)(d)(f)(k)(m)。** キーの台帳がどこにあるべきかは、kb-retrieval-core の不変条件からも支持される。LLM が生成したキーは再生成できないので、同パッケージの「再生成可能な派生物」である索引には置けず、KB の正本データとしてハーネスが検査し、交換形式に載せるしかない。kb-retrieval-core がそれを読むには、入力契約への追加（重みつきの entity フィールドとして扱うか）が要る。
+- **未決事項の「relations をたどる検索をハーネスが持つか」は、持たないで決着した。** kb-retrieval-core の `--expand-graph` が担う。
+
+**未決事項への追加。**
+
+- キーの台帳を kb-retrieval-core に渡す交換形式（graph.json のノードに載せるか、別ファイルか）と、その入力契約の変更をどちらのパッケージの変更として先に起こすか。
+- `references.yml` の `year` の型をハーネスが制約するか（kb-retrieval-core の Issue #17 と揃える）。
+
 ## 参照
 
 - Lee ほか, "Self-Evolving Search Index", arXiv:2609.19656（2026）
@@ -101,4 +146,5 @@ omnibus-kb（be567f8、`content_root` 配下の Markdown 216 件）で、`kb eva
 - `.apm/agents/rag-tester.agent.md`、`.apm/skills/expand-kb/SKILL.md`
 - [設定リファレンス](../configuration.md#evalsrag-evalyml任意) の `evals/rag-eval.yml` 節
 - [軽量オントロジーのメモ](keiryo-ontology-memo.md)（推移律と 2 段の `part-of`）
+- kb-retrieval-core の `docs/ARCHITECTURE.md`、`docs/ISSUES.md` の Issue #16〜#18（5fe691b 時点、Issue は b14f815）
 - omnibus-kb の `knowledge/works/self-index.md`、`knowledge/concepts/retrieval-augmented-generation.md`

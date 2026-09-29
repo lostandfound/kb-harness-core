@@ -14,9 +14,9 @@
 - [ ] evidence-reviewer が「`lineage` の付与を提案」した後、それを `references.yml` に反映する担い手と手順を決める。既存エントリへの `lineage` 追記は `kb reference create` の範囲外で、今は手編集しかない。（出所: 2026-09-27 ディスカッション）
 - [ ] 導入先の `references.yml` が数千件に達したときの分割方針を決める。現状は単一ファイル前提（`kb reference create` の追記、`validation.reference.unreferenced`）で、`kb reference show / search` により文脈消費の問題は解消済みなので急がない。（出所: 2026-09-27 ディスカッション）
 
-- [ ] `kb eval smoke` の字面検索で `aliases` を title と同じく重みづけし、別名が検索キーとして効くようにする。omnibus-kb の別名の問いで 357/517 → 515/517。`description` を含めるかは固定セットで測ってから決める。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md)）
 - [ ] relations（`created-by` / `part-of` など）から、正解の根拠が決まる構造の問いを機械的に作るコマンドを足し、導入先が `evals/rag-eval.yml` の固定セットを作る足がかりにする。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md)）
-- [ ] 検索用キーの台帳、差し替え可能な検索器、紛らわしい相手を返す診断、一時 KB での検証ゲート、生成を担うスキル（仮称 `tune-index`）からなる RAG の自己改善の周回を設計・実装する。上の 2 項目の後に着手する。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md)）
+- [ ] 検索用キーの台帳（検査と交換形式への出力）と、生成を担うスキル（仮称 `tune-index`）からなる RAG の自己改善のハーネス側を設計・実装する。検索・評価・紛らわしい相手の診断は kb-retrieval-core の責務（同 Issue #18）で、ハーネスには置かない。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)）
+- [ ] `references.yml` の `year` の型を制約するか決める。ハーネスは引用符つきの年を通すが、kb-retrieval-core は整数以外を拒否する（同 Issue #17。omnibus-kb の 494 件中 46 件が該当）。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)）
 
 ## 全体レビュー（2026-09-27、main @ ce52d66）の残作業
 
@@ -52,4 +52,4 @@ High 7 件は #30（コミット 996f433）で、R1〜R7 は claude/sharp-pasteu
 - [述語の階層](docs/notes/jutsugo-kaisou-memo.md#未決事項) — 標準述語の改版規則。層 2 の追加条件。既存述語の移行支援。CURIE 展開表の置き場。対称な関係
 - [関係をあとから見出す](docs/notes/kankei-hakken-memo.md#未決事項) — ハブ Concept を立てる閾値。出典由来 / 解釈由来の明示を規約に載せるか
 - [出典 URL の到達確認](docs/notes/url-kakunin-memo.md#未決事項) — 一時的な失敗を ERROR にするか。実行環境に依存する 403 をどこまで吸収するか
-- [RAG の自己改善](docs/notes/rag-jiko-kaizen-memo.md#未決事項) — relations をたどる検索をハーネスが持つか。キーの台帳のスキーマ。`description` を重みづけに含めるか。周回の停止条件と費用。固定セットの作り手
+- [RAG の自己改善](docs/notes/rag-jiko-kaizen-memo.md#未決事項) — キーの台帳のスキーマと kb-retrieval-core への交換形式。`description` を重みづけに含めるか。周回の停止条件と費用。固定セットの作り手（再考の節の追加分を含む）
