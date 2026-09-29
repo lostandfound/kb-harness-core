@@ -118,25 +118,25 @@ omnibus-kb（be567f8、`content_root` 配下の Markdown 216 件）で、`kb eva
 
 グラフ展開は relations の先にある答えに効き、別名の問いはわずかに下がる。展開を既定で無効にし、問いの種類で選ぶという kb-retrieval-core の設計と整合する。
 
-**互換性の欠け。** この測定は、omnibus-kb をそのまま読み込めなかったため、一時的に直したコピーで行った。(1) ハーネスは契約どおり graph.json に `views`（有効時）と `predicates`（`broader` / `maps_to` があるとき）を出すが、kb-retrieval-core のローダーは nodes / edges / claims 以外のトップレベルを拒否する。(2) ハーネスは `references.yml` の `year` の型を制約せず、omnibus-kb の 494 件中 46 件が引用符つきの年だが、kb-retrieval-core は整数以外を拒否する。いずれも kb-retrieval-core の `docs/ISSUES.md` に Issue #16・#17 として記録した。
+**互換性の欠け。** この測定は、omnibus-kb をそのまま読み込めなかったため、一時的に直したコピーで行った。(1) ハーネスは契約どおり graph.json に `views`（有効時）と `predicates`（`broader` / `maps_to` があるとき）を出すが、kb-retrieval-core のローダーは nodes / edges / claims 以外のトップレベルを拒否する。(2) ハーネスは `references.yml` の `year` の型を制約せず、omnibus-kb の 494 件中 46 件が引用符つきの年だが、kb-retrieval-core は整数以外を拒否する。いずれも kb-retrieval-core の `docs/ISSUES.md` に Issue #17・#18 として記録した。
 
 **改めた分担。**
 
-- **kb-retrieval-core**: 検索・重みづけ・グラフ展開・評価・前後比較。自己改善のために足すのは、失敗した問いで根拠より上に来た「紛らわしい相手」を評価レポートに出すこと（Issue #18、範囲は未確定）。
+- **kb-retrieval-core**: 検索・重みづけ・グラフ展開・評価・前後比較。自己改善のために足すのは、失敗した問いで根拠より上に来た「紛らわしい相手」を評価レポートに出すこと（Issue #19、範囲は未確定）。
 - **ハーネス**: 生成したキーを KB のデータとしてコミットする場合の台帳の検査と、graph.json など公開の交換形式への出力。relations から評価の問いの候補を作る仕組み。生成（本文からの問い、キーの修正案）を担うスキル（仮称 `tune-index`）。`kb eval smoke` はスモークにとどめ、第二の検索器に育てない。
 - **利用側の RAG アプリ**: 回答生成と回答の質の評価（kb-retrieval-core の規定どおり）。
 
 **判断の改訂。**
 
 - **取り下げる: (g)（`kb eval smoke` の別名の重みづけ）。** 本番の検索器では実装済みで、スモークを強くしても利用者の検索は良くならない。再開条件は、`kb eval smoke` の偽陽性・偽陰性が運用上の問題になったとき。
-- **移す: (h)(i)(j) は kb-retrieval-core の範囲。** (j) のうち紛らわしい相手の明示は、同パッケージの Issue #18 とする。
+- **移す: (h)(i)(j) は kb-retrieval-core の範囲。** (j) のうち紛らわしい相手の明示は、同パッケージの Issue #19 とする。
 - **維持する: (b)(d)(f)(k)(m)。** キーの台帳がどこにあるべきかは、kb-retrieval-core の不変条件からも支持される。LLM が生成したキーは再生成できないので、同パッケージの「再生成可能な派生物」である索引には置けず、KB の正本データとしてハーネスが検査し、交換形式に載せるしかない。kb-retrieval-core がそれを読むには、入力契約への追加（重みつきの entity フィールドとして扱うか）が要る。
 - **未決事項の「relations をたどる検索をハーネスが持つか」は、持たないで決着した。** kb-retrieval-core の `--expand-graph` が担う。
 
 **未決事項への追加。**
 
 - キーの台帳を kb-retrieval-core に渡す交換形式（graph.json のノードに載せるか、別ファイルか）と、その入力契約の変更をどちらのパッケージの変更として先に起こすか。
-- `references.yml` の `year` の型をハーネスが制約するか（kb-retrieval-core の Issue #17 と揃える）。
+- ~~`references.yml` の `year` の型をハーネスが制約するか~~ → 制約しないで決着。kb-retrieval-core が数字だけの文字列を整数として受けるよう直した（同 Issue #18、523a2d2）。
 
 ## 参照
 
@@ -146,5 +146,5 @@ omnibus-kb（be567f8、`content_root` 配下の Markdown 216 件）で、`kb eva
 - `.apm/agents/rag-tester.agent.md`、`.apm/skills/expand-kb/SKILL.md`
 - [設定リファレンス](../configuration.md#evalsrag-evalyml任意) の `evals/rag-eval.yml` 節
 - [軽量オントロジーのメモ](keiryo-ontology-memo.md)（推移律と 2 段の `part-of`）
-- kb-retrieval-core の `docs/ARCHITECTURE.md`、`docs/ISSUES.md` の Issue #16〜#18（5fe691b 時点、Issue は b14f815）
+- kb-retrieval-core の `docs/ARCHITECTURE.md`、`docs/ISSUES.md` の Issue #17〜#19（5fe691b 時点。Issue は b14f815 で #16〜#18 として記録し、523a2d2 で既存の #16 との重複を避けて付け直した）
 - omnibus-kb の `knowledge/works/self-index.md`、`knowledge/concepts/retrieval-augmented-generation.md`
