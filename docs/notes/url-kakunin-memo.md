@@ -110,6 +110,12 @@ KB 全体の ERROR は 12 件になった。tower.jp と greensnap.jp の誤判�
 
 - `scripts/validate.py` には `--for` / `--ref` を足さなかった。導入先のスキルはすべて `kb validate` を呼んでおり、互換入口に同じオプションを増やす利用者がいない。HEAD 404 の再確認と並列化は共通の `check_urls()` にあるので、`scripts/validate.py --check-urls` にも効く。
 
+2026-09-29 に再考の判断どおり (j) を実装した（コミット d6351a6）。
+
+- `_url_reachable()` が HEAD の `HTTPError` をすべて GET の再確認に回す。`URLError`（接続失敗）やタイムアウトは再確認しない。
+- `tests/test_validation_gaps.py` の「HEAD が 500 なら GET にフォールバックせず到達不能」を、「両方 500 なら到達不能」「HEAD にだけ 500 なら到達可能」「接続失敗なら GET を送らない」の 3 件に置き換えた。
+- tommy-farm の `https://www.e-taneya.com/item/002796` が到達可能と判定されることを確かめた。当初の判断から変えた点はない。
+
 ## 参照
 
 - `src/kb_harness/validation.py` の `check_urls()` / `_url_reachable()`（37390cc 時点）

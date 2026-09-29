@@ -18,7 +18,7 @@
 - [ ] 検索用キーの台帳（検査と交換形式への出力）と、生成を担うスキル（仮称 `tune-index`）からなる RAG の自己改善のハーネス側を設計・実装する。検索・評価・紛らわしい相手の診断は kb-retrieval-core の責務（同 Issue #19）で、ハーネスには置かない。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)）
 - [x] `references.yml` の `year` の型を制約するか決める。ハーネスは引用符つきの年を通すが、kb-retrieval-core は整数以外を拒否する（同 Issue #18。omnibus-kb の 494 件中 46 件が該当）。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)） → ハーネスは制約しない。kb-retrieval-core が数字だけの文字列を整数として受けるよう直した（kb-retrieval-core 523a2d2）。
 - [x] 導入先の懸念台帳を `concerns.root` 配下の 1 件 1 YAML にし、実在するエンティティか出典 ID を必須の対象として `kb validate` で検査する。一覧は `kb sync` が生成する。CONCERNS と BACKLOG の役割を定義し直し、目的外の記録を促すスキルの記述を直す。（出所: 2026-09-29 ディスカッション。[考察メモ](docs/notes/kenen-daichou-memo.md#実装の記録)。コミット: 8b44f31）
-- [ ] `--check-urls` で、HEAD が HTTP のエラー応答を返したら状態コードを問わず GET で確かめ直す。HEAD に 500 を返し GET には 200 を返すサイト（e-種や）を到達不能と誤判定していた。（出所: 2026-09-29 tommy-farm。[考察メモ](docs/notes/url-kakunin-memo.md#再考2026-09-29-head-の-5xx)）
+- [x] `--check-urls` で、HEAD が HTTP のエラー応答を返したら状態コードを問わず GET で確かめ直す。HEAD に 500 を返し GET には 200 を返すサイト（e-種や）を到達不能と誤判定していた。（出所: 2026-09-29 tommy-farm。[考察メモ](docs/notes/url-kakunin-memo.md#再考2026-09-29-head-の-5xx)。コミット: d6351a6）
 
 ## 全体レビュー（2026-09-27、main @ ce52d66）の残作業
 
