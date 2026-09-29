@@ -84,10 +84,10 @@ omnibus-kb の `docs/CONCERNS.md`（2026-09-29 時点、22 件）を `scripts/co
 - 当初の判断から変えた点: 「状態ごとに必須の欄」に加え、その欄を他の状態で書くことも ERROR にした。`resolved` から `open` に戻したときに古い `resolution` が残ると、一覧が「対応済み」と読めてしまうためである。
 - 当初の判断から変えた点: 「`Index` 型は対象にできない」は、一覧（`index.md`）がそもそもエンティティとして読まれないため、「存在しない」の ERROR で表れる。専用の検査は置かなかった。
 - スキルは audit-harness / expand-kb / explore-kb / ndl-digicolle / review-entity-model の記述を改めた。review-entity-model の分類 `CONCERNS に送る` は `保留（判断材料が足りない）` に替えた。
+- 追補: 最初の実装では evidence-reviewer と add-entity が台帳に触れていなかった（evidence-reviewer は説明文で「懸念台帳の確認に使用」とうたうだけだった）。evidence-reviewer は対象の既存の懸念を `kb concern list --for` で読み、確度 C / D のうち本文の修正で解消しないものを懸念の YAML 案として報告するようにした。ファイルは書かせず、反映は依頼元が行う（報告に徹するレビュアーの役割を保つ）。add-entity は、執筆時に残った食い違いや値の選択を、作成したエンティティを対象とする懸念として書くようにした。これで未決事項に置いていた「evidence-reviewer への組み込み」は決着した。
 - omnibus-kb の写しで確かめた。`concerns.root` を足すと `docs/CONCERNS.md` について WARNING が出た。対象の無い懸念（`OLAP キューブを追加する`）は `targets` 必須の ERROR で拒まれた。Paxos と グッドイヤーウェルトの 2 件を移すと、`kb validate` と `kb sync --check` が通った。omnibus-kb の 22 件の移行は、ハーネスのリリース後に導入先で行う。
 
 ## 未決事項
 
 - **Claim との関係。** `kind: conflict` は Claim の `disputed` と重なって見える。Claim は主張そのもの、懸念は根拠の状態についての注記で層が違うと見て別に置いたが、同じ食い違いを両方に書く運用が生まれたら整理が要る。
-- **evidence-reviewer への組み込み。** 入口として `kb concern list --for ENTITY` を実装した。レビュー時に対象エンティティの懸念を読ませ、新しく見つけた食い違いを懸念として提案させる手順を足すかどうかは未決である。
 - **GitHub Issues との関係。** 懸念は Issues に出さない（本文と同じコミットで更新されるべき）。Issues と重なりうるのは BACKLOG の未着手のうち外から来る要望だけで、その同期ツールは別の論点として残す。

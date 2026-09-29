@@ -54,5 +54,5 @@ High 7 件は #30（コミット 996f433）で、R1〜R7 は claude/sharp-pasteu
 - [述語の階層](docs/notes/jutsugo-kaisou-memo.md#未決事項) — 標準述語の改版規則。層 2 の追加条件。既存述語の移行支援。CURIE 展開表の置き場。対称な関係
 - [関係をあとから見出す](docs/notes/kankei-hakken-memo.md#未決事項) — ハブ Concept を立てる閾値。出典由来 / 解釈由来の明示を規約に載せるか
 - [出典 URL の到達確認](docs/notes/url-kakunin-memo.md#未決事項) — 一時的な失敗を ERROR にするか。実行環境に依存する 403 をどこまで吸収するか
-- [懸念台帳の構造化](docs/notes/kenen-daichou-memo.md#未決事項) — Claim の `disputed` との関係。evidence-reviewer への組み込み。GitHub Issues との関係
+- [懸念台帳の構造化](docs/notes/kenen-daichou-memo.md#未決事項) — Claim の `disputed` との関係。GitHub Issues との関係
 - [RAG の自己改善](docs/notes/rag-jiko-kaizen-memo.md#未決事項) — キーの台帳のスキーマと kb-retrieval-core への交換形式。`description` を重みづけに含めるか。周回の停止条件と費用。固定セットの作り手（再考の節の追加分を含む）

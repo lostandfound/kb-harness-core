@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-スキル（audit-harness / expand-kb / explore-kb / ndl-digicolle / review-entity-model）の懸念台帳の扱いを改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
+スキル（add-entity / audit-harness / expand-kb / explore-kb / ndl-digicolle / review-entity-model）とエージェント（evidence-reviewer）の懸念台帳の扱いを改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
 
 ### Added
 
@@ -15,6 +15,7 @@
 - `scripts/concerns_summary.py` が、`concerns.root` のある KB では構造化した台帳を集計する。`--ledger` を渡すか `concerns.root` が無ければ従来どおり Markdown の台帳を集計する
 - 導入ガイドの運用ファイルの定義を改めた。懸念台帳は KB の知識の確からしさの台帳、`docs/BACKLOG.md` は KB を作る作業の予定と記録で、行を移し合わない。旧来の `docs/CONCERNS.md` の雛形を外し、移行の手順を載せた
 - スキルが懸念台帳へ目的外の記録をしないようにした。audit-harness はハーネス文書の不整合を監査結果で報告するだけにし、review-entity-model は型・境界の判断を懸念に送らず保留として報告し、expand-kb は対象を特定できる出典・内容の懸念だけを懸念にする
+- evidence-reviewer が対象の既存の懸念を `kb concern list --for` で読み、確度 C / D のうち本文の修正で解消しないものを懸念の YAML 案として報告する。add-entity は執筆時に残った食い違いや値の選択を、作成したエンティティを対象とする懸念として書く
 - `kb sync` / `kb index` などの生成が、壊れた懸念 YAML を内部エラーにせず `concern.*` の診断として終了コード 1 で返す
 
 ## 0.10.0 — 2026-09-28
