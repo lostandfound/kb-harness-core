@@ -29,7 +29,7 @@
 
 ### `kb validate [--check-urls [--for ENTITY]... [--ref ID]...]`
 
-KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml`・述語の階層（`vocabulary.yml` の `broader` / `maps_to`、[設定リファレンス](configuration.md#述語の階層と標準対応)）を対象とする。ERROR にならない指摘は `warnings` に入れる。text では `<SEVERITY> <message>` の形で stderr に、json では `diagnostics` と同じ構造の `{severity, code, message}` の配列で返す（`severity` は `warning` か `info`、`message` は text と同じ文字列）。コードは `validation.description.same_as_title` / `validation.description.long` / `validation.reference.unreferenced` / `validation.reference.pending_referenced` / `validation.reference.pending_unreferenced`（info）/ `validation.relation.refinable` / `validation.relation.unclassified`（info）/ `validation.link.root_relative` / `validation.url.doi_registry_unreachable`（`--check-urls` のときだけ）。本文リンクはリンク元ファイルからの相対パスで解決し、存在しないリンク先を ERROR にする（[設定リファレンス](configuration.md#本文リンク)）。旧形式のルート相対リンク（`/people/example.md`）は解決するが、件数をまとめて `validation.link.root_relative` の WARNING で示す。`related-to` のエッジは未分類として件数を INFO で報告し、始点と終点の型が層 1 のちょうど 1 つの述語に収まるものは精緻化の余地として WARNING を出す。`kb-domain.yml` に `views.root` があればビュー定義も検査する（[設定リファレンス](configuration.md#ビュー任意)）。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。 `--check-urls` を付けると、エンティティの `sources` と `references.yml` の出典に到達できるかも確認する。ネットワークに依存するため既定では行わない。確かめ方は出典の種類で分かれる。
+KB 全体を検証する。frontmatter・リンク・relations の型制約・タグ語彙・出典参照・Claim・`evals/rag-eval.yml`・述語の階層（`vocabulary.yml` の `broader` / `maps_to`、[設定リファレンス](configuration.md#述語の階層と標準対応)）を対象とする。ERROR にならない指摘は `warnings` に入れる。text では `<SEVERITY> <message>` の形で stderr に、json では `diagnostics` と同じ構造の `{severity, code, message}` の配列で返す（`severity` は `warning` か `info`、`message` は text と同じ文字列）。コードは `validation.description.same_as_title` / `validation.description.long` / `validation.reference.unreferenced` / `validation.reference.pending_referenced` / `validation.reference.pending_unreferenced`（info）/ `validation.relation.refinable` / `validation.relation.unclassified`（info）/ `validation.link.root_relative` / `concern.legacy_ledger` / `validation.url.doi_registry_unreachable`（`--check-urls` のときだけ）。本文リンクはリンク元ファイルからの相対パスで解決し、存在しないリンク先を ERROR にする（[設定リファレンス](configuration.md#本文リンク)）。旧形式のルート相対リンク（`/people/example.md`）は解決するが、件数をまとめて `validation.link.root_relative` の WARNING で示す。`related-to` のエッジは未分類として件数を INFO で報告し、始点と終点の型が層 1 のちょうど 1 つの述語に収まるものは精緻化の余地として WARNING を出す。`kb-domain.yml` に `views.root` があればビュー定義も、`concerns.root` があれば懸念の定義も検査する（[設定リファレンス](configuration.md#ビュー任意)、[懸念台帳](configuration.md#懸念台帳任意)）。`concerns.root` があるのに旧来の `docs/CONCERNS.md` が残っていれば `concern.legacy_ledger` の WARNING を出す。`kb-domain.yml` に `validate.extra_checks` があれば本体の検証後に順に実行し、失敗を ERROR として集約する（[設定リファレンス](configuration.md#kb-domainyml)）。 `--check-urls` を付けると、エンティティの `sources` と `references.yml` の出典に到達できるかも確認する。ネットワークに依存するため既定では行わない。確かめ方は出典の種類で分かれる。
 
 - DOI（`references.yml` の `doi`、および `doi.org` / `www.doi.org` / `dx.doi.org` の URL）は出版社のページへ辿らず、DOI レジストリ（`https://doi.org/api/handles/<doi>`）で登録の有無だけを確かめる。出版社のボット遮断で登録済みの DOI が失敗扱いになるのを避けるためである。レジストリが未登録と答えたものは `DOI unregistered` の ERROR にする。レジストリに届かなかったもの（ネットワーク障害・タイムアウト・429 や 5xx）は登録の有無が分からないため ERROR にせず、`validation.url.doi_registry_unreachable` の WARNING にする。
 - `references.yml` のエントリが `doi` と `url` の両方を持つときは `doi` だけを確かめ、`url` には HTTP でアクセスしない。
@@ -81,7 +81,7 @@ kb flashcards --port 8123 --open
 
 ### `kb sync` / `kb sync --check`
 
-index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。`index.by_tag` が有効ならタグ別一覧の陳腐化も `--check` で検出する。`views.root` が設定されていればビュー一覧（`views.index`）も生成し、陳腐化を `views.stale` として検出する。
+index と graph をまとめて生成・同期確認する。`--dry-run` に対応する。`index.by_tag` が有効ならタグ別一覧の陳腐化も `--check` で検出する。`views.root` が設定されていればビュー一覧（`views.index`）も生成し、陳腐化を `views.stale` として検出する。`concerns.root` が設定されていれば懸念一覧（`concerns.index`）も生成し、陳腐化を `concerns.stale` として検出する。ビュー・懸念の定義の形式不備は内部エラーにせず、`view.*` / `concern.*` の診断として終了コード 1 で返す。
 
 ## 移行
 
@@ -120,6 +120,10 @@ Claim の `status` を明示的に遷移させる。許容される遷移は `kb
 ### `kb view list` / `kb view resolve VIEW_ID` / `kb view validate`
 
 エンティティ本文の外に置いたビュー（[設定リファレンス](configuration.md#ビュー任意)）の一覧・解決・検証。`list` は各ビューの `kind` / `basis` と解決後のメンバー数を、`resolve` は指定したビュー（ファイル名の stem）のメンバーを `path` / `title` / `note` で返す。`query` ビューの `where.relation.predicate` に親の述語を書くと、`broader` で吊るした子孫の述語のエッジも一致とみなす。`views.root` が未設定なら `view.disabled` で終了コード 2。ビューの作成は YAML を手で書く（雛形生成コマンドは持たない）。
+
+### `kb concern list [--for TARGET] [--status STATUS] [--actionable]` / `kb concern summary` / `kb concern validate`
+
+懸念台帳（[設定リファレンス](configuration.md#懸念台帳任意)）の一覧・集計・検証。`list` は懸念を ID 順に `id` / `status` / `kind` / `targets` / `summary` で返し、条件は AND で絞る。`--for` はエンティティ（`content_root` 内のファイルパス、または `targets` と同じ `/dir/file.md` の表記）か `ref: <id>` を受け、それを対象に含む懸念だけを返す。`/dir/file.md` の表記は、エンティティが消えていても受ける（宙に浮いた懸念を引くため）。どちらにも当たらない値は `concern.arguments` で終了コード 1。`--actionable` は着手できる懸念（`open` / `investigating`）だけを返す。`summary` は状態別・種別の件数と着手可能な件数を返す。`validate` は `kb validate` のうち懸念の検査だけを行う。`concerns.root` が未設定なら `concern.disabled` で終了コード 2。懸念の作成は YAML を手で書く（雛形生成コマンドは持たない）。
 
 ### `kb reference health`
 

@@ -112,46 +112,33 @@ pre-commit が閉じるのはコミットするときだけなので、コミッ
 
 ## 8. 運用ファイルを置く（任意）
 
-`docs/CONCERNS.md`（懸念台帳）と `docs/BACKLOG.md`（拡張バックログ）は、README の推奨構成に載せている任意の運用ファイルである。ハーネスはこれらを自動生成しない。`explore-kb` `expand-kb` スキルは既存ファイルにだけ追記し、依頼がなければ新設しないため、使う場合は導入時に手で置く。存在しなくても `kb validate` は失敗しない。
+導入先の運用ファイルは二つあり、役割が違う。どちらも任意で、無くても `kb validate` は失敗しない。
 
-両ファイルの役割分担は次のとおり。
+- **懸念台帳（`concerns/`）**: KB の知識の確からしさの台帳。出典どうしの食い違い、出典の弱さ、孫引き、出典の取得不能、値や系統を選んだ判断の根拠を、対象のエンティティか出典に結びつけて 1 件 1 YAML で置く。行が表すのは「やること」ではなく知識の状態で、決着しない（両論併記で記述側は完了）ことも正常な終わり方である。本文と同じコミットで更新する。
+- **BACKLOG（`docs/BACKLOG.md`）**: KB を作る作業の予定と記録。未着手の行が予定、`[x]` の行が経緯つきの作業ログになる。収録タスク、RAG 評価の欠落、探索候補、運用タスク（ハーネスの版上げなど）を置く。
 
-- **CONCERNS.md**: 未整理の懸念や違和感の受信箱。出典間の食い違い、根拠不足で本文に書けない事項を 1 行ずつ置く。`scripts/concerns_summary.py` が状態別に集計する。
-- **BACKLOG.md**: 実施すると判断した将来作業の正本。CONCERNS からの移動、RAG 評価の欠落、探索候補を受け、実装と検証が完了したら `[x]` にする。
+二つは参照し合うが、行を移し合わない。懸念が作業を生んだら、BACKLOG の行は出所に懸念 ID を書くだけにし、懸念は作業の結果に応じて状態を改める。どちらにも入らないもの（ハーネス自身の問題）はハーネスへ報告する。型やエンティティ境界の判断は `review-entity-model` の出力であり、懸念台帳には入らない。
 
-### `docs/CONCERNS.md` の雛形
+### 懸念台帳を有効にする
 
-`concerns_summary.py` はチェックボックス行（`- [ ]` / `- [x]`）を懸念として拾い、行末の `status: <状態>` で分類する。`status` を省いた行は未分類として着手可能側に現れる。書式の例を本文中に書くときは、行頭から `- [ ]` を書かない（字下げやコードブロック外の文に変える）。
+`kb-domain.yml` に `concerns.root` を書き、そのディレクトリを作る。フィールドと検査の契約は [設定リファレンス](configuration.md#懸念台帳任意) が正本である。
 
-````markdown
-# 懸念台帳
-
-レビュー指摘・執筆時の懸念・保留判断のうち、コンテンツの信頼性に関わるものを記録する。
-解決したら `[x]` にして対応コミットを付記する。着手を決めたものは [BACKLOG.md](BACKLOG.md) へ移す。
-
-形式: `<対象ファイル>: <懸念内容>。出所: <レビュー/執筆者/ユーザー>。対応方針: <方針>。status: <状態>`
-
-`status` は行末に置く。集計と抽出:
-
-```bash
-python3 apm_modules/lostandfound/kb-harness-core/scripts/concerns_summary.py
-python3 apm_modules/lostandfound/kb-harness-core/scripts/concerns_summary.py --actionable
+```yaml
+concerns:
+  root: concerns
 ```
 
-- `open` … 着手できる。調査の手立てがある
-- `investigating` … 調査中
-- `blocked-source` … 一次資料の入手待ちで着手できない。何を入手すれば動くかを対応方針に書く
-- `settled-hedged` … 史料的に決着しないが、両論併記・ヘッジで記述側は完了している。新資料が出るまで動かさない
-- `suspended` … 打ち切り。再開条件を対応方針に明記する
-- `resolved` … 解決（`[x]` と併記する）
+懸念は YAML を手で書き、`kb validate` で検査し、`kb sync` で一覧（既定 `concerns/index.md`）を生成する。着手できる懸念は `kb concern list --actionable`、あるエンティティの懸念は `kb concern list --for <entity>` で引く。`scripts/concerns_summary.py` は `concerns.root` があれば同じ台帳を集計する。
 
-`settled-hedged` と `suspended` は「もう手を入れない」宣言であり、誤って付けると懸念が沈む。
-資料が出れば動く見込みがあるものには使わない。
+### 旧来の `docs/CONCERNS.md` から移す
 
-## 未解決
+これまでの雛形は、Markdown の 1 行 1 懸念（`- [ ] <対象>: <内容> status: <状態>`）だった。この形式は対象の実在も種別も検査されず、作業や違和感も入り込んだため、構造化した台帳に置き換えた。`concerns.root` を設定した KB に `docs/CONCERNS.md` が残っていると `kb validate` が `concern.legacy_ledger` の WARNING を出す。
 
-## 解決済み
-````
+各行を次のように移し、移し終えたら `docs/CONCERNS.md` を消す。旧形式は種別を持たず対象欄の解釈も要るので、移行コマンドは用意していない。
+
+- 対象欄の slug を `/dir/file.md` に、`references.yml` の行は本文中の出典 ID を `ref: <id>` にして `targets` に並べる。「〜ほか 5 件」のような書き方は列挙し直す。
+- 内容から `kind` を選ぶ。どれにも当たらない行（作業の予定、型・境界の判断、ハーネスの問題）は懸念ではないので、BACKLOG か `review-entity-model` の出力、またはハーネスへの報告へ回す。
+- `status` はそのまま使える。`[x]` の行は `resolved` にし、対応を `resolution` に書く。`blocked-source` は `awaiting`、`suspended` は `resume_when`、`settled-hedged` は `resolution` を書く。
 
 ### `docs/BACKLOG.md` の雛形
 
@@ -160,10 +147,10 @@ python3 apm_modules/lostandfound/kb-harness-core/scripts/concerns_summary.py --a
 ````markdown
 # 拡張バックログ
 
-実施すると判断した将来作業の正本。上から優先。着手中という中間状態は書かず、実装と検証が完了した後に `[x]` へ変更する。
-未整理の疑問は [CONCERNS.md](CONCERNS.md) に置き、対応方針が決まったものだけをここへ移す。
+KB を作る作業の予定と記録。上から優先。着手中という中間状態は書かず、実装と検証が完了した後に `[x]` へ変更し、経緯とコミットを付記する。
+出典や内容の懸念はここではなく懸念台帳（`concerns/`）に置く。懸念から生まれた作業は、出所に懸念 ID を書く。
 
-形式: `- [ ] <slug> (<type>): <一行説明>。relations 案: <述語 → パス>。根拠: <言及済み未収録 / RAG 欠落 / カテゴリバランス など>（コミット: <hash>）`
+形式: `- [ ] <slug> (<type>): <一行説明>。relations 案: <述語 → パス>。根拠: <言及済み未収録 / RAG 欠落 / カテゴリバランス / 懸念 <id> など>（コミット: <hash>）`
 
 ## 収録タスク
 

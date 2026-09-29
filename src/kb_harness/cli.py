@@ -13,6 +13,16 @@ from typing import Any
 
 import yaml
 
+from .concerns import (
+    STATUSES as CONCERN_STATUSES,
+    ConcernError,
+    concern_record,
+    legacy_ledger_warnings,
+    load_concerns,
+    select_concerns,
+    summarize as summarize_concerns,
+    validate_concerns,
+)
 from .diagnostics import HarnessError
 from .doctor import diagnose
 from .evaluation import smoke_result, summary_result
@@ -134,6 +144,15 @@ def _parser() -> argparse.ArgumentParser:
     resolve_parser.add_argument("view_id")
     _add_common_options(resolve_parser)
     _add_common_options(view_commands.add_parser("validate", help="validate view definitions"))
+    concern_parser = subcommands.add_parser("concern", help="inspect the concern ledger (source and content concerns)")
+    concern_commands = concern_parser.add_subparsers(dest="concern_command", required=True)
+    concern_list = concern_commands.add_parser("list", help="list concerns, optionally filtered")
+    concern_list.add_argument("--for", dest="target", default=None, metavar="TARGET", help="only concerns about this entity (/dir/file.md or a file path) or reference (ref: <id>)")
+    concern_list.add_argument("--status", default=None, choices=CONCERN_STATUSES)
+    concern_list.add_argument("--actionable", action="store_true", help="only concerns that can be worked on now (open / investigating)")
+    _add_common_options(concern_list)
+    _add_common_options(concern_commands.add_parser("summary", help="count concerns by status and kind"))
+    _add_common_options(concern_commands.add_parser("validate", help="validate concern definitions"))
 
     doctor_parser = subcommands.add_parser("doctor", help="check project health")
     _add_common_options(doctor_parser)
@@ -310,8 +329,8 @@ def _run_derived(
             output_format=output_format,
             dry_run=dry_run,
         )
-    except ViewError as error:
-        # ビュー定義の不備は利用者が直すものなので、内部エラーではなくビューの診断として返す
+    except (ViewError, ConcernError) as error:
+        # ビュー・懸念の定義の不備は利用者が直すものなので、内部エラーではなく定義の診断として返す
         _emit(
             {"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]},
             output_format,
@@ -329,6 +348,12 @@ def _sync_stale_code(project: Project, path: str) -> str:
         try:
             if path == str(project.views_index.resolve().relative_to(project.repo_root.resolve())):
                 return "views.stale"
+        except ValueError:
+            pass
+    if project.concerns_index is not None:
+        try:
+            if path == str(project.concerns_index.resolve().relative_to(project.repo_root.resolve())):
+                return "concerns.stale"
         except ValueError:
             pass
     return "index.stale"
@@ -417,6 +442,80 @@ def _view_action(project: Project, args: Any) -> int:
         return _internal_error(error, args.format)
 
 
+def _concern_target(project: Project, raw: str) -> str:
+    """--for の値を懸念の targets の表記（`/dir/file.md` か `ref: <id>`）にそろえる。"""
+    if raw.startswith("ref:"):
+        return f"ref: {raw[len('ref:'):].strip()}"
+    path = Path(raw) if Path(raw).is_absolute() else Path.cwd() / raw
+    try:
+        return "/" + path.resolve().relative_to(project.content_root.resolve()).as_posix()
+    except ValueError:
+        pass
+    # ファイルシステム上の content_root の外を指す "/dir/file.md" は、targets と同じ
+    # content_root 相対の表記とみなす。消えたエンティティを指す懸念もこれで引ける
+    if raw.startswith("/") and raw.endswith(".md"):
+        return raw
+    raise ConcernError(f"--for must name an entity inside the content root or 'ref: <id>': {raw}", "concern.arguments")
+
+
+def _concern_action(project: Project, args: Any) -> int:
+    if project.concerns_root is None:
+        _emit(
+            {
+                "ok": False,
+                "changed": [],
+                "diagnostics": [
+                    {"code": "concern.disabled", "message": "concerns are not configured (kb-domain.yml concerns.root)"}
+                ],
+            },
+            args.format,
+            error=True,
+        )
+        return 2
+    try:
+        if args.concern_command == "validate":
+            errors = validate_concerns(project.content_root, project.concerns_root)
+            diagnostics = [{"code": "concern.error", "message": error} for error in errors]
+            _emit({"ok": not diagnostics, "changed": [], "diagnostics": diagnostics}, args.format)
+            return 1 if diagnostics else 0
+        concerns = load_concerns(project.concerns_root)
+        if args.concern_command == "summary":
+            summary = summarize_concerns(concerns)
+            if args.format == "json":
+                print(json.dumps({"ok": True, **summary}, ensure_ascii=False, sort_keys=True))
+            else:
+                print(f"total\t{summary['total']}")
+                print(f"actionable\t{summary['actionable']}")
+                for status, count in summary["by_status"].items():
+                    print(f"status:{status}\t{count}")
+                for kind, count in summary["by_kind"].items():
+                    print(f"kind:{kind}\t{count}")
+            return 0
+        target = _concern_target(project, args.target) if args.target else None
+        selected = select_concerns(concerns, target=target, status=args.status, actionable=args.actionable)
+        if args.format == "json":
+            print(
+                json.dumps(
+                    {"ok": True, "concerns": [concern_record(concern) for concern in selected]},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            )
+        else:
+            for concern in selected:
+                print(f"{concern.id}\t{concern.status}\t{concern.kind}\t{', '.join(concern.targets)}\t{concern.summary}")
+        return 0
+    except ConcernError as error:
+        _emit(
+            {"ok": False, "changed": [], "diagnostics": [{"code": error.code, "message": str(error)}]},
+            args.format,
+            error=True,
+        )
+        return 1
+    except Exception as error:
+        return _internal_error(error, args.format)
+
+
 def _validate(
     project: Project,
     output_format: str,
@@ -430,6 +529,9 @@ def _validate(
         errors = validate(project.content_root, warnings=warnings, repo_root=project.repo_root)
         if project.views_root is not None:
             errors.extend(validate_views(project.content_root, project.views_root))
+        if project.concerns_root is not None:
+            errors.extend(validate_concerns(project.content_root, project.concerns_root))
+        warnings.extend(legacy_ledger_warnings(project.repo_root, project.concerns_root))
         if urls:
             errors += check_urls(
                 project.content_root, warnings=warnings, entities=url_entities, ref_ids=url_refs
@@ -893,6 +995,8 @@ def _main(argv: Sequence[str] | None = None) -> int:
         return _claim_create(project, args) if args.claim_command == "create" else _claim_action(project, args)
     if args.command == "view":
         return _view_action(project, args)
+    if args.command == "concern":
+        return _concern_action(project, args)
 
     if args.command == "doctor":
         try:

@@ -59,11 +59,12 @@ kb sync --check                                                   # index.md や
 ├── graph.json                    # 【生成物】関連グラフ（kb sync 等で自動生成）
 ├── views/                        # 【任意】ビュー定義（kb-domain.yml の views.root で有効化）
 │   └── index.md                  # 【生成物】ビュー一覧（kb sync が生成）
+├── concerns/                     # 【任意】懸念台帳（kb-domain.yml の concerns.root で有効化）
+│   └── index.md                  # 【生成物】懸念一覧（kb sync が生成）
 ├── evals/
 │   └── rag-eval.yml              # 【任意】RAG 評価クエリ設定
 ├── docs/
-│   ├── CONCERNS.md               # 【任意】未整理の懸念や課題を記録する受信箱
-│   └── BACKLOG.md                # 【任意】着手を決定した将来タスク
+│   └── BACKLOG.md                # 【任意】KB を作る作業の予定と記録
 └── <content_root>/
     ├── vocabulary.yml            # 【必須】型・述語・タグの語彙定義
     ├── references.yml            # 【任意】文献・出典レジストリ
@@ -81,7 +82,8 @@ kb sync --check                                                   # index.md や
 - **`graph.json`**: エンティティ間の関係を記録した知識グラフファイル。`kb graph build` または `kb sync` によって自動生成される。
 - **`index.md`**: 各ディレクトリのエンティティ一覧などを記載するインデックス文書。ファイル内の管理対象セクションが `kb sync` によって自動同期される。
 - **`log.md`**: 各階層の更新履歴を記録するファイル（OKF v0.2 仕様で予約されているが、必須ではない）。
-- **`docs/CONCERNS.md` / `docs/BACKLOG.md`**: 知識の抜け漏れや運用上の課題を記録するための運用文書（任意）。ファイルが存在しなくても検証エラーにはならない。また、エンティティそのものではないため OKF バンドルには含めない。 ハーネスは自動生成しないため、使う場合は [導入ガイド](docs/integration.md#8-運用ファイルを置く任意) の雛形から手で置く。
+- **`concerns/`**: エンティティと出典の確からしさについての懸念（出典の食い違い・弱さ・孫引きなど）を 1 件 1 YAML で置く台帳（任意）。各懸念は実在するエンティティか出典を対象に持ち、`kb validate` が検査する。契約は [設定リファレンス](docs/configuration.md#懸念台帳任意)。
+- **`docs/BACKLOG.md`**: KB を作る作業の予定と記録（任意）。ファイルが存在しなくても検証エラーにはならない。エンティティそのものではないため OKF バンドルには含めない。ハーネスは自動生成しないため、使う場合は [導入ガイド](docs/integration.md#8-運用ファイルを置く任意) の雛形から手で置く。
 - **その他の `docs/` 配下**: 上記以外のファイル名や用途は、導入先が自由に定めてよい。
 
 ## 提供物
@@ -99,6 +101,7 @@ kb sync --check                                                   # index.md や
 | `kb entity create --from spec.yml` | spec ファイルからエンティティを検証付きで原子的に作成 |
 | `kb claim create\|inspect\|list\|validate\|transition` | Claim の作成・照会・一覧表示・検証・状態遷移 |
 | `kb view list\|resolve\|validate` | エンティティの外に置いたビュー（束ね・導出）の一覧・解決・検証 |
+| `kb concern list\|summary\|validate` | 懸念台帳（エンティティと出典の確からしさの注記）の一覧・集計・検証 |
 | `kb reference health\|spec\|create\|show\|search` | `references.yml` の点検・登録 spec への変換・原子的追加・ID / エンティティ単位の照会・語句 / URL / DOI 検索 |
 | `kb eval summary\|smoke` | RAG 評価履歴の集計および検索可能性の回帰確認 |
 | `kb okf validate` / `kb export okf` | OKF v0.2 バンドルの検証およびエクスポート |

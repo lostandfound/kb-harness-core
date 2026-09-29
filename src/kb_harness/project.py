@@ -40,6 +40,9 @@ class Project:
     # views_root はビュー定義 YAML を置くディレクトリ、views_index は kb sync が生成する一覧。
     views_root: Path | None = None
     views_index: Path | None = None
+    # kb-domain.yml の任意セクション concerns:。未指定なら無効。置き方の制約は views と同じ。
+    concerns_root: Path | None = None
+    concerns_index: Path | None = None
 
     @classmethod
     def discover(cls, start: str | Path | None = None) -> "Project":
@@ -81,29 +84,13 @@ class Project:
             raise ProjectError(
                 f"{path}: validate.extra_checks must be a list of non-empty strings"
             )
-        views_section = data.get("views") if isinstance(data.get("views"), dict) else {}
-        views_root: Path | None = None
-        views_index: Path | None = None
-        if views_section:
-            raw_root = views_section.get("root")
-            if not isinstance(raw_root, str) or not raw_root.strip():
-                raise ProjectError(f"{path}: views.root must be a non-empty string")
-            raw_index = views_section.get("index", f"{raw_root.rstrip('/')}/index.md")
-            if not isinstance(raw_index, str) or not raw_index.strip():
-                raise ProjectError(f"{path}: views.index must be a non-empty string")
-            views_root = _contained(path, "views.root", raw_root)
-            views_index = _contained(path, "views.index", raw_index)
-            resolved_content = (path.parent / content_root).resolve()
-            for label, candidate in (("views.root", views_root), ("views.index", views_index)):
-                if candidate == resolved_content or resolved_content in candidate.parents:
-                    raise ProjectError(
-                        f"{path}: {label} must not be inside domain.content_root (views live outside entities)"
-                    )
-            reserved = {path.resolve(), (path.parent / "graph.json").resolve(), views_root}
-            if views_index in reserved or views_index.suffix != ".md":
-                raise ProjectError(
-                    f"{path}: views.index must be a .md path distinct from graph.json, kb-domain.yml and views.root"
-                )
+        resolved_content = (path.parent / content_root).resolve()
+        views_root, views_index = _generated_section(path, data, "views", resolved_content)
+        concerns_root, concerns_index = _generated_section(path, data, "concerns", resolved_content)
+        if views_root is not None and concerns_root is not None:
+            views_paths = {views_root, views_index}
+            if concerns_root in views_paths or concerns_index in views_paths:
+                raise ProjectError(f"{path}: concerns.root and concerns.index must differ from views.root and views.index")
         return cls(
             repo_root=path.parent,
             content_root=path.parent / content_root,
@@ -112,4 +99,37 @@ class Project:
             extra_checks=tuple(raw_checks),
             views_root=views_root,
             views_index=views_index,
+            concerns_root=concerns_root,
+            concerns_index=concerns_index,
         )
+
+
+def _generated_section(
+    path: Path, data: dict, section: str, resolved_content: Path
+) -> tuple[Path | None, Path | None]:
+    """views: / concerns: のように「定義 YAML の置き場 + kb sync が生成する一覧」を持つ節を解決する。
+
+    どちらも content_root の外に置く（エンティティとして検査されないように）。未指定なら (None, None)。
+    """
+    raw_section = data.get(section)
+    if not isinstance(raw_section, dict) or not raw_section:
+        return None, None
+    raw_root = raw_section.get("root")
+    if not isinstance(raw_root, str) or not raw_root.strip():
+        raise ProjectError(f"{path}: {section}.root must be a non-empty string")
+    raw_index = raw_section.get("index", f"{raw_root.rstrip('/')}/index.md")
+    if not isinstance(raw_index, str) or not raw_index.strip():
+        raise ProjectError(f"{path}: {section}.index must be a non-empty string")
+    root = _contained(path, f"{section}.root", raw_root)
+    index = _contained(path, f"{section}.index", raw_index)
+    for label, candidate in ((f"{section}.root", root), (f"{section}.index", index)):
+        if candidate == resolved_content or resolved_content in candidate.parents:
+            raise ProjectError(
+                f"{path}: {label} must not be inside domain.content_root ({section} live outside entities)"
+            )
+    reserved = {path.resolve(), (path.parent / "graph.json").resolve(), root}
+    if index in reserved or index.suffix != ".md":
+        raise ProjectError(
+            f"{path}: {section}.index must be a .md path distinct from graph.json, kb-domain.yml and {section}.root"
+        )
+    return root, index

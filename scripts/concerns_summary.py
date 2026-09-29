@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""懸念台帳（docs/CONCERNS.md）の状態別集計と、着手可能な懸念の抽出。
+"""懸念台帳の状態別集計と、着手可能な懸念の抽出。
+
+`kb-domain.yml` に `concerns.root` があれば、構造化した台帳（1 件 1 YAML）を
+`kb_harness.concerns` で読む互換入口として動く（`kb concern summary` / `list --actionable` と同じ）。
+無ければ従来どおり Markdown の台帳（docs/CONCERNS.md）を集計する。
 
 台帳は解決/未解決の 2 値しか持たず、着手できるもの、一次資料の入手待ちで
 着手できないもの、史料的に決着不能で記述側は完了しているものが混在していた。
@@ -10,6 +14,8 @@ import argparse
 import re
 import sys
 from pathlib import Path
+
+import kb_config  # noqa: F401  src/ を import 経路に足し、kb_harness を読めるようにする
 
 DEFAULT_LEDGER = "docs/CONCERNS.md"
 
@@ -88,9 +94,39 @@ def format_report(entries: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _structured_report(actionable_only: bool) -> str | None:
+    """concerns.root が設定された KB なら構造化台帳の報告を返す。未設定なら None。"""
+    from kb_harness.concerns import STATUSES as STRUCTURED_STATUSES
+    from kb_harness.concerns import load_concerns, select_concerns, summarize as summarize_structured
+    from kb_harness.project import Project, ProjectError
+
+    try:
+        project = Project.discover()
+    except ProjectError:
+        return None
+    if project.concerns_root is None:
+        return None
+    concerns = load_concerns(project.concerns_root)
+    active = select_concerns(concerns, actionable=True)
+    if actionable_only:
+        return "\n".join(
+            f"[{c.status}] {', '.join(c.targets)}: {c.summary}（{c.id}）" for c in active
+        )
+    summary = summarize_structured(concerns)
+    lines = [f"懸念 {summary['total']}件"]
+    lines += [f"  {s}: {summary['by_status'][s]}" for s in STRUCTURED_STATUSES]
+    lines += ["", f"着手可能: {len(active)}件"]
+    lines += [f"  [{c.status}] {', '.join(c.targets)}" for c in active]
+    return "\n".join(lines)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ledger", default=DEFAULT_LEDGER, help="懸念台帳のパス")
+    parser.add_argument(
+        "--ledger",
+        default=None,
+        help=f"Markdown の懸念台帳のパス（既定 {DEFAULT_LEDGER}）。渡すと concerns.root があっても Markdown を読む",
+    )
     parser.add_argument(
         "--actionable",
         action="store_true",
@@ -98,7 +134,12 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
-    path = Path(args.ledger)
+    if args.ledger is None:
+        structured = _structured_report(args.actionable)
+        if structured is not None:
+            print(structured)
+            return 0
+    path = Path(args.ledger or DEFAULT_LEDGER)
     if not path.exists():
         print(f"懸念台帳が見つからない: {path}", file=sys.stderr)
         return 2
