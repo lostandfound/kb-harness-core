@@ -150,7 +150,7 @@ python3 scripts/refs_health.py [--refs FILE] [--stale-days N] [--lineage] [--pen
 
 ### concerns_summary.py
 
-懸念台帳（Markdown）の状態別集計と、着手可能な懸念の抽出。台帳の形式は導入先が定める。雛形と状態語彙は [導入ガイド](integration.md#8-運用ファイルを置く任意) を参照。
+懸念台帳の状態別集計と、着手可能な懸念の抽出。`kb-domain.yml` に `concerns.root` があれば構造化した台帳（1 件 1 YAML、[設定リファレンス](configuration.md#懸念台帳任意)）を `kb_harness.concerns` で読む互換入口として動き、`kb concern summary` / `kb concern list --actionable` と同じ台帳を集計する。無いか `--ledger` を渡したときは、旧来の Markdown の台帳（行末の `status:` で分類）を集計する。移行の手順は [導入ガイド](integration.md#8-運用ファイルを置く任意) を参照。
 
 ```bash
 python3 scripts/concerns_summary.py [--ledger FILE] [--actionable]
@@ -158,7 +158,7 @@ python3 scripts/concerns_summary.py [--ledger FILE] [--actionable]
 
 | オプション | 内容 |
 |---|---|
-| `--ledger` | 台帳のパス |
+| `--ledger` | Markdown の台帳のパス（既定 `docs/CONCERNS.md`）。渡すと `concerns.root` があっても Markdown を読む |
 | `--actionable` | 着手可能な懸念のみを 1 行ずつ出力する |
 
 ## 補助

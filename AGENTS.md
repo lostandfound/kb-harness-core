@@ -64,7 +64,7 @@ Claim のルール（許容 status、遷移、domain/range 制約、値Claim の
 
 ## 自身の作業台帳
 
-ハーネス自身の未着手・完了・保留の一覧はルートの `BACKLOG.md` に置く。設計判断の保留は `docs/notes/` の各メモの「未決事項」節が正本で、`BACKLOG.md` は所在の一覧だけを持つ。導入先 KB 向けの `docs/BACKLOG.md` / `docs/CONCERNS.md` の規約（`docs/integration.md`）とは別物である。
+ハーネス自身の未着手・完了・保留の一覧はルートの `BACKLOG.md` に置く。設計判断の保留は `docs/notes/` の各メモの「未決事項」節が正本で、`BACKLOG.md` は所在の一覧だけを持つ。導入先 KB 向けの `docs/BACKLOG.md` と懸念台帳（`concerns.root`）の規約（`docs/integration.md`）とは別物である。
 
 ハーネスの変更は、問題・対応・判断を記録しながら進める。
 

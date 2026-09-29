@@ -33,6 +33,10 @@ index:
     cooking: 料理
     science: 科学
 
+# 任意。懸念台帳（1 件 1 YAML）を有効にする。kb validate が検査し、kb sync が一覧を生成する
+concerns:
+  root: concerns
+
 # 任意。kb validate が本体の検証後にリポジトリルートで順に実行する導入先固有チェック
 validate:
   extra_checks:
@@ -51,6 +55,8 @@ validate:
 | `index.tag_labels` | 任意 | タグ ID から見出し表示名への対応。未登録のタグは ID をそのまま見出しにする。 |
 | `views.root` | 任意 | ビュー定義 YAML を置くディレクトリ（`repo_root` 相対）。指定するとビュー機能が有効になり、`kb validate` が定義を検査し、`kb sync` / `kb graph build` がビュー一覧と `graph.json` の `views` 配列を生成する。リポジトリの内側かつ `content_root` の外でなければならず、外れる設定は読み込み時にエラーになる。契約は[ビュー](#ビュー任意)を参照。既定は無効。 |
 | `views.index` | 任意 | `kb sync` が生成するビュー一覧の出力先（`repo_root` 相対、`.md`）。既定は `<views.root>/index.md`。リポジトリの内側かつ `content_root` の外で、`graph.json` / `kb-domain.yml` / `views.root` 自身と衝突してはならない。 |
+| `concerns.root` | 任意 | 懸念 YAML を置くディレクトリ（`repo_root` 相対）。指定すると懸念台帳が有効になり、`kb validate` が定義を検査し、`kb sync` が懸念一覧を生成する。置き場所の制約は `views.root` と同じで、加えて `views.root` / `views.index` と同じパスにはできない。契約は[懸念台帳](#懸念台帳任意)を参照。既定は無効。 |
+| `concerns.index` | 任意 | `kb sync` が生成する懸念一覧の出力先（`repo_root` 相対、`.md`）。既定は `<concerns.root>/index.md`。制約は `views.index` と同じ。 |
 | `validate.extra_checks` | 任意 | シェルコマンド文字列の一覧。`kb validate` が本体の検証後にリポジトリルートを作業ディレクトリとして順に実行し、非ゼロ終了を `validation.extra_check.failed`（ERROR）として集約する。`--format json` では `extra_checks` にコマンドごとの `returncode` / `ok` / `stderr` が出る。`kb doctor` は先頭語が PATH 上に見つからないコマンドを `doctor.extra_check.unavailable`（WARNING）として報告する。YAML で `true` などは真偽値になるので引用符で囲む。 |
 
 上記以外のキーはハーネスは読まない。導入先が独自の設定を同じファイルに置いても支障はない。
@@ -372,6 +378,42 @@ where:
 - `basis: source` を書きたくなったビューは、Claim かエンティティへ昇格する候補である。ビューは出典を持たないのが原則で、`source` は昇格前の一時的な状態として許す。
 - `kb graph build` はビューを `nodes` / `edges` に混ぜず、独立した `views` 配列へ出力する（`id` / `name` / `description` / `kind` / `basis` / `where` / 解決済み `members`）。
 - `list` の `members` に Claim / Index / `graph: false` の型を書くと `kb validate` が ERROR にする。`query` の解決が対象からこれらの型をあらかじめ除くのと同じ扱いを `list` にも適用しており、`graph.json` の `views[].members` は常に `nodes` に含まれるパスだけを指す。
+
+## 懸念台帳（任意）
+
+懸念は、エンティティや出典の確からしさについての注記である。出典どうしの食い違い、出典の弱さ、孫引き、出典の取得不能、値や系統を選んだ判断の根拠を、対象と状態つきで残す。`kb-domain.yml` の `concerns.root` で有効化し、そのディレクトリに 1 件 1 YAML で置く。ファイル名の stem が懸念 ID になる（ケバブケース）。
+
+懸念は必ず実在するエンティティか出典を対象に持つ。結びつく先の無いもの、つまり作業の予定・ハーネスの問題・漠然とした違和感は書けない。作業は導入先の BACKLOG に、型やエンティティ境界の判断は `review-entity-model` の出力に置く（[導入ガイド](integration.md#8-運用ファイルを置く任意)）。判断の経緯は [考察メモ](notes/kenen-daichou-memo.md)。
+
+```yaml
+# concerns/paxos-first-submission.yml
+targets:
+  - /concepts/paxos.md
+  - "ref: lamport-1998"
+kind: conflict
+status: settled-hedged
+summary: 原論文の最初の投稿年が資料で食い違う（英語版 Wikipedia は 1989 年、著者の解説は 1990 年）
+sources: ["ref: wikipedia-en-paxos", "ref: lamport-writings"]
+resolution: 本文は両論を併記した
+```
+
+| フィールド | 内容 |
+|---|---|
+| `targets` | 必須。懸念の対象。エンティティは `content_root` 相対の `/dir/file.md`（ビューの `members` と同じ表記）、出典は `ref: <id>`。1 件以上、重複なし。存在しない対象は ERROR（改名・削除で宙に浮いた懸念もここで見つかる）。一覧（`index.md`）は対象にできない |
+| `kind` | 必須。`conflict`（出典どうしの食い違い）/ `weak-source`（出典が弱い、単一系統しかない）/ `indirect`（孫引きで原典と照合していない）/ `unreachable`（出典を取得できない）/ `judgment`（値や系統を選んだ判断の根拠） |
+| `status` | 必須。`open`（着手できる）/ `investigating`（調査中）/ `blocked-source`（資料の入手待ち）/ `suspended`（再開条件つきの打ち切り）/ `settled-hedged`（決着しないが、両論併記などで記述側は完了）/ `resolved`（解決） |
+| `summary` | 必須。懸念の要約 |
+| `detail` | 任意。経緯や根拠の詳しい説明 |
+| `sources` | 任意。懸念の根拠になった出典。`ref: <id>` は `references.yml` に存在すること |
+| `resolution` | `settled-hedged` / `resolved` で必須。記述側で何をしたか |
+| `awaiting` | `blocked-source` で必須。何を入手すれば動けるか |
+| `resume_when` | `suspended` で必須。再開の条件 |
+
+- 上記以外のキーはエラー。`resolution` / `awaiting` / `resume_when` を対応する状態以外で書くのもエラー（状態を変えたら欄も改める）。同じ stem を `.yml` と `.yaml` の両方で置くのもエラー。
+- `settled-hedged` と `suspended` は「もう手を入れない」宣言であり、誤って付けると懸念が沈む。資料が出れば動く見込みがあるものには使わない。
+- 着手できる懸念は `open` と `investigating`。`kb concern list --actionable` で取り出す。
+- 懸念は `graph.json` に出さない。RAG などの消費者には `kb sync` が生成する懸念一覧（`concerns.index`）で露出する。
+- `concerns.root` を設定した KB に旧来の `docs/CONCERNS.md` が残っていると、`kb validate` が `concern.legacy_ledger` の WARNING を出す。
 
 ## evals/rag-eval.yml（任意）
 

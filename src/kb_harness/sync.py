@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping
 
+from .concerns import plan_concerns_index
 from .graph import plan_graph
 from .index import plan_index
 from .project import Project
@@ -103,6 +104,7 @@ def plan_sync(project: Project) -> dict[Path, str]:
         ),
         **plan_graph(project.content_root, project.repo_root / "graph.json", project.views_root),
         **plan_views_index(project.content_root, project.views_root, project.views_index),
+        **plan_concerns_index(project.content_root, project.concerns_root, project.concerns_index),
     }
     return dict(sorted(changes.items(), key=lambda item: str(item[0])))
 

@@ -74,8 +74,20 @@ omnibus-kb の `docs/CONCERNS.md`（2026-09-29 時点、22 件）を `scripts/co
 - **見送る: (g)。** モデリングの判断は出典や内容の確からしさではなく、`review-entity-model` の守備範囲である。omnibus-kb の該当 2 件はどちらも解決済みで、移行で困らない。再開条件は、導入先で対象の特定できるモデリングの懸念が繰り返し行き場を失ったとき。
 - **見送る: 移行コマンド。** 旧形式の行は種別を持たず、対象欄も解釈が要るので、機械的な変換は不正確になる。omnibus-kb の 22 件は手で移す。
 
+## 実装の記録
+
+2026-09-29 に判断どおり (b)(d)(f) を実装した。
+
+- `src/kb_harness/concerns.py` に読み込み・検査・一覧の描画を置いた。`kb validate` / `kb sync` / 一時 KB での全体検証（`staging.py`）から呼び、`scripts/concerns_summary.py` は `concerns.root` があればこの API を呼ぶ互換入口にした。旧来の Markdown の集計は、未移行の導入先のためにスクリプトに残した。
+- `kb-domain.yml` の `views:` 節の解決を `_generated_section()` に切り出し、`concerns:` 節も同じ制約（リポジトリの内側、`content_root` の外、一覧は `.md`）で解決する。加えて、`views` と同じパスを禁じた。ビューの読み込みは `views.root` 直下の `*.yml` を全部拾うので、同じディレクトリに置くと懸念がビューとして読まれる。
+- `kb concern list / summary / validate` を足した。`list --for` はメモの未決事項に挙げた evidence-reviewer 向けの入口を兼ねる。エンティティは `/dir/file.md` と、`content_root` 内のファイルパスの両方を受ける（`kb validate --for` / `kb reference show --for` がファイルパスを受けるのに合わせた）。
+- 当初の判断から変えた点: 「状態ごとに必須の欄」に加え、その欄を他の状態で書くことも ERROR にした。`resolved` から `open` に戻したときに古い `resolution` が残ると、一覧が「対応済み」と読めてしまうためである。
+- 当初の判断から変えた点: 「`Index` 型は対象にできない」は、一覧（`index.md`）がそもそもエンティティとして読まれないため、「存在しない」の ERROR で表れる。専用の検査は置かなかった。
+- スキルは audit-harness / expand-kb / explore-kb / ndl-digicolle / review-entity-model の記述を改めた。review-entity-model の分類 `CONCERNS に送る` は `保留（判断材料が足りない）` に替えた。
+- omnibus-kb の写しで確かめた。`concerns.root` を足すと `docs/CONCERNS.md` について WARNING が出た。対象の無い懸念（`OLAP キューブを追加する`）は `targets` 必須の ERROR で拒まれた。Paxos と グッドイヤーウェルトの 2 件を移すと、`kb validate` と `kb sync --check` が通った。omnibus-kb の 22 件の移行は、ハーネスのリリース後に導入先で行う。
+
 ## 未決事項
 
 - **Claim との関係。** `kind: conflict` は Claim の `disputed` と重なって見える。Claim は主張そのもの、懸念は根拠の状態についての注記で層が違うと見て別に置いたが、同じ食い違いを両方に書く運用が生まれたら整理が要る。
-- **evidence-reviewer への組み込み。** エンティティ単位で懸念を引けるようになったので、レビュー時に対象エンティティの懸念を読ませる手順を足せる。`kb concern list --for ENTITY` のような入口を作るかどうか。
+- **evidence-reviewer への組み込み。** 入口として `kb concern list --for ENTITY` を実装した。レビュー時に対象エンティティの懸念を読ませ、新しく見つけた食い違いを懸念として提案させる手順を足すかどうかは未決である。
 - **GitHub Issues との関係。** 懸念は Issues に出さない（本文と同じコミットで更新されるべき）。Issues と重なりうるのは BACKLOG の未着手のうち外から来る要望だけで、その同期ツールは別の論点として残す。
