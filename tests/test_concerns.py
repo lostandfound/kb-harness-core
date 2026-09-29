@@ -286,6 +286,13 @@ class TestCli(ConcernTestCase):
         _code, out, _err = run_cli("concern", "list", "--for", entity_file, "--start", str(self.root), "--format", "json")
         self.assertEqual([c["id"] for c in json.loads(out)["concerns"]], ["raft-origin"])
 
+    def test_list_for_content_relative_path_of_missing_entity(self):
+        self.write("gone.yml", VALID.replace("/concepts/paxos.md", "/concepts/renamed.md"))
+        _code, out, _err = run_cli(
+            "concern", "list", "--for", "/concepts/renamed.md", "--start", str(self.root), "--format", "json"
+        )
+        self.assertEqual([c["id"] for c in json.loads(out)["concerns"]], ["gone"])
+
     def test_list_for_outside_content_root(self):
         code, out, _err = run_cli(
             "concern", "list", "--for", str(self.root / "kb-domain.yml"), "--start", str(self.root), "--format", "json"

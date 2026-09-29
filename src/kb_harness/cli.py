@@ -446,13 +446,16 @@ def _concern_target(project: Project, raw: str) -> str:
     """--for の値を懸念の targets の表記（`/dir/file.md` か `ref: <id>`）にそろえる。"""
     if raw.startswith("ref:"):
         return f"ref: {raw[len('ref:'):].strip()}"
-    if raw.startswith("/") and (project.content_root / raw.lstrip("/")).is_file():
-        return raw
     path = Path(raw) if Path(raw).is_absolute() else Path.cwd() / raw
     try:
         return "/" + path.resolve().relative_to(project.content_root.resolve()).as_posix()
     except ValueError:
-        raise ConcernError(f"--for must name an entity inside the content root or 'ref: <id>': {raw}", "concern.arguments")
+        pass
+    # ファイルシステム上の content_root の外を指す "/dir/file.md" は、targets と同じ
+    # content_root 相対の表記とみなす。消えたエンティティを指す懸念もこれで引ける
+    if raw.startswith("/") and raw.endswith(".md"):
+        return raw
+    raise ConcernError(f"--for must name an entity inside the content root or 'ref: <id>': {raw}", "concern.arguments")
 
 
 def _concern_action(project: Project, args: Any) -> int:

@@ -123,7 +123,7 @@ Claim の `status` を明示的に遷移させる。許容される遷移は `kb
 
 ### `kb concern list [--for TARGET] [--status STATUS] [--actionable]` / `kb concern summary` / `kb concern validate`
 
-懸念台帳（[設定リファレンス](configuration.md#懸念台帳任意)）の一覧・集計・検証。`list` は懸念を ID 順に `id` / `status` / `kind` / `targets` / `summary` で返し、条件は AND で絞る。`--for` はエンティティ（`/dir/file.md` か、`content_root` 内のファイルパス）または `ref: <id>` を受け、それを対象に含む懸念だけを返す。`content_root` の外を指すと `concern.arguments` で終了コード 1。`--actionable` は着手できる懸念（`open` / `investigating`）だけを返す。`summary` は状態別・種別の件数と着手可能な件数を返す。`validate` は `kb validate` のうち懸念の検査だけを行う。`concerns.root` が未設定なら `concern.disabled` で終了コード 2。懸念の作成は YAML を手で書く（雛形生成コマンドは持たない）。
+懸念台帳（[設定リファレンス](configuration.md#懸念台帳任意)）の一覧・集計・検証。`list` は懸念を ID 順に `id` / `status` / `kind` / `targets` / `summary` で返し、条件は AND で絞る。`--for` はエンティティ（`content_root` 内のファイルパス、または `targets` と同じ `/dir/file.md` の表記）か `ref: <id>` を受け、それを対象に含む懸念だけを返す。`/dir/file.md` の表記は、エンティティが消えていても受ける（宙に浮いた懸念を引くため）。どちらにも当たらない値は `concern.arguments` で終了コード 1。`--actionable` は着手できる懸念（`open` / `investigating`）だけを返す。`summary` は状態別・種別の件数と着手可能な件数を返す。`validate` は `kb validate` のうち懸念の検査だけを行う。`concerns.root` が未設定なら `concern.disabled` で終了コード 2。懸念の作成は YAML を手で書く（雛形生成コマンドは持たない）。
 
 ### `kb reference health`
 
