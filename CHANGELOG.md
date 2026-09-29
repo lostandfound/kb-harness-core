@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.11.0 — 2026-09-29
+
 スキル（add-entity / audit-harness / expand-kb / explore-kb / ndl-digicolle / review-entity-model）とエージェント（evidence-reviewer）の懸念台帳の扱いを改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
 
 ### Added
