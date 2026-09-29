@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.11.1 — 2026-09-29
+
+### Fixed
+
+- `--check-urls` が、HEAD がエラー応答を返した URL を状態コードを問わず GET で確かめ直す。これまでは 403 / 404 / 405 だけを確かめ直しており、HEAD にだけ 500 を返すサイト（e-種や など）を到達不能と誤判定していた。タイムアウトや接続失敗は従来どおり確かめ直さない。`scripts/validate.py --check-urls` も同じ
+
 ## 0.11.0 — 2026-09-29
 
 スキル（add-entity / audit-harness / expand-kb / explore-kb / ndl-digicolle / review-entity-model）とエージェント（evidence-reviewer）の懸念台帳の扱いを改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。

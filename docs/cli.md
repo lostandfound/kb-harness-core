@@ -33,7 +33,7 @@ KB 全体を検証する。frontmatter・リンク・relations の型制約・�
 
 - DOI（`references.yml` の `doi`、および `doi.org` / `www.doi.org` / `dx.doi.org` の URL）は出版社のページへ辿らず、DOI レジストリ（`https://doi.org/api/handles/<doi>`）で登録の有無だけを確かめる。出版社のボット遮断で登録済みの DOI が失敗扱いになるのを避けるためである。レジストリが未登録と答えたものは `DOI unregistered` の ERROR にする。レジストリに届かなかったもの（ネットワーク障害・タイムアウト・429 や 5xx）は登録の有無が分からないため ERROR にせず、`validation.url.doi_registry_unreachable` の WARNING にする。
 - `references.yml` のエントリが `doi` と `url` の両方を持つときは `doi` だけを確かめ、`url` には HTTP でアクセスしない。
-- それ以外の URL は HTTP で確かめる。HEAD を送り、405・ボット対策の 403・HEAD にだけ返す 404 には GET でもう一度試す。届かなければ `unreachable URL` の ERROR にする。出版社の URL に DOI が含まれていても（`https://link.springer.com/article/10.xxxx/...` など）DOI とはみなさず、この HTTP の確認になる。ボット遮断で失敗する出版社の論文は、`doi` か `doi.org` の URL で登録するとレジストリでの確認に切り替わる。
+- それ以外の URL は HTTP で確かめる。HEAD を送り、エラー応答（405・ボット対策の 403・HEAD にだけ返す 404 や 500 など）なら状態コードを問わず GET でもう一度試す。タイムアウトや接続失敗は GET で試し直さない。届かなければ `unreachable URL` の ERROR にする。出版社の URL に DOI が含まれていても（`https://link.springer.com/article/10.xxxx/...` など）DOI とはみなさず、この HTTP の確認になる。ボット遮断で失敗する出版社の論文は、`doi` か `doi.org` の URL で登録するとレジストリでの確認に切り替わる。
 
 確認は並列に行い、同じホストへの同時接続は 2 本までに抑える。1 回の実行の中で同じ URL・同じ DOI は 1 回だけ確かめる。ERROR と WARNING の並びは並列化の影響を受けず、エンティティ、`references.yml` の順の走査順になる。
 

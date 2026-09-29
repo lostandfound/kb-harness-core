@@ -637,17 +637,16 @@ def _url_reachable(url: str) -> bool:
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status < 400
-    except urllib.error.HTTPError as e:
-        # HEAD 拒否サーバ（405、ボット対策の 403）と、HEAD にだけ 404 を返すサーバには
-        # GET でフォールバック（docs/notes/url-kakunin-memo.md）
-        if e.code in (403, 404, 405):
-            get_req = urllib.request.Request(url, method="GET", headers=_UA)
-            try:
-                with urllib.request.urlopen(get_req, timeout=10) as resp:
-                    return resp.status < 400
-            except Exception:
-                return False
-        return False
+    except urllib.error.HTTPError:
+        # HEAD は GET を省く近道にすぎない。HEAD を拒むサーバ（405、ボット対策の 403）や
+        # HEAD にだけ 404 / 500 を返すサーバがあるので、エラー応答なら状態コードを問わず
+        # GET で確かめ直す（docs/notes/url-kakunin-memo.md）
+        get_req = urllib.request.Request(url, method="GET", headers=_UA)
+        try:
+            with urllib.request.urlopen(get_req, timeout=10) as resp:
+                return resp.status < 400
+        except Exception:
+            return False
     except Exception:
         return False
 
