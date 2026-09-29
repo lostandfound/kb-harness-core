@@ -15,8 +15,8 @@
 - [ ] 導入先の `references.yml` が数千件に達したときの分割方針を決める。現状は単一ファイル前提（`kb reference create` の追記、`validation.reference.unreferenced`）で、`kb reference show / search` により文脈消費の問題は解消済みなので急がない。（出所: 2026-09-27 ディスカッション）
 
 - [ ] relations（`created-by` / `part-of` など）から、正解の根拠が決まる構造の問いを機械的に作るコマンドを足し、導入先が `evals/rag-eval.yml` の固定セットを作る足がかりにする。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md)）
-- [ ] 検索用キーの台帳（検査と交換形式への出力）と、生成を担うスキル（仮称 `tune-index`）からなる RAG の自己改善のハーネス側を設計・実装する。検索・評価・紛らわしい相手の診断は kb-retrieval-core の責務（同 Issue #18）で、ハーネスには置かない。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)）
-- [ ] `references.yml` の `year` の型を制約するか決める。ハーネスは引用符つきの年を通すが、kb-retrieval-core は整数以外を拒否する（同 Issue #17。omnibus-kb の 494 件中 46 件が該当）。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)）
+- [ ] 検索用キーの台帳（検査と交換形式への出力）と、生成を担うスキル（仮称 `tune-index`）からなる RAG の自己改善のハーネス側を設計・実装する。検索・評価・紛らわしい相手の診断は kb-retrieval-core の責務（同 Issue #19）で、ハーネスには置かない。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)）
+- [x] `references.yml` の `year` の型を制約するか決める。ハーネスは引用符つきの年を通すが、kb-retrieval-core は整数以外を拒否する（同 Issue #18。omnibus-kb の 494 件中 46 件が該当）。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)） → ハーネスは制約しない。kb-retrieval-core が数字だけの文字列を整数として受けるよう直した（kb-retrieval-core 523a2d2）。
 
 ## 全体レビュー（2026-09-27、main @ ce52d66）の残作業
 
