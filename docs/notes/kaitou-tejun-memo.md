@@ -8,7 +8,7 @@
 
 - **答え方の手順がどこにも無い。** KB の評価の主軸は「RAG での回答精度」（`rag-tester` エージェント）だが、答え方の手順は rag-tester の作業手順 3 に、テストの一部として 1 行あるだけである。導入先 omnibus-kb の AGENTS.md・README にも、問い合わせへの答え方の記述は無い。利用者がセッションで KB に質問すると、エージェントは探し方をその場で決め、学習知識で穴を埋める、出典を示さない、懸念台帳を見ない、という答え方になりうる。
 - **字面の検索だけでは relations の先にある答えに届かない。** [RAG の自己改善のメモ](rag-jiko-kaizen-memo.md)の測定では、字面検索で根拠が上位 5 件に入ったのは「作り手」の問いで 8/15、「所属」の問いで 23/33 だった。kb-retrieval-core の `--expand-graph` でも 7/15、25/33 である。答えるエージェントが graph.json と frontmatter の relations を辿れば届く種類の失敗である。
-- **確度を下げるべき記述が少なくない。** omnibus-kb（8b64001、エンティティ 268 件）では、懸念が 43 件あり、対象のエンティティは 43 件である。確度 C / D の relation は 28 ファイルに計 30 本ある。graph.json の `edges` は `confidence` を持たないので、graph.json だけを読んで答えると確度 C の関係を断定してしまう。
+- **確度を下げるべき記述が少なくない。** omnibus-kb（8b64001、エンティティ 268 件）では、懸念が 43 件あり、対象のエンティティは 43 件である。確度 C / D の relation は 28 ファイルに計 30 本ある。graph.json の `edges` は `confidence` を持たないので、graph.json だけを読んで答えると確度 C の関係を断定してしまう。（訂正、同日: 誤り。`kb graph build` は確度 C の関係の edge に `confidence: C` を載せる（`src/kb_harness/graph.py`）。確度を持たない edge だけを見て判断していた。下の「実装の記録」の訂正を参照）
 - **テストと本番の答え方が別になる。** rag-tester が固有の手順で答える限り、rag-tester の判定は「実際に答えるときの手順」の品質を測っていない。
 
 ## 対応の選択肢
@@ -32,6 +32,7 @@
 
 - `.apm/skills/ask-kb/SKILL.md` を足した。探す順序は title・aliases → description・tags・一覧 → 本文 → `graph.json` の relations（1〜2 段、逆向きを含む）→ ビュー → 導入先の検索器（任意）。読むものは本文と frontmatter、`kb reference show --for`、`kb concern list --for`（エンティティと出典の両方）、`kb claim list`。答えは「答え・根拠・確度と注意・KB に無いこと・KB の外の知識（任意）」の順にする。欠落は `evals/rag-eval.yml` の `gap` と同じ語彙で示す。
 - 当初の判断から変えた点: relations の確度は `graph.json` の `edges` に載らないので、答えに使う関係は始点の frontmatter で確度を確かめる手順にした。`graph.json` が古い場合も生成し直さず（スキルは読むだけ）、frontmatter の `relations` を正とする。rag-tester がこれまで実行していた `export_graph.py --force` もこの手順に置き換えた。
+- **訂正（同日、`ask-kb` を実際に使って判明）:** 「relations の確度は `graph.json` の `edges` に載らない」は誤りだった。確度 C の関係の edge には `confidence` が載る。スキルの記述を「frontmatter と `graph.json` の両方に載り、`graph.json` が古い場合は frontmatter を正とする」に直した。relations の確度は C だけなので、「確度 C / D の関係」という記述も「確度 C の関係」に直した（v0.12.1）。
 - rag-tester は、制約の節で `ask-kb` の `SKILL.md` を読むように改め、作業手順 3 をスキルの手順で答えることに置き換えた。どの経路で根拠に届いたかを記録させ、`gap: retrieval` の判定材料にした。KB の外の知識の補足は rag-tester では使わない。
 - 追記（同日）: Claude 以外（Codex・Cursor など）でも使うため、ランタイムに依存する箇所を直した。(1) スキル本文の「Grep する」を、ツール名ではない「文字列検索（grep・rg など）」にした。(2) rag-tester が読むパスを、Claude Code の配置先 `.claude/skills/ask-kb/SKILL.md` から、`--target` に依存しない正本 `apm_modules/lostandfound/kb-harness-core/.apm/skills/ask-kb/SKILL.md` に改めた。導入先は補助スクリプトも同じ `apm_modules/` から呼んでおり、新しい前提は増えない。(3) スキルの自動選択はランタイムによって異なるので、導入先の `AGENTS.md` から正本のパスを指す 1 行を、`docs/integration.md` で推奨した。
 - omnibus-kb（8b64001）で、スキルが使うコマンド（`kb sync --check`、`kb reference show --for`、`kb concern list --for` のエンティティと `ref:`、`kb view list` / `resolve`、`kb claim list`）がすべて期待どおりに動くことを確かめた。
