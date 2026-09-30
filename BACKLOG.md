@@ -15,7 +15,7 @@
 - [ ] 導入先の `references.yml` が数千件に達したときの分割方針を決める。現状は単一ファイル前提（`kb reference create` の追記、`validation.reference.unreferenced`）で、`kb reference show / search` により文脈消費の問題は解消済みなので急がない。（出所: 2026-09-27 ディスカッション）
 
 - [x] KB への問い合わせに答える手順をスキル `ask-kb` にし、rag-tester の答え方をこのスキルに委ねる。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/kaitou-tejun-memo.md#実装の記録)。コミット: f10a114）
-- [ ] `Unreleased` をタグ付きリリース v0.12.0 にし、omnibus-kb の `apm.yml` の固定コミットを上げて `apm install` でスキル・エージェント・常時の指示を再生成する。（出所: `ask-kb`・ランタイム非依存・エージェントのスキル化）
+- [x] `Unreleased` をタグ付きリリース v0.12.0 にし、omnibus-kb の `apm.yml` の固定コミットを上げて `apm install` でスキル・エージェント・常時の指示を再生成する。（出所: `ask-kb`・ランタイム非依存・エージェントのスキル化。ハーネス側 5ec6719（#45）、タグ v0.12.0 は Tag release ワークフローで打った。omnibus-kb 側は lostandfound/omnibus-kb#31（52b319e）。omnibus-kb で `kb validate` ERROR 0 件、`kb sync --check` OK）
 - [x] 配布資産と対外契約から特定ランタイムへの依存（ランタイム名・ツール名・配置先パス・frontmatter の `tools` / `model`）を除き、AGENTS.md の指針・テスト・audit-harness の観点で守る。hooks はアダプタとして隔離する。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/runtime-hiizon-memo.md#実装の記録)。コミット: 79d19ea）
 - [x] evidence-reviewer と rag-tester の手順をスキル（`review-evidence` / `test-rag`）に移し、エージェントは薄い入口にする。導入先への常時の指示を `.apm/instructions/` で配る。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/runtime-hiizon-memo.md#実装の記録エージェントのスキル化と-instructions)。コミット: 0173869）
 - [ ] relations（`created-by` / `part-of` など）から、正解の根拠が決まる構造の問いを機械的に作るコマンドを足し、導入先が `evals/rag-eval.yml` の固定セットを作る足がかりにする。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md)）
