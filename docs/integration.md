@@ -29,12 +29,43 @@ dependencies:
 apm 0.32 以降は短縮 SHA での固定を受理しない。SHA で固定するときは 40 桁で書く。
 
 ```bash
-apm install --target claude
+apm install --target <ランタイム>
 ```
 
-`apm install` はパッケージを `apm_modules/lostandfound/kb-harness-core/` に展開し、`.apm/skills/` `.apm/agents/` を `.claude/skills/` `.claude/agents/` へ配置する。`--target codex` など他ランタイムも選べる。
+`apm install` はパッケージを `apm_modules/lostandfound/kb-harness-core/` に展開し、`.apm/` の資産を、指定したランタイムの配置先ディレクトリへ配置する。`--target` に渡せる名前と配置先は apm の文書に従う。複数のランタイムを使うなら `apm.yml` の `targets:` にすべて並べる。配置先ランタイムは `--target` か `targets:` で必ず指定する。どちらも無いと `apm install` はエラーで止まる。
 
-配置先ランタイムは `--target` か導入先 `apm.yml` の `targets:` で必ず指定する。どちらも無いと `apm install` はエラーで止まる。`--target codex` では、エージェント定義の `tools` が Codex 側に写らず落ちる旨の警告が出る。Codex でエージェントのツールを絞りたい場合は、生成された `.codex/agents/*.toml` を使わない。
+このパッケージが配る資産は 3 種類で、ランタイムごとに届く範囲が違う（正本は apm の文書の「Primitives and Targets」）。
+
+| 資産 | 置き場所 | 届く範囲 |
+|---|---|---|
+| スキル | `.apm/skills/` | すべてのランタイム。手順の正本はすべてスキルにある |
+| エージェント | `.apm/agents/` | エージェントの仕組みを持つランタイムだけ。`evidence-reviewer` と `rag-tester` は、それぞれ `review-evidence` / `test-rag` スキルを読んで従うだけの入口なので、届かないランタイムでもスキルとして同じ手順を使える |
+| 常時の指示 | `.apm/instructions/kb-harness.instructions.md` | 多くのランタイムでは、`apm install` がそのランタイムの規則ファイルとして配置する。ランタイムによっては `apm install` では配置されず、`apm compile` で `AGENTS.md` にまとめて届く（下記） |
+
+資産はどのランタイムにもある能力だけで書いてあり、frontmatter は apm がどのランタイムにも写せるキーだけである。ツールの制限は本文に書いてある。
+
+### 常時の指示を `AGENTS.md` に入れる
+
+常時の指示は、KB への問い合わせには `ask-kb` に従うこと、主要なスキル、コミット前の検証を案内する。`apm install` が規則ファイルを配置しないランタイムでは、`apm compile --target <ランタイム>` で `AGENTS.md` に入れる。どのランタイムが該当するかは、`apm install` の出力に規則（rule / instruction）の配置が出るかで分かる。
+
+手書きの `AGENTS.md` があると、`apm compile` はそれを上書きせず、警告を出して指示も入れない。手書きの内容を保ったまま指示を入れるには、apm の managed-section モードを使う。`AGENTS.md` に次の 2 行を置き、導入先の `apm.yml` に設定を足す。印の外側は `apm compile` のたびにそのまま保たれ、印の内側だけが生成される。
+
+```markdown
+<!-- apm:start -->
+<!-- apm:end -->
+```
+
+```yaml
+compilation:
+  agents_md:
+    mode: managed_section
+```
+
+`apm compile` を使わない場合は、`AGENTS.md` に次の 1 行を手で書けば、問い合わせへの答え方だけは同じにできる。
+
+```markdown
+- KB の内容を問われたら、`apm_modules/lostandfound/kb-harness-core/.apm/skills/ask-kb/SKILL.md` の手順で、KB の記述だけを根拠に答える。
+```
 
 ## 4. `kb` CLI をインストールする
 
@@ -58,29 +89,9 @@ python3 apm_modules/lostandfound/kb-harness-core/scripts/ndl_search.py "<検索�
 
 ## 6. hooks を設定する（任意）
 
-### Claude Code の hooks
+### エージェントのフック
 
-apm は `.apm/hooks/*.json` を `.claude/settings.json` にマージする機能を持つが、このパッケージは hooks を同梱していない（検証の自動実行を強制しないため）。必要なら導入先の `.claude/settings.json` に書く。`.md` 編集後に `kb validate` を実行する例:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *.md) kb validate >&2 || exit 2;; esac",
-            "timeout": 60,
-            "statusMessage": "kb validate 実行中..."
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+ファイルの編集後やターンの終了時にコマンドを実行できるランタイムでは、そこに `kb validate`（と `kb sync --check`）を登録すると、壊れた状態のまま作業が終わるのを防げる。登録の形式は各ランタイムの文書に従う。このパッケージはフックの設定を同梱しない（検証の自動実行を強制しないため）。フックが無くても、下の git pre-commit が同じ検証を閉じる。
 
 ### git pre-commit
 
@@ -104,7 +115,9 @@ python3 apm_modules/lostandfound/kb-harness-core/scripts/check_source_attrition.
 
 ### ターンの終了を検証で閉じる（任意）
 
-pre-commit が閉じるのはコミットするときだけなので、コミットせずに終わるターンでは検証が走らない。`.claude/settings.json` の Stop hook に `scripts/verify_turn.sh` を登録すると、ターンの終了時に `kb validate` と `kb sync --check` を実行し、失敗したらその場で Claude に直させる。設定例は [スクリプト一覧](scripts.md#verify_turnsh) を参照。
+<!-- runtime-adapter -->
+特定のランタイムのフック形式に合わせた任意のアダプタである。pre-commit が閉じるのはコミットするときだけなので、コミットせずに終わるターンでは検証が走らない。`.claude/settings.json` の Stop hook に `scripts/verify_turn.sh` を登録すると、ターンの終了時に `kb validate` と `kb sync --check` を実行し、失敗したらその場で Claude に直させる。設定例は [スクリプト一覧](scripts.md#verify_turnsh) を参照。
+<!-- /runtime-adapter -->
 
 ## 7. 版を上げるとき
 
@@ -174,8 +187,8 @@ python3 apm_modules/lostandfound/kb-harness-core/scripts/eval_summary.py --open
 
 ## 運用上の注意
 
-- **正本は `.apm/`。** スキル・エージェントを修正するときはパッケージ側の `.apm/` を編集し、`apm install` で再デプロイする。ランタイム配下（`.claude/skills/` など）の同名ファイルは生成物であり直接編集しない。
+- **正本は `.apm/`。** スキル・エージェントを修正するときはパッケージ側の `.apm/` を編集し、`apm install` で再デプロイする。ランタイムの配置先にある同名ファイルは生成物であり直接編集しない。
 - `apm audit` で、正本と展開先のドリフト（未反映の差分）を検査できる。
-- エージェント定義は `.apm/agents/` では `*.agent.md` だが、デプロイ後は対象ランタイムの形式（Claude は `.md`、Codex は `.toml`）になる。
+- エージェント定義は `.apm/agents/` では `*.agent.md` だが、デプロイ後は対象ランタイムの形式になる。
 - scripts の正本はパッケージの `scripts/`。導入先からは `apm_modules/lostandfound/kb-harness-core/scripts/<name>.py` で直接呼び、導入先ルートに symlink を張らない。導入先ルートの `scripts/` は導入先固有のスクリプト置き場として使える。
 - `kb doctor` は `pyproject.toml` が宣言する `kb-ontology-core` のタグとインストール済みバージョンの不一致を報告する。依存を更新したら再インストールする。

@@ -7,7 +7,7 @@ description: NDL サーチ（国立国会図書館）API で書籍・資料を�
 
 1. `python3 apm_modules/lostandfound/kb-harness-core/scripts/ndl_search.py "<検索語>" --count 5 --format json > <作業用ディレクトリ>/search-result.json` を実行する（作業用ディレクトリはリポジトリ外のスクラッチ領域。`search-result.json`・`reference.yml` はリポジトリに含めない）。API は認証不要。ノイズが多い場合は `--title-only` でタイトル検索に絞る。雑誌は `--mediatype periodicals`。人向けの登録案が必要なら `--format yaml`（既定）を使う。
 
-2. 出力される references.yml 登録案から、対象エンティティの主張を実際に裏付けられそうな文献を選ぶ。タイトルだけで判断できない場合は URL（NDL サーチの書誌ページ）を WebFetch して内容を確認する。
+2. 出力される references.yml 登録案から、対象エンティティの主張を実際に裏付けられそうな文献を選ぶ。タイトルだけで判断できない場合は URL（NDL サーチの書誌ページ）を取得して内容を確認する。
 
 3. 登録前に `kb reference search --url <URL>`（DOI があれば `--doi <DOI>`、書籍はタイトルや著者名の語句）で既存エントリを確認する。同じ資料が既にあればその ID を使い、新規登録はしない。
 

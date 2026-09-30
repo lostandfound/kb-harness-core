@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """RAG 評価データセット（evals/rag-eval.yml）の決定論集計・退行検出。
 
-rag-tester が history を追記した後、目視だけでは退行（過去 OK → 最新非 OK）を
+test-rag スキルが history を追記した後、目視だけでは退行（過去 OK → 最新非 OK）を
 見落としうるため、機械判定を挟んで CI・運用ループに組み込めるようにする。
 """
 import argparse
