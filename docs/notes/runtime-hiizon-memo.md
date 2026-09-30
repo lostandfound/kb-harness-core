@@ -67,6 +67,19 @@ frontmatter の `tools` の制限は、もともと実効性が弱い。rag-test
 - **当初の判断から変えた点**: 大文字小文字を区別しない検出では、ツール名の `Grep` / `Glob` が普通名詞の grep / glob（コマンドやパターン）と衝突するので、この 2 語だけ大文字始まりに限った。
 - **範囲外として残したもの**: このリポジトリのルートの `CLAUDE.md`（`AGENTS.md` への symlink）。開発者の手元の便宜で、配布資産でも対外契約でもない。`tests/` のアダプタのテスト（`test_verify_turn.py`）。
 
+### 実装の記録（エージェントのスキル化と instructions）
+
+- `.apm/skills/review-evidence/` と `.apm/skills/test-rag/` に、エージェントの本文をそのまま移した。冒頭に「独立した役として実行する。別のコンテキストで実行できるなら、そこで実行する」を足した。「本エージェント」の表記も改めた。エージェント定義は、従うスキルの正本のパスを示す 1 段落だけにした。名前は変えていない。
+- `.apm/instructions/kb-harness.instructions.md`（`applyTo: "**"`）を足した。
+- `tests/test_runtime_neutrality.py` の frontmatter の検査を、プリミティブごとに許すキーを変える形にした。エージェントがスキルの正本を指し、見出しを持つ本文を置かないことも検査に加えた。
+- 導入ガイドの節 3 に、資産 3 種の届く範囲、`apm compile` と managed-section モードを書いた。`AGENTS.md` に 1 行書く方法は、`apm compile` を使わない場合の代わりの手段にした。
+- **apm 0.32.0 での実地確認。** 手元の作業ツリーを空の導入先へ `apm install` し、11 ランタイムの配置を確かめた。
+  - スキル 13 件は 11 ランタイムすべてに届いた。
+  - エージェントは copilot・claude・cursor・codex・opencode・kiro・grok-build に届いた。codex では TOML に変換され、`tools` が無いので警告は出ない。
+  - 常時の指示は、`apm install` の時点で copilot・claude・cursor・antigravity・windsurf・kiro・grok-build の規則ファイルとして配置された。codex・gemini・opencode・hermes では、`apm compile` で `AGENTS.md`（gemini では `GEMINI.md` も）に入った。
+  - 手書きの `AGENTS.md` があると、`apm compile` は「Protected AGENTS.md」と警告して上書きせず、指示も入れなかった。managed-section モードでは、手書きの部分を保ったまま印の内側にだけ入った。
+- omnibus-kb の `targets` は antigravity と claude で、どちらも `apm install` の時点で規則ファイルとして届く。手書きの `AGENTS.md` には触れない。
+
 ## 未決事項
 
 - **アダプタをパッケージに置き続けるか。** `verify_turn.sh` は特定ランタイムのフックの入出力（ペイロードの `stop_hook_active`、終了コード 2 の意味）に依存する。他のランタイム向けのアダプタを求められたときに、パッケージに足すのか、導入先に委ねるのかを決める。

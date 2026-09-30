@@ -17,7 +17,7 @@
 - [x] KB への問い合わせに答える手順をスキル `ask-kb` にし、rag-tester の答え方をこのスキルに委ねる。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/kaitou-tejun-memo.md#実装の記録)。コミット: f10a114）
 - [ ] `Unreleased` をタグ付きリリースにし、omnibus-kb の `apm.yml` の固定コミットを上げて `apm install` で `ask-kb` と rag-tester を再生成する。（出所: `ask-kb` の実装）
 - [x] 配布資産と対外契約から特定ランタイムへの依存（ランタイム名・ツール名・配置先パス・frontmatter の `tools` / `model`）を除き、AGENTS.md の指針・テスト・audit-harness の観点で守る。hooks はアダプタとして隔離する。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/runtime-hiizon-memo.md#実装の記録)。コミット: 79d19ea）
-- [ ] evidence-reviewer と rag-tester の手順をスキル（`review-evidence` / `test-rag`）に移し、エージェントは薄い入口にする。導入先への常時の指示を `.apm/instructions/` で配る。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/runtime-hiizon-memo.md#再考同日-エージェントをスキルに導入先への指示を-instructions-に)）
+- [x] evidence-reviewer と rag-tester の手順をスキル（`review-evidence` / `test-rag`）に移し、エージェントは薄い入口にする。導入先への常時の指示を `.apm/instructions/` で配る。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/runtime-hiizon-memo.md#実装の記録エージェントのスキル化と-instructions)。コミット: 0173869）
 - [ ] relations（`created-by` / `part-of` など）から、正解の根拠が決まる構造の問いを機械的に作るコマンドを足し、導入先が `evals/rag-eval.yml` の固定セットを作る足がかりにする。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md)）
 - [ ] 検索用キーの台帳（検査と交換形式への出力）と、生成を担うスキル（仮称 `tune-index`）からなる RAG の自己改善のハーネス側を設計・実装する。検索・評価・紛らわしい相手の診断は kb-retrieval-core の責務（同 Issue #19）で、ハーネスには置かない。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)）
 - [x] `references.yml` の `year` の型を制約するか決める。ハーネスは引用符つきの年を通すが、kb-retrieval-core は整数以外を拒否する（同 Issue #18。omnibus-kb の 494 件中 46 件が該当）。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)） → ハーネスは制約しない。kb-retrieval-core が数字だけの文字列を整数として受けるよう直した（kb-retrieval-core 523a2d2）。
