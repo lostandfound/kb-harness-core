@@ -14,7 +14,7 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 - CONTRIBUTING.md、README.md
 - ランタイム固有のエージェント向け指示ファイル（あれば。AGENTS.md と同じく導線の過不足を見る）
 - `docs/` 配下の現行文書すべて。任意の運用ファイル `docs/BACKLOG.md`（KB を作る作業の予定と記録）は、存在する場合のみ監査する。懸念台帳（`kb-domain.yml` の `concerns.root`）は `kb validate` が検査するので、ここでは文書との整合だけを見る。アーカイブ扱いのディレクトリは、導入先の README でアーカイブと明示されているかだけ見る
-- `apm_modules/lostandfound/kb-harness-core/.apm/` 配下の全 SKILL.md・エージェント定義（**KB ハーネス資産の正本**。ランタイムの配置先ディレクトリ（導入先 `apm.yml` の `targets` による）にある同名資産は `apm install` による生成物 — 正本と配布先の同一性も確認し、ドリフトがあれば正本を直して対象ランタイムへ再デプロイする）
+- `apm_modules/lostandfound/kb-harness-core/.apm/` 配下の全 SKILL.md・エージェント定義・常時の指示（**KB ハーネス資産の正本**。ランタイムの配置先ディレクトリ（導入先 `apm.yml` の `targets` による）にある同名資産は `apm install` による生成物 — 正本と配布先の同一性も確認し、ドリフトがあれば正本を直して対象ランタイムへ再デプロイする）
 - ルート `.apm/`（ドメイン固有エージェントの正本。パッケージ側と同様に配布先との同一性を確認する）
 - ランタイムの配置先ディレクトリのうちパッケージ外の資産（プロジェクト固有スキル等）
 - apm.yml の `targets` と実在する配布先ディレクトリの対応（README/CONTRIBUTING が配布先として挙げるランタイムがすべて `targets` に含まれているか。抜けていると `apm install` がそのランタイムを更新せずドリフトが沈む。前例: 配布先ランタイムの 1 つが欠落、2026-09-03）

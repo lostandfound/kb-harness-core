@@ -60,14 +60,15 @@ Claim のルール（許容 status、遷移、domain/range 制約、値Claim の
 
 - `.apm/`・README・AGENTS.md・`docs/*.md`・`scripts/`・`src/kb_harness/` に、特定のランタイム名・ツール名・配置先ディレクトリ・モデル名を書かない。動作は能力で書く（ファイルを読む、文字列検索、シェルで実行、Web ページを取得、Web 検索、利用者に確認する）。
 - 他の資産は `apm_modules/lostandfound/kb-harness-core/` 配下の正本のパスで指す。配置先のパスは `--target` で変わる。
-- スキル・エージェントの frontmatter は `name` と `description` だけにする。ツールの制限は本文に書く（「ファイルを書き換えない」など）。
+- 手順の正本はスキルに置く。スキルはすべてのランタイムに届くが、エージェントと常時の指示は届かないランタイムがある。エージェントはスキルを読んで従うだけの入口にし、手順を書かない。
+- frontmatter は、スキルとエージェントでは `name` と `description` だけ、常時の指示（`.apm/instructions/`）では `description` と `applyTo` だけにする。ツールの制限は本文に書く（「ファイルを書き換えない」など）。
 - サブエージェント・hooks・並列実行など、ランタイムによっては無い機能は任意とする。無くても手順が完結するように書く。決定的な処理は `kb` CLI とスクリプトに置く。
 - ランタイムの仕組みに合わせる部品（アダプタ）は、Markdown では `<!-- runtime-adapter -->` 〜 `<!-- /runtime-adapter -->` で囲んだ区間に、ファイル全体なら `tests/test_runtime_neutrality.py` の例外一覧に理由つきで置く。アダプタが無くても全機能が成り立つこと。
 - 語の検出は `tests/test_runtime_neutrality.py` が、手順の前提としての依存は `audit-harness` の観点 8 が見る。テストの語の一覧は検出の手がかりであり、対応ランタイムの一覧ではない。
 
 ### 資産の正本とデプロイ
 
-- スキル・エージェントの正本は `.apm/skills/` `.apm/agents/`。`apm install --target <ランタイム>` が、そのランタイムの配置先ディレクトリへ展開する。**配置先の側は生成物であり編集しない。**
+- スキル・エージェント・常時の指示の正本は `.apm/skills/` `.apm/agents/` `.apm/instructions/`。`apm install --target <ランタイム>` が、そのランタイムの配置先ディレクトリへ展開する。**配置先の側は生成物であり編集しない。**
 - エージェント定義は `.apm/` では `*.agent.md`、デプロイ後は配置先ランタイムの形式に変換される。
 - `scripts/` は APM のデプロイ対象外。導入先は `python3 apm_modules/lostandfound/kb-harness-core/scripts/<name>.py` で直接実行する（`scripts/` の symlink は 0.3.0 で廃止。`docs/integration.md` 参照）。
 - hooks も APM 管理外（`docs/integration.md` 参照）。

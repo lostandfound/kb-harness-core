@@ -32,13 +32,36 @@ apm 0.32 以降は短縮 SHA での固定を受理しない。SHA で固定す�
 apm install --target <ランタイム>
 ```
 
-`apm install` はパッケージを `apm_modules/lostandfound/kb-harness-core/` に展開し、`.apm/skills/` `.apm/agents/` を、指定したランタイムの配置先ディレクトリへ配置する。`--target` に渡せる名前と配置先は apm の文書に従う。複数のランタイムを使うなら `apm.yml` の `targets:` にすべて並べる。
+`apm install` はパッケージを `apm_modules/lostandfound/kb-harness-core/` に展開し、`.apm/` の資産を、指定したランタイムの配置先ディレクトリへ配置する。`--target` に渡せる名前と配置先は apm の文書に従う。複数のランタイムを使うなら `apm.yml` の `targets:` にすべて並べる。配置先ランタイムは `--target` か `targets:` で必ず指定する。どちらも無いと `apm install` はエラーで止まる。
 
-配置先ランタイムは `--target` か導入先 `apm.yml` の `targets:` で必ず指定する。どちらも無いと `apm install` はエラーで止まる。スキル・エージェントの定義はどのランタイムにもある能力だけで書いてあり、frontmatter は `name` と `description` だけである。ツールの制限は本文に書いてある。
+このパッケージが配る資産は 3 種類で、ランタイムごとに届く範囲が違う（正本は apm の文書の「Primitives and Targets」）。
 
-### 問い合わせへの答え方を AGENTS.md から指す（推奨）
+| 資産 | 置き場所 | 届く範囲 |
+|---|---|---|
+| スキル | `.apm/skills/` | すべてのランタイム。手順の正本はすべてスキルにある |
+| エージェント | `.apm/agents/` | エージェントの仕組みを持つランタイムだけ。`evidence-reviewer` と `rag-tester` は、それぞれ `review-evidence` / `test-rag` スキルを読んで従うだけの入口なので、届かないランタイムでもスキルとして同じ手順を使える |
+| 常時の指示 | `.apm/instructions/kb-harness.instructions.md` | 多くのランタイムでは、`apm install` がそのランタイムの規則ファイルとして配置する。ランタイムによっては `apm install` では配置されず、`apm compile` で `AGENTS.md` にまとめて届く（下記） |
 
-スキルが description から自動で選ばれるか、どこに配置されるかは、ランタイムによって異なる。KB への質問にどのランタイムでも同じ手順で答えさせるには、導入先の `AGENTS.md` に次の 1 行を書く。`AGENTS.md` は多くのランタイムが読み、パスは `--target` に依存しない。
+資産はどのランタイムにもある能力だけで書いてあり、frontmatter は apm がどのランタイムにも写せるキーだけである。ツールの制限は本文に書いてある。
+
+### 常時の指示を `AGENTS.md` に入れる
+
+常時の指示は、KB への問い合わせには `ask-kb` に従うこと、主要なスキル、コミット前の検証を案内する。`apm install` が規則ファイルを配置しないランタイムでは、`apm compile --target <ランタイム>` で `AGENTS.md` に入れる。どのランタイムが該当するかは、`apm install` の出力に規則（rule / instruction）の配置が出るかで分かる。
+
+手書きの `AGENTS.md` があると、`apm compile` はそれを上書きせず、警告を出して指示も入れない。手書きの内容を保ったまま指示を入れるには、apm の managed-section モードを使う。`AGENTS.md` に次の 2 行を置き、導入先の `apm.yml` に設定を足す。印の外側は `apm compile` のたびにそのまま保たれ、印の内側だけが生成される。
+
+```markdown
+<!-- apm:start -->
+<!-- apm:end -->
+```
+
+```yaml
+compilation:
+  agents_md:
+    mode: managed_section
+```
+
+`apm compile` を使わない場合は、`AGENTS.md` に次の 1 行を手で書けば、問い合わせへの答え方だけは同じにできる。
 
 ```markdown
 - KB の内容を問われたら、`apm_modules/lostandfound/kb-harness-core/.apm/skills/ask-kb/SKILL.md` の手順で、KB の記述だけを根拠に答える。

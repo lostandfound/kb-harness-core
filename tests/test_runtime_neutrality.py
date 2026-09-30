@@ -67,7 +67,12 @@ WORD_RE = re.compile("|".join(PATTERNS), re.IGNORECASE)
 TOOL_RE = re.compile("|".join(CASE_SENSITIVE_PATTERNS))
 ADAPTER_RE = re.compile(r"<!-- runtime-adapter -->.*?<!-- /runtime-adapter -->", re.DOTALL)
 FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
-ALLOWED_FRONTMATTER_KEYS = {"name", "description"}
+# プリミティブごとに、APM がどのランタイムにも写せるキーだけを許す。
+ALLOWED_FRONTMATTER_KEYS = {
+    "skills": {"name", "description"},
+    "agents": {"name", "description"},
+    "instructions": {"description", "applyTo"},
+}
 
 
 def scanned_files() -> list[Path]:
@@ -125,8 +130,22 @@ class RuntimeNeutralityTest(unittest.TestCase):
             if not match:
                 continue
             keys = {line.split(":", 1)[0].strip() for line in match.group(1).splitlines() if re.match(r"^[A-Za-z_][\w-]*:", line)}
-            with self.subTest(path=path.relative_to(ROOT).as_posix()):
-                self.assertLessEqual(keys, ALLOWED_FRONTMATTER_KEYS, "frontmatter は name と description だけにする。ツールの制限は本文に書く")
+            rel = path.relative_to(ROOT / ".apm")
+            with self.subTest(path=rel.as_posix()):
+                self.assertIn(rel.parts[0], ALLOWED_FRONTMATTER_KEYS, "未知のプリミティブ。許すキーを決めてから足す")
+                self.assertLessEqual(keys, ALLOWED_FRONTMATTER_KEYS[rel.parts[0]], "frontmatter は APM がどのランタイムにも写せるキーだけにする。ツールの制限は本文に書く")
+
+    def test_agents_are_thin_entries_to_skills(self):
+        # エージェントは届かないランタイムがあるので、手順を持たずスキルを指すだけにする。
+        skill_path_re = re.compile(r"apm_modules/lostandfound/kb-harness-core/\.apm/skills/([a-z0-9-]+)/SKILL\.md")
+        for path in sorted((ROOT / ".apm" / "agents").glob("*.agent.md")):
+            body = FRONTMATTER_RE.sub("", path.read_text(encoding="utf-8"))
+            with self.subTest(path=path.name):
+                skills = skill_path_re.findall(body)
+                self.assertTrue(skills, "エージェントは従うスキルの正本のパスを示す")
+                for name in skills:
+                    self.assertTrue((ROOT / ".apm" / "skills" / name / "SKILL.md").is_file())
+                self.assertNotIn("\n## ", body, "手順はスキルに書き、エージェントには見出しを持つ本文を置かない")
 
 
 if __name__ == "__main__":

@@ -2,15 +2,19 @@
 
 ## Unreleased
 
-スキル（ask-kb を追加、既存スキルのランタイム非依存化）とエージェント（rag-tester・evidence-reviewer）を改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
+スキル（ask-kb・review-evidence・test-rag を追加、既存スキルのランタイム非依存化）、エージェント（rag-tester・evidence-reviewer を入口化）、常時の指示（追加）を改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
 
 ### Added
 
 - スキル `ask-kb`。KB への問い合わせに、KB の記述だけを根拠として答える手順。title・aliases → description・tags・一覧 → 本文 → `graph.json` の relations → ビューの順に探し、`kb reference show --for` で出典を、`kb concern list --for` で懸念を引いて、relations の確度 C / D や `disputed` の Claim を断定せずに答える。KB に無いことは「KB には記載がない」と答え、欠落を `gap` の語彙で示す。KB のファイルは書き換えない。特定のランタイムに依存しない（判断の経緯は docs/notes/kaitou-tejun-memo.md）
 - 導入ガイドに、導入先の `AGENTS.md` から `ask-kb` の正本（`apm_modules/` 配下）を指す 1 行を推奨として載せた。スキルの自動選択がランタイムによって異なっても、同じ手順で答えさせるため
 
+- スキル `review-evidence` と `test-rag`。エージェント `evidence-reviewer` / `rag-tester` の手順をスキルに移した。スキルはすべてのランタイムに届くが、エージェントは届かないランタイムがある（apm 0.32.0 では gemini・antigravity・windsurf・hermes）
+- 常時の指示 `.apm/instructions/kb-harness.instructions.md`。KB への問い合わせに `ask-kb` で答えること、主要なスキル、コミット前の検証を案内する。多くのランタイムでは `apm install` が規則ファイルとして配置し、そうでないランタイムでは `apm compile` で `AGENTS.md` に入る。手書きの `AGENTS.md` を保つには apm の managed-section モードを使う（導入ガイドの節 3）
+
 ### Changed
 
+- エージェント `evidence-reviewer` / `rag-tester` を、対応するスキルを読んで従うだけの入口にした。名前は変えていないので、導入先の呼び出しはそのまま使える
 - スキル・エージェント・文書を、特定のエージェントランタイムに依存しない書き方にした。本文からランタイム固有のツール名（Web 取得・Web 検索）と配置先ディレクトリを除き、能力で書いた。README・導入ガイドの `apm install` の例は `--target <ランタイム>` にした（判断の経緯は docs/notes/runtime-hiizon-memo.md）
 - エージェント定義（evidence-reviewer・rag-tester）の frontmatter から `tools` と `model` を外した。ツールの制限は本文に書いた（evidence-reviewer は KB のファイルを書き換えない。rag-tester が書き換えてよいのは `evals/rag-eval.yml` だけ）。ランタイムによっては、エージェントが既定のツールとモデルで動くようになる
 - 導入ガイドのフックの節を、特定ランタイムの設定例から、フックを持つランタイムで `kb validate` / `kb sync --check` を登録するという一般的な説明に改めた。`scripts/verify_turn.sh` は特定ランタイム向けの任意のアダプタとして残し、文書ではそう明示した

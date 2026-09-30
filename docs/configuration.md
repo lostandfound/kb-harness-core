@@ -7,7 +7,7 @@
 | `kb-domain.yml` | リポジトリルート | 全スクリプト・スキル・エージェント |
 | `vocabulary.yml` | `<content_root>/` | `kb validate` / `kb entity create` / `kb graph build` ほか |
 | `references.yml` | `<content_root>/` | `kb validate` / `kb reference *`, `find-book` / `find-paper` スキル |
-| `evals/rag-eval.yml` | リポジトリルート（任意） | `kb validate` / `kb eval *`, `rag-tester` |
+| `evals/rag-eval.yml` | リポジトリルート（任意） | `kb validate` / `kb eval *`, `test-rag` スキル |
 
 `evals/rag-eval.yml` は `content_root` の親ではなくリポジトリルート（`kb-domain.yml` のある場所）直下を見る。`domain.content_root: kb/entities` のように `content_root` がリポジトリルート直下に無い配置でも、`kb validate` / `kb sync` / `kb entity create` は `kb-domain.yml` から解決した `repo_root` を使うので取りこぼさない。
 
@@ -266,7 +266,7 @@ predicates:
 
 ルート直下の ID の重複は `reference.duplicate.id` エラーになる。重複検出はルート mapping 直下のキーだけを見る。1 エントリ内で同じキー（例: `author:` を 2 回書く）を重複させても、それはこの検査の対象ではない（YAML パーサが後勝ちで解決する）。
 
-各エントリは任意キー `lineage`（非空文字列）を持てる。同じ由来の資料群につけるラベルで、evidence-reviewer は `lineage` が同じ資料を独立源として数えない（複数あっても 1 つの源として扱う）。由来の単位はドメインが決め、`kb-domain.yml` の `domain.lineage_example` に書く。流派・学派の伝承（`上地流系`）、同じ記事の別言語版・転載・要約（`wikipedia:三星堆`）、当事者や利害関係者の自己発信（`anthropic-official`）などが典型で、ラベルの綴りは KB 内で揃える。未記載は「独立」ではなく「未判定」を意味し、`scripts/refs_health.py --lineage` が未判定の文献を列挙する。他の資料と由来を共有しないと判定済みの資料には予約値 `系統外` を書く。`kb reference search --field lineage <ラベル>` で同じ由来の資料を引ける。
+各エントリは任意キー `lineage`（非空文字列）を持てる。同じ由来の資料群につけるラベルで、`review-evidence` スキルは `lineage` が同じ資料を独立源として数えない（複数あっても 1 つの源として扱う）。由来の単位はドメインが決め、`kb-domain.yml` の `domain.lineage_example` に書く。流派・学派の伝承（`上地流系`）、同じ記事の別言語版・転載・要約（`wikipedia:三星堆`）、当事者や利害関係者の自己発信（`anthropic-official`）などが典型で、ラベルの綴りは KB 内で揃える。未記載は「独立」ではなく「未判定」を意味し、`scripts/refs_health.py --lineage` が未判定の文献を列挙する。他の資料と由来を共有しないと判定済みの資料には予約値 `系統外` を書く。`kb reference search --field lineage <ラベル>` で同じ由来の資料を引ける。
 
 登録用 YAML は `ndl_search.py` / `cinii_search.py` が出力する。
 
@@ -427,7 +427,7 @@ RAG 評価データセット。リポジトリルート直下の `evals/` に置
   evidence:
     - /people/example.md          # 根拠となるエンティティのルート相対パス
   gap: missing-relation            # 任意。最新 verdict が非 OK のときの原因分類
-  history:                        # rag-tester が追記する
+  history:                        # test-rag スキルが追記する
     - date: 2026-01-01
       verdict: OK
 ```
