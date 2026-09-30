@@ -71,7 +71,39 @@ frontmatter の `tools` の制限は、もともと実効性が弱い。rag-test
 
 - **アダプタをパッケージに置き続けるか。** `verify_turn.sh` は特定ランタイムのフックの入出力（ペイロードの `stop_hook_active`、終了コード 2 の意味）に依存する。他のランタイム向けのアダプタを求められたときに、パッケージに足すのか、導入先に委ねるのかを決める。
 - **既知の語の一覧の保守。** 新しいランタイムやツール名が現れても、一覧は自動では増えない。audit-harness の観点 8 で見つけたら一覧に足す運用にしているが、足す契機がこれで十分かは運用して確かめる。
+- **エージェントをスキルにするか。** evidence-reviewer と rag-tester はエージェントとして配っているが、APM は gemini・antigravity・windsurf・hermes にエージェントを届けない。omnibus-kb の `targets` にある antigravity にも届いていない（実際、`.agents/` にはスキルしか無い）。スキルにすれば全ランタイムに届く。ただし、別のコンテキストで独立に審査するという利点は、サブエージェントを持つランタイムでしか得られない。スキルを正本にし、エージェントはそれを読む薄い入口にする案が有力である。
+- **導入先への指示を instructions プリミティブで配るか。** `ask-kb` を指す 1 行は、いまは導入先に `AGENTS.md` へ書いてもらう。`.apm/instructions/` に置けば、APM が各ランタイムの規則ファイルか `AGENTS.md` に届ける。ただし codex・gemini・opencode・hermes では導入先が `apm compile` を実行する必要がある。また、導入先の `AGENTS.md` が生成物に変わることの影響もある。
 - **frontmatter を外したことの影響。** ランタイムによっては、エージェントが既定のツールとモデルで動くようになった。書き込みの制限は本文の指示に頼る。導入先で本文の指示が破られる事例が出たら、ランタイムに依存しない制限の書き方（APM 側の仕組みなど）を探す。
+
+## 再考（同日）: APM の仕様
+
+APM 0.32.0（microsoft/apm、2026-09-25 リリース、73d6d0e 時点の `main`）の文書とソースを読み、判断を確かめた。正本は同リポジトリの `docs/src/content/docs/concepts/primitives-and-targets.md` と `reference/targets-matrix.md` である。
+
+**対象ランタイム。** `targets:` と `--target` が受ける値は `copilot`・`claude`・`grok-build`・`cursor`・`opencode`・`codex`・`gemini`・`antigravity`・`windsurf`・`kiro`・`agent-skills`・`hermes` の 12 種である。このほか、`intellij` は Copilot の設定を経由して配置する。`copilot-cowork`・`copilot-app`・`grok-cloud`・`openclaw` は実験的な機能として有効にしたときだけ使える。`agent-skills`・`antigravity`・`hermes` は明示したときだけ対象になり、自動検出にも `all` にも含まれない。ランタイムは今後も増えるので、(b) の「一覧を作らない」は妥当である。
+
+**プリミティブごとの届く範囲。**
+
+| プリミティブ | 届かないランタイム | 備考 |
+|---|---|---|
+| skills | なし（全ランタイム） | 形式は agent-skills 標準の `SKILL.md`。多くのランタイムは共通の `.agents/skills/` に置かれ、claude・grok-build・kiro だけが固有のディレクトリに置かれる |
+| agents | gemini・antigravity・windsurf・hermes（と agent-skills） | windsurf 向けには、エージェントをスキルとして書くよう APM 自身が案内している |
+| instructions | 全ランタイム。ただし codex・gemini・opencode・hermes は `apm compile` で `AGENTS.md` / `GEMINI.md` にまとめて届く | frontmatter は `description` と `applyTo` |
+| hooks | grok-build・opencode・hermes | APM は「移植可能のふりをしない」プリミティブと位置づける。イベント名は写す（`Stop` → copilot では `agentStop`、gemini では `SessionEnd`）が、ペイロードと終了コードの意味は写さない |
+
+**エージェントの frontmatter。** `model` と `tools` をそのまま受けるのは copilot・claude・grok-build・cursor・opencode だけである。codex は `name`・`description`・本文だけを写し、`tools` があると警告する。kiro は `tools` を権限として扱い、許された値（`read`・`write`・`shell`・`web` など）以外があると配置しない。opencode は `tools` をツール名から真偽値への対応表として要求する。以前の `tools: Read, Grep, Glob, Bash` は、kiro では配置が止まり、opencode では形式が合わない。frontmatter を外した (g) の判断は仕様からも支持される。
+
+**スキルの形式（agent-skills 標準）。** `name` は英小文字・数字・ハイフンの 1〜64 字で、ディレクトリ名と一致させる。`description` は 1024 字以内、本文は 500 行・5000 トークン以内が目安である。ハーネスのスキル 11 件はいずれも満たす（最大で 89 行、description 150 字）。スキルのフォルダは丸ごと複製されるので、`scripts/` や `references/` を同梱できる。
+
+**リンクの書き換え。** スキルからパッケージ内の他のファイルへの相対リンクは、`apm install` のときに `apm_modules/<owner>/<repo>/...` を指すよう書き換えられる。コードとして書いたパス（`python3 apm_modules/lostandfound/kb-harness-core/scripts/...`）は書き換えられないが、配置先に依存しない点では同じである。
+
+**アダプタ。** `verify_turn.sh` は、特定ランタイムの Stop フックのペイロード（`stop_hook_active`）と終了コード 2 の意味に依存する。APM の hooks プリミティブで配っても、イベント名が写るだけで意味は写らない。(d) の「任意のアダプタとして隔離する」を維持する。
+
+**このリポジトリの `CLAUDE.md`。** APM の自動検出は、ルートに `CLAUDE.md` があるだけで claude を対象にする。このリポジトリは導入先ではないので実害は無いが、導入先の雛形として持ち込まないよう注意する。
+
+**判断への追加。**
+
+- テストの検出語に、APM の対象一覧のランタイム名と配置先（kiro・opencode・grok・hermes・openclaw、`.grok/`・`.kiro/`・`.opencode/`・`.windsurf/`）を足した。
+- 下の未決事項に 2 件を足した。
 
 ## 参照
 

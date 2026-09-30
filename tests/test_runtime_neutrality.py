@@ -19,7 +19,8 @@ FILE_EXCEPTIONS = {
     "scripts/verify_turn.sh": "特定ランタイムのターン終了フックの入出力形式に合わせたアダプタ。無くても pre-commit が同じ検証を閉じる",
 }
 
-# 既知の語。大文字小文字を区別しない。
+# 既知の語。大文字小文字を区別しない。ランタイム名と配置先は APM 0.32.0 の対象一覧
+# （docs/notes/runtime-hiizon-memo.md「APM の仕様」）から採った。
 PATTERNS = [
     # ランタイム・製品名
     r"\bclaude\b",
@@ -29,12 +30,21 @@ PATTERNS = [
     r"\bantigravity\b",
     r"\bgemini\b",
     r"\bwindsurf\b",
+    r"\bkiro\b",
+    r"\bopencode\b",
+    r"\bgrok\b",
+    r"\bhermes\b",
+    r"\bopenclaw\b",
     # 配置先ディレクトリ・ランタイム固有の指示ファイル
     r"\.claude/",
     r"\.codex/",
     r"\.cursor/",
     r"\.agents/",
     r"\.gemini/",
+    r"\.grok/",
+    r"\.kiro/",
+    r"\.opencode/",
+    r"\.windsurf/",
     r"\.github/(?:agents|prompts|instructions)/",
     r"\bCLAUDE\.md\b",
     r"\bGEMINI\.md\b",
