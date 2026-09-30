@@ -36,6 +36,14 @@ apm install --target claude
 
 配置先ランタイムは `--target` か導入先 `apm.yml` の `targets:` で必ず指定する。どちらも無いと `apm install` はエラーで止まる。`--target codex` では、エージェント定義の `tools` が Codex 側に写らず落ちる旨の警告が出る。Codex でエージェントのツールを絞りたい場合は、生成された `.codex/agents/*.toml` を使わない。
 
+### 問い合わせへの答え方を AGENTS.md から指す（推奨）
+
+スキルが description から自動で選ばれるかは、ランタイム（Claude Code・Codex・Cursor など）とその配置先（`.claude/skills/`・`.agents/skills/` など）によって異なる。KB への質問にどのランタイムでも同じ手順で答えさせるには、導入先の `AGENTS.md` に次の 1 行を書く。`AGENTS.md` は多くのランタイムが読み、パスは `--target` に依存しない。
+
+```markdown
+- KB の内容を問われたら、`apm_modules/lostandfound/kb-harness-core/.apm/skills/ask-kb/SKILL.md` の手順で、KB の記述だけを根拠に答える。
+```
+
 ## 4. `kb` CLI をインストールする
 
 ```bash

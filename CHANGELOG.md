@@ -6,11 +6,12 @@
 
 ### Added
 
-- スキル `ask-kb`。KB への問い合わせに、KB の記述だけを根拠として答える手順。title・aliases → description・tags・一覧 → 本文 → `graph.json` の relations → ビューの順に探し、`kb reference show --for` で出典を、`kb concern list --for` で懸念を引いて、relations の確度 C / D や `disputed` の Claim を断定せずに答える。KB に無いことは「KB には記載がない」と答え、欠落を `gap` の語彙で示す。KB のファイルは書き換えない（判断の経緯は docs/notes/kaitou-tejun-memo.md）
+- スキル `ask-kb`。KB への問い合わせに、KB の記述だけを根拠として答える手順。title・aliases → description・tags・一覧 → 本文 → `graph.json` の relations → ビューの順に探し、`kb reference show --for` で出典を、`kb concern list --for` で懸念を引いて、relations の確度 C / D や `disputed` の Claim を断定せずに答える。KB に無いことは「KB には記載がない」と答え、欠落を `gap` の語彙で示す。KB のファイルは書き換えない。特定のランタイムに依存しない（判断の経緯は docs/notes/kaitou-tejun-memo.md）
+- 導入ガイドに、導入先の `AGENTS.md` から `ask-kb` の正本（`apm_modules/` 配下）を指す 1 行を推奨として載せた。スキルの自動選択がランタイムによって異なっても、同じ手順で答えさせるため
 
 ### Changed
 
-- rag-tester が `ask-kb` の手順で答えるようにした。判定・`history` の追記・新規クエリの作成は従来どおり rag-tester が持つ。これまでの `export_graph.py --force` の実行は、読むだけの手順（`graph.json` を読み、古ければ frontmatter の relations を正とする）に置き換えた
+- rag-tester が `ask-kb` の手順で答えるようにした。スキルは `--target` に依存しない正本のパス（`apm_modules/lostandfound/kb-harness-core/.apm/skills/ask-kb/SKILL.md`）で読む。判定・`history` の追記・新規クエリの作成は従来どおり rag-tester が持つ。これまでの `export_graph.py --force` の実行は、読むだけの手順（`graph.json` を読み、古ければ frontmatter の relations を正とする）に置き換えた
 
 ## 0.11.1 — 2026-09-29
 

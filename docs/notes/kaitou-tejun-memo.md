@@ -33,12 +33,14 @@
 - `.apm/skills/ask-kb/SKILL.md` を足した。探す順序は title・aliases → description・tags・一覧 → 本文 → `graph.json` の relations（1〜2 段、逆向きを含む）→ ビュー → 導入先の検索器（任意）。読むものは本文と frontmatter、`kb reference show --for`、`kb concern list --for`（エンティティと出典の両方）、`kb claim list`。答えは「答え・根拠・確度と注意・KB に無いこと・KB の外の知識（任意）」の順にする。欠落は `evals/rag-eval.yml` の `gap` と同じ語彙で示す。
 - 当初の判断から変えた点: relations の確度は `graph.json` の `edges` に載らないので、答えに使う関係は始点の frontmatter で確度を確かめる手順にした。`graph.json` が古い場合も生成し直さず（スキルは読むだけ）、frontmatter の `relations` を正とする。rag-tester がこれまで実行していた `export_graph.py --force` もこの手順に置き換えた。
 - rag-tester は、制約の節で `ask-kb` の `SKILL.md` を読むように改め、作業手順 3 をスキルの手順で答えることに置き換えた。どの経路で根拠に届いたかを記録させ、`gap: retrieval` の判定材料にした。KB の外の知識の補足は rag-tester では使わない。
+- 追記（同日）: Claude 以外（Codex・Cursor など）でも使うため、ランタイムに依存する箇所を直した。(1) スキル本文の「Grep する」を、ツール名ではない「文字列検索（grep・rg など）」にした。(2) rag-tester が読むパスを、Claude Code の配置先 `.claude/skills/ask-kb/SKILL.md` から、`--target` に依存しない正本 `apm_modules/lostandfound/kb-harness-core/.apm/skills/ask-kb/SKILL.md` に改めた。導入先は補助スクリプトも同じ `apm_modules/` から呼んでおり、新しい前提は増えない。(3) スキルの自動選択はランタイムによって異なるので、導入先の `AGENTS.md` から正本のパスを指す 1 行を、`docs/integration.md` で推奨した。
 - omnibus-kb（8b64001）で、スキルが使うコマンド（`kb sync --check`、`kb reference show --for`、`kb concern list --for` のエンティティと `ref:`、`kb view list` / `resolve`、`kb claim list`）がすべて期待どおりに動くことを確かめた。
 
 ## 未決事項
 
-- **導入先の AGENTS.md から `ask-kb` を指すか。** スキルは description で呼ばれるが、導入先が「KB への質問にはこのスキルを使う」と明記するほうが確実である。ハーネスの `docs/integration.md` で推奨するかを、omnibus-kb で使ってみてから決める。
-- **rag-tester がスキルを読むパス。** エージェントは Skill ツールを持たないので、展開先のパス（Claude Code なら `.claude/skills/ask-kb/SKILL.md`）を直接読ませている。`--target` を複数持つ導入先が現れたら、パスの書き方を見直す。
+- ~~導入先の AGENTS.md から `ask-kb` を指すか~~ → `docs/integration.md` で推奨することで決着した（上の追記）。
+- ~~rag-tester がスキルを読むパス~~ → `apm_modules/` の正本を読むことで決着した（上の追記）。
+- **サブエージェントを持たないランタイムでの rag-tester。** Codex では、エージェント定義の `tools` が写らない（`docs/integration.md` の節 3）。Cursor などサブエージェントの定義を受けないランタイムでは、rag-tester は使えない。`ask-kb` 自体は影響を受けない。rag-tester の評価を別のランタイムでも回す需要が出たら、評価の手順をスキルに切り出すかを決める。
 - **kb-retrieval-core の使い方をスキルに書くか。** 今は「入っていれば候補に加える」とだけ書いた。導入先に kb-retrieval-core が入り、呼び出し方が安定したら、コマンド例を足すかを決める。
 
 ## 参照
