@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+スキル（ask-kb を追加）とエージェント（rag-tester）を改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
+
+### Added
+
+- スキル `ask-kb`。KB への問い合わせに、KB の記述だけを根拠として答える手順。title・aliases → description・tags・一覧 → 本文 → `graph.json` の relations → ビューの順に探し、`kb reference show --for` で出典を、`kb concern list --for` で懸念を引いて、relations の確度 C / D や `disputed` の Claim を断定せずに答える。KB に無いことは「KB には記載がない」と答え、欠落を `gap` の語彙で示す。KB のファイルは書き換えない（判断の経緯は docs/notes/kaitou-tejun-memo.md）
+
+### Changed
+
+- rag-tester が `ask-kb` の手順で答えるようにした。判定・`history` の追記・新規クエリの作成は従来どおり rag-tester が持つ。これまでの `export_graph.py --force` の実行は、読むだけの手順（`graph.json` を読み、古ければ frontmatter の relations を正とする）に置き換えた
+
 ## 0.11.1 — 2026-09-29
 
 ### Fixed
