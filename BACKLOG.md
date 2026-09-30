@@ -15,7 +15,7 @@
 - [ ] 導入先の `references.yml` が数千件に達したときの分割方針を決める。現状は単一ファイル前提（`kb reference create` の追記、`validation.reference.unreferenced`）で、`kb reference show / search` により文脈消費の問題は解消済みなので急がない。（出所: 2026-09-27 ディスカッション）
 
 - [x] KB への問い合わせに答える手順をスキル `ask-kb` にし、rag-tester の答え方をこのスキルに委ねる。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/kaitou-tejun-memo.md#実装の記録)。コミット: f10a114）
-- [ ] `Unreleased` をタグ付きリリースにし、omnibus-kb の `apm.yml` の固定コミットを上げて `apm install` で `ask-kb` と rag-tester を再生成する。（出所: `ask-kb` の実装）
+- [ ] `Unreleased` をタグ付きリリース v0.12.0 にし、omnibus-kb の `apm.yml` の固定コミットを上げて `apm install` でスキル・エージェント・常時の指示を再生成する。（出所: `ask-kb`・ランタイム非依存・エージェントのスキル化）
 - [x] 配布資産と対外契約から特定ランタイムへの依存（ランタイム名・ツール名・配置先パス・frontmatter の `tools` / `model`）を除き、AGENTS.md の指針・テスト・audit-harness の観点で守る。hooks はアダプタとして隔離する。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/runtime-hiizon-memo.md#実装の記録)。コミット: 79d19ea）
 - [x] evidence-reviewer と rag-tester の手順をスキル（`review-evidence` / `test-rag`）に移し、エージェントは薄い入口にする。導入先への常時の指示を `.apm/instructions/` で配る。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/runtime-hiizon-memo.md#実装の記録エージェントのスキル化と-instructions)。コミット: 0173869）
 - [ ] relations（`created-by` / `part-of` など）から、正解の根拠が決まる構造の問いを機械的に作るコマンドを足し、導入先が `evals/rag-eval.yml` の固定セットを作る足がかりにする。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md)）
@@ -40,7 +40,7 @@ High 7 件は #30（コミット 996f433）で、R1〜R7 は claude/sharp-pasteu
 - [x] `Unreleased` をタグ付きリリース v0.11.0 にし、omnibus-kb の `apm.yml` の固定コミットを上げて `apm install` でスキルとエージェントを再生成する。（出所: 懸念台帳の実装（#41）。ハーネス側 3fe592e、omnibus-kb 側 4e7cbe3。タグ v0.11.0 は 3fe592e に手動で打つ）
 - [x] omnibus-kb の `docs/CONCERNS.md` を懸念台帳へ移す。移行時点で 23 件あり、出典・内容の懸念 17 件を YAML に、型・述語・規約・本文の見直し 4 件を BACKLOG へ、解決済みのモデリング 2 件を BACKLOG の該当項目へ経緯として移した。（出所: 懸念台帳の実装時。omnibus-kb 798f989）
 - [x] `Unreleased` をタグ付きリリース v0.11.1 にし、tommy-farm の `apm.yml` のタグを上げて `apm install` で再生成し、`kb validate --check-urls` で e-種や の誤判定が消えたことを確かめる。（出所: HEAD の 5xx の修正。ハーネス側 04f2104（#43）、タグ v0.11.1 は Tag release ワークフローで打った。tommy-farm 側は lostandfound/tommy-farm#2（bf016ea））
-- [ ] R1 で `kb validate` が web 以外の文献にも「`url` か書誌（`author` / `publisher`）」を要求するようになった（従来は `kb reference health` のみ）。導入先（omnibus-kb）で固定コミットを上げる前に `kb validate` を回し、新規 ERROR を確認する。（出所: R1 実装時）
+- [x] R1 で `kb validate` が web 以外の文献にも「`url` か書誌（`author` / `publisher`）」を要求するようになった（従来は `kb reference health` のみ）。導入先（omnibus-kb）で固定コミットを上げる前に `kb validate` を回し、新規 ERROR を確認する。（出所: R1 実装時） → v0.12.0 の作業ツリーで omnibus-kb（8b64001）に `kb validate` を回し、ERROR 0 件を確認した。
 - [ ] **R8 Low（急がない）**。出典表記 regex 3 本（`validation.CITATION_RE` / `references._CITATION_RE` / `scripts/check_source_attrition.py`）と kebab regex 3 本、`TIMESTAMP_RE` 2 本の統合。`validate()` が `vocabulary.yml` を 4 回読む。`validation.py:32-42,699-769` の旧 CLI（`default_content_root` / `fix_timestamps` / `main`）の置き場。`okf.py:383` 脚注参照 regex が 1 行 1 件しか拾わない。`sync.py:126` の `newline=""` 未指定（Windows で CRLF が `\r\r\n`、未検証）。`scripts/explore_diff.py:159` の `kb-domain.yml` 決め打ち、`cinii_search.py:23` の `.env` 探索位置、`generate_index.py` が `by_tag` を渡さない、`browse.py` の macOS 固定と `playwright` 未宣言。`install-hooks.sh:9` の `.git/hooks` 直書き（worktree で失敗）。`pyproject.toml` package-data の階層列挙（`static/**/*` に）。`kb --version` が無い。`cli.py` の `_main` を handler テーブル + `_fail` ヘルパに整理。（出所: 全体レビュー）
 
 ## 完了

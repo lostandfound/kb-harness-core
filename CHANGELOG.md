@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.12.0 — 2026-09-30
+
 スキル（ask-kb・review-evidence・test-rag を追加、既存スキルのランタイム非依存化）、エージェント（rag-tester・evidence-reviewer を入口化）、常時の指示（追加）を改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
 
 ### Added
