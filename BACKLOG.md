@@ -14,7 +14,8 @@
 - [ ] evidence-reviewer が「`lineage` の付与を提案」した後、それを `references.yml` に反映する担い手と手順を決める。既存エントリへの `lineage` 追記は `kb reference create` の範囲外で、今は手編集しかない。（出所: 2026-09-27 ディスカッション）
 - [ ] 導入先の `references.yml` が数千件に達したときの分割方針を決める。現状は単一ファイル前提（`kb reference create` の追記、`validation.reference.unreferenced`）で、`kb reference show / search` により文脈消費の問題は解消済みなので急がない。（出所: 2026-09-27 ディスカッション）
 
-- [ ] KB への問い合わせに答える手順をスキル `ask-kb` にし、rag-tester の答え方をこのスキルに委ねる。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/kaitou-tejun-memo.md)）
+- [x] KB への問い合わせに答える手順をスキル `ask-kb` にし、rag-tester の答え方をこのスキルに委ねる。（出所: 2026-09-30 ディスカッション。[考察メモ](docs/notes/kaitou-tejun-memo.md#実装の記録)。コミット: f10a114）
+- [ ] `Unreleased` をタグ付きリリースにし、omnibus-kb の `apm.yml` の固定コミットを上げて `apm install` で `ask-kb` と rag-tester を再生成する。（出所: `ask-kb` の実装）
 - [ ] relations（`created-by` / `part-of` など）から、正解の根拠が決まる構造の問いを機械的に作るコマンドを足し、導入先が `evals/rag-eval.yml` の固定セットを作る足がかりにする。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md)）
 - [ ] 検索用キーの台帳（検査と交換形式への出力）と、生成を担うスキル（仮称 `tune-index`）からなる RAG の自己改善のハーネス側を設計・実装する。検索・評価・紛らわしい相手の診断は kb-retrieval-core の責務（同 Issue #19）で、ハーネスには置かない。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)）
 - [x] `references.yml` の `year` の型を制約するか決める。ハーネスは引用符つきの年を通すが、kb-retrieval-core は整数以外を拒否する（同 Issue #18。omnibus-kb の 494 件中 46 件が該当）。（出所: [RAG の自己改善のメモ](docs/notes/rag-jiko-kaizen-memo.md#再考同日-kb-retrieval-core-との分担)） → ハーネスは制約しない。kb-retrieval-core が数字だけの文字列を整数として受けるよう直した（kb-retrieval-core 523a2d2）。
@@ -59,4 +60,5 @@ High 7 件は #30（コミット 996f433）で、R1〜R7 は claude/sharp-pasteu
 - [関係をあとから見出す](docs/notes/kankei-hakken-memo.md#未決事項) — ハブ Concept を立てる閾値。出典由来 / 解釈由来の明示を規約に載せるか
 - [出典 URL の到達確認](docs/notes/url-kakunin-memo.md#未決事項) — 一時的な失敗を ERROR にするか。実行環境に依存する 403 をどこまで吸収するか
 - [懸念台帳の構造化](docs/notes/kenen-daichou-memo.md#未決事項) — Claim の `disputed` との関係。GitHub Issues との関係
+- [問い合わせへの答え方](docs/notes/kaitou-tejun-memo.md#未決事項) — 導入先の AGENTS.md から指すか。rag-tester が読むスキルのパス。kb-retrieval-core の使い方を書くか
 - [RAG の自己改善](docs/notes/rag-jiko-kaizen-memo.md#未決事項) — キーの台帳のスキーマと kb-retrieval-core への交換形式。`description` を重みづけに含めるか。周回の停止条件と費用。固定セットの作り手（再考の節の追加分を含む）
