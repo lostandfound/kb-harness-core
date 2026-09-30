@@ -28,7 +28,7 @@ description: KB への問い合わせに、KB の記述だけを根拠として�
 1. **名前で引く。** `<content_root>` 配下の frontmatter の `title` と `aliases` を文字列検索（grep・rg など、使えるもの）で引く。表記ゆれ（全角・半角、カタカナ・英字、略語）を変えて試す。
 2. **説明と分類で引く。** `description`、`tags`、`<content_root>/index.md` の分野別一覧、各ディレクトリの `index.md` を見る。
 3. **本文で引く。** 本文を語句で文字列検索する。本文での言及は、その語を題にしたエンティティが無いことを示す手がかりにもなる。
-4. **関係を辿る。** 作り手・所属・由来・系譜・関連を問う場合、答えは本文ではなく relations の先にあることが多い。ルートの `graph.json` の `edges`（`source` / `predicate` / `target`）で、見つけたエンティティから 1〜2 段たどる。逆向き（「X が作ったもの」「X に属するもの」）は `target` 側から引く。述語の意味は `<content_root>/vocabulary.yml` で確かめる。
+4. **関係を辿る。** 作り手・所属・由来・系譜・関連を問う場合、答えは本文ではなく relations の先にあることが多い。ルートの `graph.json` の `edges`（`source` / `predicate` / `target`。確度 C の関係には `confidence` も付く）で、見つけたエンティティから 1〜2 段たどる。逆向き（「X が作ったもの」「X に属するもの」）は `target` 側から引く。述語の意味は `<content_root>/vocabulary.yml` で確かめる。
 5. **束ねを見る。** 列挙の問い（「〜を全部挙げよ」）は、`views.root` があれば `kb view list` で関係するビューを探し、`kb view resolve <id>` でメンバーを引く。ビューは書き手が見出した束ねなので、ビューの `description` と `basis` を答えに添える。
 6. **検索器があれば使う。** 導入先が kb-retrieval-core などの検索器を入れていれば、その結果を候補として加える。候補は必ず本文を読んで確かめる。
 
@@ -38,7 +38,7 @@ description: KB への問い合わせに、KB の記述だけを根拠として�
 
 候補のエンティティごとに次を読む。
 
-- 本文と frontmatter（`relations`、型固有の時間のフィールド、`same_as`）。relations の確度 `confidence` は frontmatter にだけあり、`graph.json` の `edges` には無い。答えに使う関係は、始点のファイルの frontmatter で確度を確かめる。
+- 本文と frontmatter（`relations`、型固有の時間のフィールド、`same_as`）。答えに使う関係は確度を確かめる。relations の確度は `confidence: C` だけで、始点のファイルの frontmatter と `graph.json` の `edges` の両方に載る。`graph.json` が古い場合は frontmatter を正とする。
 - 出典: `kb reference show --for <エンティティのパス>` で、`sources` と本文の「（出典: id）」が引く書誌を得る。`references.yml` を丸ごと読まない。
 - 懸念: `concerns.root` があれば `kb concern list --for <エンティティのパス>` で、対象の懸念を読む。答えに使う出典にも `kb concern list --for "ref: <id>"` を当てる。
 - Claim: 答えに関わる Claim があれば `kb claim list` で `status` を確かめる。
@@ -53,7 +53,7 @@ description: KB への問い合わせに、KB の記述だけを根拠として�
 2. **根拠。** 使った出典を、`ref: <id>` と書誌（著者・題・年、あれば URL）で挙げる。Web 出典の URL 文字列はそのまま示す。
 3. **確度と注意。** 次があれば必ず書く。
    - 答えに使った懸念（ID・`kind`・`status`・要旨）。`status` が未解決のものは、どちらの記述も断定しない。
-   - 確度 C / D の関係（「〜の関係は確度 C（公式資料のみ）」のように）。
+   - 確度 C の関係（「〜の関係は確度 C（公式資料のみ）」のように）。
    - `disputed` / `proposed` の Claim。
    - 整理前の型（`Note` など）だけに基づく記述。
 4. **KB に無いこと。** 問いのうち KB で答えられなかった部分を、「KB には記載がない」と明記する。どこまで探したか（引いた名前・たどった関係）を 1 行で添える。

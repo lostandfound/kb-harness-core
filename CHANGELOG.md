@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.12.1 — 2026-09-30
+
+スキル（ask-kb）の記述を直したため、導入先は固定コミットを上げたあと `apm install` で配置先を再生成する。
+
+### Fixed
+
+- `ask-kb` が「relations の確度は `graph.json` の `edges` に載らない」としていた誤りを直した。確度 C の関係の edge には `confidence` が載る。`graph.json` が古い場合は frontmatter を正とする。relations に無い確度 D への言及も外した
+
 ## 0.12.0 — 2026-09-30
 
 スキル（ask-kb・review-evidence・test-rag を追加、既存スキルのランタイム非依存化）、エージェント（rag-tester・evidence-reviewer を入口化）、常時の指示（追加）を改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
