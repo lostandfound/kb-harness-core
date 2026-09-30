@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-スキル（ask-kb を追加）とエージェント（rag-tester）を改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
+スキル（ask-kb を追加、既存スキルのランタイム非依存化）とエージェント（rag-tester・evidence-reviewer）を改めたため、導入先は固定コミットを上げたあと `apm install` で `.claude/` を再生成する。
 
 ### Added
 
@@ -11,6 +11,9 @@
 
 ### Changed
 
+- スキル・エージェント・文書を、特定のエージェントランタイムに依存しない書き方にした。本文からランタイム固有のツール名（Web 取得・Web 検索）と配置先ディレクトリを除き、能力で書いた。README・導入ガイドの `apm install` の例は `--target <ランタイム>` にした（判断の経緯は docs/notes/runtime-hiizon-memo.md）
+- エージェント定義（evidence-reviewer・rag-tester）の frontmatter から `tools` と `model` を外した。ツールの制限は本文に書いた（evidence-reviewer は KB のファイルを書き換えない。rag-tester が書き換えてよいのは `evals/rag-eval.yml` だけ）。ランタイムによっては、エージェントが既定のツールとモデルで動くようになる
+- 導入ガイドのフックの節を、特定ランタイムの設定例から、フックを持つランタイムで `kb validate` / `kb sync --check` を登録するという一般的な説明に改めた。`scripts/verify_turn.sh` は特定ランタイム向けの任意のアダプタとして残し、文書ではそう明示した
 - rag-tester が `ask-kb` の手順で答えるようにした。スキルは `--target` に依存しない正本のパス（`apm_modules/lostandfound/kb-harness-core/.apm/skills/ask-kb/SKILL.md`）で読む。判定・`history` の追記・新規クエリの作成は従来どおり rag-tester が持つ。これまでの `export_graph.py --force` の実行は、読むだけの手順（`graph.json` を読み、古ければ frontmatter の relations を正とする）に置き換えた
 
 ## 0.11.1 — 2026-09-29

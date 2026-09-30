@@ -191,6 +191,7 @@ python3 scripts/check_source_attrition.py [PATH ...] [--base REV] [--strict]
 
 ### verify_turn.sh
 
+<!-- runtime-adapter -->
 Claude Code の Stop hook から呼び、ターンの終了を `kb validate` と `kb sync --check` で閉じる。pre-commit が閉じるのはコミットするときだけで、コミットせずに終わるターンでは検証が一度も走らない。
 
 標準入力でフックのペイロードを受け取り、検証に失敗すると終了コード 2 を返す。終了コード 2 のとき標準エラーがそのまま Claude に返るため、指示しなくてもその場で修正してからターンを終える。終了コード 1 ではブロックにならない。
@@ -215,3 +216,4 @@ Claude Code の Stop hook から呼び、ターンの終了を `kb validate` と
   }
 }
 ```
+<!-- /runtime-adapter -->

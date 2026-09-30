@@ -12,12 +12,12 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 - `kb-domain.yml`（ドメイン定義。実態との乖離も監査対象）
 - AGENTS.md（導入先が行数などの上限を定めている場合はその制約も確認する）
 - CONTRIBUTING.md、README.md
-- CLAUDE.md（プロジェクト用。AGENTS.md と同じく導線の過不足を見る）
+- ランタイム固有のエージェント向け指示ファイル（あれば。AGENTS.md と同じく導線の過不足を見る）
 - `docs/` 配下の現行文書すべて。任意の運用ファイル `docs/BACKLOG.md`（KB を作る作業の予定と記録）は、存在する場合のみ監査する。懸念台帳（`kb-domain.yml` の `concerns.root`）は `kb validate` が検査するので、ここでは文書との整合だけを見る。アーカイブ扱いのディレクトリは、導入先の README でアーカイブと明示されているかだけ見る
-- `apm_modules/lostandfound/kb-harness-core/.apm/` 配下の全 SKILL.md・エージェント定義（**KB ハーネス資産の正本**。`.codex/`・`.claude/` 配下の同名資産は `apm install` による生成物 — 正本と配布先の同一性も確認し、ドリフトがあれば正本を直して対象ランタイムへ再デプロイする）
+- `apm_modules/lostandfound/kb-harness-core/.apm/` 配下の全 SKILL.md・エージェント定義（**KB ハーネス資産の正本**。ランタイムの配置先ディレクトリ（導入先 `apm.yml` の `targets` による）にある同名資産は `apm install` による生成物 — 正本と配布先の同一性も確認し、ドリフトがあれば正本を直して対象ランタイムへ再デプロイする）
 - ルート `.apm/`（ドメイン固有エージェントの正本。パッケージ側と同様に配布先との同一性を確認する）
-- `.codex/`・`.claude/`・`.agents/skills/` 配下のうちパッケージ外の資産（プロジェクト固有スキル等）
-- apm.yml の `targets` と実在する配布先ディレクトリの対応（README/CONTRIBUTING が配布先として挙げるランタイムがすべて `targets` に含まれているか。抜けていると `apm install` がそのランタイムを更新せずドリフトが沈む。前例: codex 欠落、2026-09-03）
+- ランタイムの配置先ディレクトリのうちパッケージ外の資産（プロジェクト固有スキル等）
+- apm.yml の `targets` と実在する配布先ディレクトリの対応（README/CONTRIBUTING が配布先として挙げるランタイムがすべて `targets` に含まれているか。抜けていると `apm install` がそのランタイムを更新せずドリフトが沈む。前例: 配布先ランタイムの 1 つが欠落、2026-09-03）
 - apm.yml・`apm_modules/lostandfound/kb-harness-core/apm.yml`（依存宣言・パッケージ内容の一致）
 - scripts/*.py の CLI 実引数（--help 相当）と docstring（正本はモジュール側 `apm_modules/lostandfound/kb-harness-core/scripts`。導入先ルートには symlink を張らず、このパスで直接呼ぶ）
 - `kb --help` と各サブコマンドの `--help` 実出力 ↔ `docs/` 配下・`apm_modules/lostandfound/kb-harness-core/README.md`・各 SKILL.md が語るコマンド名とフラグ
@@ -25,7 +25,7 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 - evals/ 配下、.env.example、.github/workflows/
 - `.git/hooks/pre-commit` ↔ `apm_modules/lostandfound/kb-harness-core/scripts/hooks/pre-commit`（install-hooks.sh はコピー方式のため、正本更新後に再インストールしないと古い hook が走り続ける。diff で同一性を確認し、違えば `bash apm_modules/lostandfound/kb-harness-core/scripts/install-hooks.sh`）
 
-## 監査の 7 観点
+## 監査の 8 観点
 
 1. **文書↔実装の乖離** — 文書が語るコマンド・フラグ・パス・フィールド名が実在するか。スクリプトの実引数と文書の記述を突き合わせる
 2. **文書間の矛盾** — 同じ規約が複数文書で違う値・表現になっていないか（述語・型固有フィールドの値域・sources 形式・レビュー工程）
@@ -34,6 +34,7 @@ description: ハーネス文書群（AGENTS.md・CONTRIBUTING・スキル・エ�
 5. **AGENTS.md の過不足** — 導入先が定める上限を守りつつ、現行ハーネスへの導線が過不足ないか
 6. **設計文書の時制** — 「将来導入」「設計案」「導入後の候補」と書かれた事項が実装済みになっていないか。実装状況は vocabulary.yml・claims/ 等の実態と `git log` で確認し、完了したものは完了形に直し完了日を残す。前例: Claim と Organization（2026-09-03）
 7. **検証コマンドの一致** — CI ワークフロー・pre-commit hook・AGENTS.md・CONTRIBUTING・本スキルの「検証」節が同じテストランナーと同じコマンド一式を指しているか。前例: CI が pytest 化した後も他が unittest のまま（2026-09-03）
+8. **ランタイム非依存** — スキル・エージェント・文書が、特定のランタイムを前提にしていないか。語（ランタイム名・ツール名・配置先パス）はパッケージ側のテストが検出するので、ここでは手順の前提を見る。サブエージェント・hooks・並列実行・特定のモデルなど、ランタイムによっては無い機能が無いと手順が成り立たないものを報告する。そうした機能は任意とし、無いときの手順を書く（前例: `ask-kb` 追加時に rag-tester が特定ランタイムの配置先を読む形で書かれた、2026-09-30）
 
 ## 修正方針
 

@@ -7,7 +7,7 @@ description: CiNii API で論文を検索し references.yml へ登録する確�
 
 1. `python3 apm_modules/lostandfound/kb-harness-core/scripts/cinii_search.py "<検索語>" --count 5 --format json > <作業用ディレクトリ>/search-result.json` を実行する（作業用ディレクトリはリポジトリ外のスクラッチ領域。`search-result.json`・`reference.yml` はリポジトリに含めない）。アプリケーション ID は `.env`（gitignore 済み、`CINII_APP_ID=...`）から自動で読まれる。未設定エラーが出たらユーザーに `.env` への設定を依頼する（ID の値をチャットやリポジトリに書かせない）。人向けの登録案が必要なら `--format yaml`（既定）を使う。
 
-2. 出力される references.yml 登録案から、対象エンティティの主張を実際に裏付けられそうな文献を選ぶ。タイトルだけで判断できない場合は URL を WebFetch して要旨を確認する。
+2. 出力される references.yml 登録案から、対象エンティティの主張を実際に裏付けられそうな文献を選ぶ。タイトルだけで判断できない場合は URL を取得して要旨を確認する。
 
 3. 登録前に `kb reference search --url <URL>`（DOI があれば `--doi <DOI>`、書籍はタイトルや著者名の語句）で既存エントリを確認する。同じ資料が既にあればその ID を使い、新規登録はしない。
 

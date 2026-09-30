@@ -12,7 +12,7 @@
 
 - **`kb` CLI**: スキーマ検証、関連グラフの構築、インデックス同期、原子的書き込みなどを行うコマンドラインツール
 - **検証スクリプト**: リンク切れ、語彙の整合性、書誌情報の検査などを行うツール群
-- **エージェント定義・スキル**: AI エージェント（Claude Code 等）が KB の調査・執筆・レビューを自律的に進めるためのワークフロー
+- **エージェント定義・スキル**: AI エージェントが KB の調査・執筆・レビューを自律的に進めるためのワークフロー
 
 本パッケージ自体には特定の専門分野（ドメイン）の知識は含まれていない。エンティティの型、関係（述語）、タグの語彙、ディレクトリ構成などは、導入先リポジトリ側の `kb-domain.yml` や `vocabulary.yml` で定義する。ハーネスはその定義を読み込んで動作するため、あらゆる領域の知識ベースに適用できる。
 
@@ -40,7 +40,7 @@ dependencies:
 パッケージをインストールし、KB の状態を診断・検証する。
 
 ```bash
-apm install --target claude                                       # スキルとエージェント定義を .claude/ へ展開
+apm install --target <ランタイム>                                 # スキルとエージェント定義を配置先ランタイムへ展開
 python3 -m pip install apm_modules/lostandfound/kb-harness-core   # kb CLI と Python API をインストール（Claim を使うなら "apm_modules/lostandfound/kb-harness-core[claims]"）
 kb doctor                                                         # 設定・依存パッケージ・生成物の整合性を診断
 kb validate                                                       # KB 全体のスキーマとリレーションを検証
@@ -111,7 +111,7 @@ kb sync --check                                                   # index.md や
 
 ### スキル
 
-AI エージェント（Claude Code 等）から呼び出して利用する定義済みワークフロー。
+AI エージェントから呼び出して利用する定義済みワークフロー。
 
 | スキル | 用途 |
 |---|---|
