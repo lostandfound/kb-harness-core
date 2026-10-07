@@ -105,7 +105,11 @@ def load_entity_spec(path: Path) -> dict[str, Any]:
     except FileNotFoundError as error:
         raise EntitySpecError(f"spec not found: {path}", code="entity.spec.not_found", argument=True) from error
     except (OSError, yaml.YAMLError) as error:
-        raise EntitySpecError(f"cannot read spec {path}: {error}", argument=True) from error
+        hint = (
+            "。値に ': '（コロン＋空白）や ' #'、先頭の記号（- ? [ { & * ! | > ' \" % @ `）を含む文字列は"
+            "二重引用符で囲む（本文は '|' のブロックで書く）"
+        )
+        raise EntitySpecError(f"cannot read spec {path}: {error}{hint}", argument=True) from error
     if not isinstance(data, dict):
         raise EntitySpecError("entity spec must be a YAML mapping", argument=True)
     # sources は型定義の sources_required で省略可否が決まるため、
@@ -124,7 +128,11 @@ def load_entity_spec(path: Path) -> dict[str, Any]:
         raise EntitySpecError("slug must be lowercase ASCII kebab-case")
     title = _nonempty_string(data["title"], "title")
     if "（" in title or "(" in title:
-        raise EntitySpecError("title must not contain parentheses")
+        raise EntitySpecError(
+            f"title must not contain parentheses: '{title}'。"
+            "括弧の中身（曖昧さ回避・読み仮名・原綴り・別名）は title から外し、"
+            "別名なら aliases、説明なら description か本文に書く"
+        )
     _nonempty_string(data["description"], "description")
     _string_list(data["tags"], "tags", required=True)
     if "sources" in data:

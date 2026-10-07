@@ -7,5 +7,6 @@ applyTo: "**"
 
 - KB の内容を問われたら、`ask-kb` スキルの手順で、KB の記述だけを根拠に、出典と確度を示して答える。
 - エンティティの追加は `add-entity`、出典の審査は `review-evidence`、RAG 評価は `test-rag`、KB の拡張は `expand-kb` スキルに従う。スキルを呼ぶ機能が無いランタイムでは、`apm_modules/lostandfound/kb-harness-core/.apm/skills/<名前>/SKILL.md` を読んで従う。
+- エンティティの `title` に括弧（`(` `)` `（` `）`）を入れない。別名は `aliases`、区別の説明は `description` か本文に書く。spec や YAML の文字列値は二重引用符で囲み、コロンや先頭の記号による構文エラーを避ける。
 - 生成物（`index.md` の生成区間・`graph.json`・ビューと懸念の一覧）は手で編集せず、`kb sync` で生成する。
 - コミットの前に `kb validate` と `kb sync --check` を通す。

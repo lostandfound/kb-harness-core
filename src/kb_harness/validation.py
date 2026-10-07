@@ -378,7 +378,7 @@ def validate(root: Path, warnings: list[str] | None = None, repo_root: Path | No
 
         title = fm.get("title")
         if isinstance(title, str) and TITLE_PAREN_RE.search(title):
-            errors.append(f"ERROR {rel}: title に括弧を含めてはならない '{title}'")
+            errors.append(f"ERROR {rel}: title に括弧を含めてはならない '{title}'（括弧の中身は aliases・description・本文へ移す）")
 
         description = fm.get("description")
         if isinstance(description, str):
