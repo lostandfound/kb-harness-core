@@ -47,3 +47,28 @@ class EntityActionTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_spec_errors_carry_fix_hints(tmp_path):
+    from kb_harness.entity import EntitySpecError, load_entity_spec
+
+    broken = tmp_path / "broken.yml"
+    broken.write_text("type: Concept\ntitle: Re: ゼロ\n", encoding="utf-8")
+    try:
+        load_entity_spec(broken)
+    except EntitySpecError as error:
+        assert "二重引用符" in str(error)
+    else:
+        raise AssertionError("expected EntitySpecError")
+
+    paren = tmp_path / "paren.yml"
+    paren.write_text(
+        'type: Concept\nslug: a\ntitle: "芋（馬鈴薯）"\ndescription: d\ntags: [t]\nsections: {s: b}\n',
+        encoding="utf-8",
+    )
+    try:
+        load_entity_spec(paren)
+    except EntitySpecError as error:
+        assert "aliases" in str(error) and "芋（馬鈴薯）" in str(error)
+    else:
+        raise AssertionError("expected EntitySpecError")
