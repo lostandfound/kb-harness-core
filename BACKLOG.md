@@ -10,7 +10,7 @@
 
 ## 未着手
 
-- [x] 導入先のローカルスキルとハーネスのスキルの共存の指針を `docs/integration.md` に書く。（出所: lostandfound/kb-harness-core#50。[考察メモ](docs/notes/rokaru-skill-kyozon-memo.md#実装の記録)）
+- [x] 導入先のローカルスキルとハーネスのスキルの共存の指針を `docs/integration.md` に書く。（出所: lostandfound/kb-harness-core#50。[考察メモ](docs/notes/rokaru-skill-kyozon-memo.md#実装の記録)。コミット: 8051ee5）
 - [x] エンティティ追加時に title の括弧や YAML のコロンで spec を作り直す手戻りを減らす。`add-entity` に書式規則の手順を足し、常時の指示にも載せ、括弧禁止と YAML 構文エラーの診断に直し方を添える。（出所: 2026-10-07 omnibus-kb 運用での繰り返し。考察メモは省略: 検査規則は変えず、案内だけの変更）
 - [ ] `scripts/refs_health.py`（`lineage` 未判定・`pending` 滞留・到達確認の記録）を `kb reference` に統合するか決める。`kb reference health` は構造検査だけで、`lineage` の運用を促す入口が `docs/scripts.md` の 1 行しかない。この周知不足が `lineage` を 2 週間以上孤児にした。（出所: 2026-09-27 ディスカッション）
 - [ ] evidence-reviewer が「`lineage` の付与を提案」した後、それを `references.yml` に反映する担い手と手順を決める。既存エントリへの `lineage` 追記は `kb reference create` の範囲外で、今は手編集しかない。（出所: 2026-09-27 ディスカッション）
