@@ -36,3 +36,5 @@ apm-cli 0.33.0 を一時ディレクトリで実測した。
 ## 実装の記録
 
 `docs/integration.md` の「3.」に小節「ローカルのスキルと共存させる」を足した。
+
+常時の指示（`.apm/instructions/kb-harness.instructions.md`）に 1 項目を足した。文書だけでは、導入先のエージェントが `integration.md` を開かない限り届かないためである（`apm_modules/` は導入先で git 管理外）。配置先のパスは書かず、`.apm/skills/` と文書への導線だけを置いた。
