@@ -10,3 +10,4 @@ applyTo: "**"
 - エンティティの `title` に括弧（`(` `)` `（` `）`）を入れない。別名は `aliases`、区別の説明は `description` か本文に書く。spec や YAML の文字列値は二重引用符で囲み、コロンや先頭の記号による構文エラーを避ける。
 - 生成物（`index.md` の生成区間・`graph.json`・ビューと懸念の一覧）は手で編集せず、`kb sync` で生成する。
 - コミットの前に `kb validate` と `kb sync --check` を通す。
+- この KB 固有のスキルは、このリポジトリの `.apm/skills/<名前>/SKILL.md` に置く。`apm install` が配置した先は生成物なので直接編集しない。名前には KB 固有の接頭辞を付け、ハーネスのスキル名と衝突させない。`apm install --force` は使わない。詳細は `apm_modules/lostandfound/kb-harness-core/docs/integration.md` の「ローカルのスキルと共存させる」を読む。

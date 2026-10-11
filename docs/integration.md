@@ -67,6 +67,23 @@ compilation:
 - KB の内容を問われたら、`apm_modules/lostandfound/kb-harness-core/.apm/skills/ask-kb/SKILL.md` の手順で、KB の記述だけを根拠に答える。
 ```
 
+### ローカルのスキルと共存させる
+
+導入先が自前のスキルを持つ場合も、`apm install` はそれを黙って上書きしない（apm 0.33 で確認）。衝突時の挙動は置き場所で決まる。
+
+| ローカルのスキルの置き場所 | 同名のとき |
+|---|---|
+| 配置先に手で置いた（apm の管理外） | ローカルが残り、ハーネス側は展開されない。診断に `local files exist, not managed by APM` が出る。`--force` を付けたときだけ上書きされる |
+| 導入先の `.apm/skills/` | ローカルが勝ち、ハーネス側を置き換える。診断に `replaced by a different package` が出る |
+
+運用は次のとおりにする。
+
+- ローカル専用のスキルは導入先の `.apm/skills/<名前>/SKILL.md` に置く。配置先は `apm install` の生成物であり、直接編集しない。
+- ローカルのスキル名には KB 固有の接頭辞を付け、ハーネスのスキル名（`add-entity` / `ask-kb` など）と衝突させない。
+- ハーネスのスキルを差し替えたいときは、同名のスキルを `.apm/skills/` に置けばローカルが勝つ。ただし、ハーネスの版を上げても追従しない。別名の補助スキルでハーネスのスキルを呼ぶ形を勧める。
+- `apm install --force` は使わない。実行前にコミットし、`apm install --dry-run` と `--verbose` で衝突の一覧を確認し、実行後に差分を見る。
+- `apm.lock.yaml` の `deployed_files` に載らないファイルは apm の管理外で、`apm audit` が管理外のファイルとして報告する。
+
 ## 4. `kb` CLI をインストールする
 
 ```bash
